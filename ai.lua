@@ -57,6 +57,8 @@ function ai.play(game, pot)
         return
     end
     game.handle_card_effects(2, choice, pot)
+    print("\n=== AI-TURN COMPLETE ===")
+    print("AI heeft nu " .. #game.players[2].hand .. " kaarten op hand:")
 end
 
 -- Simple timer based update used to delay the AI's move
