@@ -16,7 +16,8 @@ local ongeldigeZetTimer = 0
 toonPotOverlay = false
 
 function love.load()
-    love.graphics.setBackgroundColor(0.9, 0.9, 0.9)
+    love.graphics.setBackgroundColor(0.1, 0.4, 0.2)
+
 end
 
 function startGame(mode)
@@ -79,12 +80,11 @@ function love.draw()
     love.graphics.print("Ronde: " .. ronde, 20, 20)
     love.graphics.print("Kaarten in pot: " .. #pot, 20, 40)
     
-    pickupButton = drawPickupButton()
-
     --debug ish
     love.graphics.print("Speler aan zet: " .. game.currentPlayer, 20, 60)
     love.graphics.print("AI-timer: " .. string.format("%.2f", game.aiTimer), 20, 80)
 
+    buttons = drawActionButtons()
 
 end
 
@@ -107,16 +107,11 @@ function love.mousepressed(x, y, button)
         player.startDrag(x, y)
     end
 
-    -- Toon pot overlay toggle
-    if button == 1 and x > love.graphics.getWidth() - 150 and y > love.graphics.getHeight() - 50 then
-        toonPotOverlay = not toonPotOverlay
-    end
-
-    -- Pickup button check
-    if button == 1 and pickupButton then
-        if x >= pickupButton.x and x <= pickupButton.x + pickupButton.w and
-           y >= pickupButton.y and y <= pickupButton.y + pickupButton.h then
-
+    -- Knoppen onderaan controleren (Pak kaart & Pot bekijken)
+    if button == 1 and buttons then
+        -- Pak kaart knop
+        local b = buttons.pickup
+        if x >= b.x and x <= b.x + b.w and y >= b.y and y <= b.y + b.h then
             if game.currentPlayer == 1 then
                 for i = #pot, 1, -1 do
                     table.insert(player.hand, table.remove(pot, i))
@@ -126,6 +121,14 @@ function love.mousepressed(x, y, button)
             else
                 print("Niet jouw beurt.")
             end
+            return
+        end
+
+        -- Pot bekijken knop
+        local b2 = buttons.pot
+        if x >= b2.x and x <= b2.x + b2.w and y >= b2.y and y <= b2.y + b2.h then
+            toonPotOverlay = not toonPotOverlay
+            return
         end
     end
 end

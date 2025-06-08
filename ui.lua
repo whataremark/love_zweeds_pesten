@@ -40,37 +40,45 @@ function ui.draw_pot(pot, ongeldigeZetActief, toonOverlay)
         end
     end
 
-    -- Pot bekijken knop
-    love.graphics.setColor(0.2, 0.2, 0.2)
-    love.graphics.rectangle("fill", w - 150, h - 50, 140, 40, 8)
-    
+-- Overlay met alle kaarten (compact, tussen boven- en onderkant)
+if toonOverlay then
+    local screenW = love.graphics.getWidth()
+    local screenH = love.graphics.getHeight()
+
+    local overlayW = 300
+    local overlayH = screenH - 300  -- genoeg ruimte boven en onder
+    local overlayX = screenW - overlayW - 20
+    local overlayY = 130  -- onder de bovenste kaarten
+
+    -- Achtergrond van de overlay
+    love.graphics.setColor(0.2, 0.5, 0.3, 0.97)  -- zachtere groen
+    love.graphics.rectangle("fill", overlayX, overlayY, overlayW, overlayH, 12)
+
+    -- Header
     love.graphics.setColor(1, 1, 1)
-    love.graphics.print("📂 Pot bekijken", w - 140, h - 40)
+    love.graphics.printf(" Pot kaarten", overlayX, overlayY + 10, overlayW, "center")
 
-    -- Overlay met alle kaarten
-    if toonOverlay then
-        love.graphics.setColor(1, 1, 1, 0.92)
-        love.graphics.rectangle("fill", 20, 20, w - 40, h - 40, 12)  -- met afgeronde hoeken
+    -- Kaarten tekenen
+    local startX = overlayX + 20
+    local startY = overlayY + 40
+    local maxPerRow = 3
+    local padding = 15
+    local kaart_hoogte = 70
 
-        local startX = 60
-        local startY = 80
-        local maxPerRow = 7
-        local padding = 20
-        local kaart_hoogte = 100
-
-        for i, kaart in ipairs(pot) do
-            local rij = math.floor((i - 1) / maxPerRow)
-            local kolom = (i - 1) % maxPerRow
-            local schaal = kaart_hoogte / kaart.afbeelding:getHeight()
-            local x = startX + kolom * (90 + padding)
-            local y = startY + rij * (kaart_hoogte + padding)
-            love.graphics.setColor(1, 1, 1)
-            love.graphics.draw(kaart.afbeelding, x, y, 0, schaal, schaal)
-        end
-
+    for i, kaart in ipairs(pot) do
+        local rij = math.floor((i - 1) / maxPerRow)
+        local kolom = (i - 1) % maxPerRow
+        local schaal = kaart_hoogte / kaart.afbeelding:getHeight()
+        local x = startX + kolom * (90 + padding)
+        local y = startY + rij * (kaart_hoogte + padding)
         love.graphics.setColor(1, 1, 1)
-        love.graphics.print("Klik nogmaals op de knop om te sluiten", startX, startY - 30)
+        love.graphics.draw(kaart.afbeelding, x, y, 0, schaal, schaal)
     end
+
+    -- Footer
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.printf("Klik op de knop om te sluiten", overlayX, overlayY + overlayH - 25, overlayW, "center")
+end
 end
 
 function ui.draw_other_players()
@@ -149,15 +157,31 @@ function ui.draw_menu(mouseX, mouseY)
 end
 
 
---Pickup Button ----
-function drawPickupButton()
-    local x, y, w, h = 100, 500, 150, 40
+-- Pickup + Pot bekijkknoppen gecombineerd en gecentreerd
+function drawActionButtons()
+    local w, h = love.graphics.getWidth(), love.graphics.getHeight()
+    local btnW, btnH = 150, 40
+    local spacing = 20
+    local totalW = btnW * 2 + spacing
+    local startX = (w - totalW) / 2
+    local y = h - btnH - 20
+
+    -- === Pak kaart knop ===
     love.graphics.setColor(0.2, 0.6, 0.2)
-    love.graphics.rectangle("fill", x, y, w, h)
+    love.graphics.rectangle("fill", startX, y, btnW, btnH, 8)
     love.graphics.setColor(1, 1, 1)
-    love.graphics.printf("Pak kaart", x, y + 10, w, "center")
+    love.graphics.printf("Pak kaart", startX, y + 10, btnW, "center")
 
-    return {x = x, y = y, w = w, h = h}
+    -- === Pot bekijken knop ===
+    love.graphics.setColor(0.2, 0.2, 0.2)
+    love.graphics.rectangle("fill", startX + btnW + spacing, y, btnW, btnH, 8)
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.printf("📂 Pot bekijken", startX + btnW + spacing, y + 10, btnW, "center")
+
+    -- Return knopposities voor klikdetectie
+    return {
+        pickup = { x = startX, y = y, w = btnW, h = btnH },
+        pot    = { x = startX + btnW + spacing, y = y, w = btnW, h = btnH }
+    }
 end
-
 return ui
