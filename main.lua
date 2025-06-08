@@ -4,6 +4,8 @@ local ui = require("ui")
 local rules = require("rules")
 local game = require("game")
 
+local bgCanvas
+
 
 local scene = "menu"  -- "menu" | "playing"
 local selectedMode    -- "ai" | "human"
@@ -16,9 +18,31 @@ local ongeldigeZetTimer = 0
 toonPotOverlay = false
 
 function love.load()
-    love.graphics.setBackgroundColor(0.1, 0.4, 0.2)
+    
+    bgCanvas = generateGreenFeltBackground(love.graphics.getWidth(), love.graphics.getHeight())
+
 
 end
+
+function generateGreenFeltBackground(w, h)
+    local canvas = love.graphics.newCanvas(w, h)
+    love.graphics.setCanvas(canvas)
+
+    local centerX, centerY = w / 2, h / 2
+    local radius = math.max(w, h) * 0.6
+
+    -- Teken meerdere transparante groene cirkels voor vilt-look
+    for i = 1, 100 do
+        local alpha = 0.02
+        local size = radius * (1 - (i / 100))
+        love.graphics.setColor(0.05, 0.3, 0.1, alpha)
+        love.graphics.circle("fill", centerX, centerY, size)
+    end
+
+    love.graphics.setCanvas()
+    return canvas
+end
+
 
 function startGame(mode)
     selectedMode = mode
@@ -65,16 +89,21 @@ end
 
 
 function love.draw()
+    love.graphics.setBackgroundColor(0.1, 0.4, 0.1)
     if scene=="menu" then
         ui.draw_menu(love.mouse.getX(),love.mouse.getY())
         return
     end
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.draw(bgCanvas, 0, 0)
+    
     ui.draw_pot(pot, ongeldigeZetTimer > 0, toonPotOverlay)
     ui.draw_other_players()
     ui.draw_hand(player.hand, player.draggingCard)
+    
+    
 
     love.graphics.print("Aan de beurt: Speler " .. game.currentPlayer, 20, 20)
-
 
     love.graphics.setColor(0, 0, 0)
     love.graphics.print("Ronde: " .. ronde, 20, 20)
@@ -93,6 +122,7 @@ function love.mousepressed(x, y, button)
         local inside = function(mx, my, bx, by, bw, bh)
             return mx > bx and mx < bx + bw and my > by and my < by + bh
         end
+        
         if inside(x, y, ui.aiX, ui.aiY, ui.aiW, ui.aiH) then
             startGame("ai")
             return

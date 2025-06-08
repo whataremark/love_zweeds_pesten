@@ -10,6 +10,10 @@ local cardBack = love.graphics.newImage("/png/back.png")
 
 local player = require("player") -- <-- dit is essentieel!
 
+local groteTitelFont = love.graphics.newFont(40)
+local kleineTitelFont = love.graphics.newFont(20)
+
+
 function ui.draw_pot(pot, ongeldigeZetActief, toonOverlay)
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
     local x, y = w / 2 - 50, h / 2 - 70
@@ -36,8 +40,16 @@ function ui.draw_pot(pot, ongeldigeZetActief, toonOverlay)
             love.graphics.setColor(1, 0, 0, 0.5)
             love.graphics.rectangle("line", x, y, 100, kaart_hoogte)
             love.graphics.setColor(1, 0, 0)
-            love.graphics.print("❌ Ongeldige zet!", x - 10, y + kaart_hoogte + 5)
+            love.graphics.print("Ongeldige zet!", x - 10, y + kaart_hoogte + 5)
         end
+         
+        -- Teken achtergrond rechthoek achter pot-kaarten
+        local potW, potH = 200, 230  -- groter dan de kaart
+        local potX = (w - potW) / 2
+        local potY = (h - potH) / 2
+        love.graphics.setColor(1, 1, 1, 0.95)  -- bijna wit, 95% opacity
+        love.graphics.rectangle("line", potX, potY, potW, potH, 18, 18)
+
     end
 
 -- Overlay met alle kaarten (compact, tussen boven- en onderkant)
@@ -81,6 +93,7 @@ if toonOverlay then
 end
 end
 
+--andere speler kaarten tekenen
 function ui.draw_other_players()
     local game = require("game")
     local hand = game.players[2].hand
@@ -110,7 +123,7 @@ end
 
 function ui.draw_hand(hand, draggingCard)
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
-    local kaart_hoogte = 120
+    local kaart_hoogte = 160
     local padding = 15
     local schaal = kaart_hoogte / 500 -- schatting originele PNG hoogte
     local kaart_breedte = 300 * schaal
@@ -138,8 +151,10 @@ end
 -- MENU  --------------------------------------------------------
 function ui.draw_menu(mouseX, mouseY)
     local w,h = love.graphics.getWidth(), love.graphics.getHeight()
+    love.graphics.setFont(groteTitelFont)
     love.graphics.setColor(1,1,1)
-    love.graphics.printf("Zweeds Pesten",0,150,w,"center")
+    love.graphics.printf("Zweeds Pesten", 0, 150, w, "center")
+    love.graphics.setFont(kleineTitelFont)
 
     local function button(txt,y)
         local bw,bh = 280,60
@@ -176,7 +191,7 @@ function drawActionButtons()
     love.graphics.setColor(0.2, 0.2, 0.2)
     love.graphics.rectangle("fill", startX + btnW + spacing, y, btnW, btnH, 8)
     love.graphics.setColor(1, 1, 1)
-    love.graphics.printf("📂 Pot bekijken", startX + btnW + spacing, y + 10, btnW, "center")
+    love.graphics.printf("Pot bekijken", startX + btnW + spacing, y + 10, btnW, "center")
 
     -- Return knopposities voor klikdetectie
     return {

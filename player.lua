@@ -13,7 +13,7 @@ end
 
 function player.startDrag(x, y)
     local padding = 15
-    local kaartHoogte = 120
+    local kaartHoogte = 160
     local schaal = kaartHoogte / 500
     local kaartBreedte = 300 * schaal
 

@@ -14,6 +14,7 @@ game.nextMustBeUnder7 = false
 game.extraTurn = false
 
 
+
 --helper functie om de bovenste kaart in de pot te vinden
 local function get_effective_top_card(pot)
     for i = #pot, 1, -1 do
