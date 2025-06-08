@@ -92,8 +92,6 @@ function game.handle_card_effects(playerIndex, kaart, pot)
     game.next_turn()
 end
 
-
-
 ---AI SHIT----
 
 function game.ai_turn(pot)
