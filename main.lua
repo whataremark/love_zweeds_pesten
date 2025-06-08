@@ -3,6 +3,8 @@ local player = require("player")
 local ui = require("ui")
 local rules = require("rules")
 local game = require("game")
+local utils = require("utils")
+--local ai = require("ai")
 
 
 local scene = "menu"  -- "menu" | "playing"
@@ -148,7 +150,7 @@ function love.mousereleased(x, y, button)
 
     if inPot then
         if rules.is_speelbaar(kaart, pot, game.nextMustBeUnder7) then
-            game.handle_card_effects(1, kaart, pot)
+            utils.handle_card_effects(game, 1, kaart, pot)
             ronde = ronde + 1
         else
             table.insert(player.hand, kaart)
