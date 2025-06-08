@@ -1,5 +1,14 @@
 local ui = {}
 
+local kaartHoogte = 120
+local schaal = kaartHoogte / 500
+local kaartBreedte = 300 * schaal
+local padding = 15
+
+
+local player = require("player") -- <-- dit is essentieel!
+
+
 function ui.draw_pot(pot, ongeldigeZetActief, toonOverlay)
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
     local x, y = w / 2 - 50, h / 2 - 70
@@ -78,6 +87,7 @@ function ui.draw_hand(hand, draggingCard)
     local kaart_breedte = 300 * schaal
     local x_start = (w - (#hand * (kaart_breedte + padding))) / 2
     local y = h - kaart_hoogte - 50
+    
 
     -- Teken alle kaarten in hand
     for i, kaart in ipairs(hand) do
@@ -86,12 +96,12 @@ function ui.draw_hand(hand, draggingCard)
         love.graphics.draw(kaart.afbeelding, x, y, 0, schaal, schaal)
     end
 
-    -- Teken gesleepte kaart boven cursor
+    -- sleepkaart bovenop tekenen (volgt muis)
     if draggingCard then
         local mx, my = love.mouse.getPosition()
-        local schaal = kaart_hoogte / draggingCard.afbeelding:getHeight()
-        love.graphics.setColor(1, 1, 1)
-        love.graphics.draw(draggingCard.afbeelding, mx - 40, my - 60, 0, schaal, schaal)
+        local x = mx - player.dragOffset.x
+        local y = my - player.dragOffset.y
+        love.graphics.draw(draggingCard.afbeelding, x, y, 0, schaal, schaal)
     end
 end
 
@@ -115,6 +125,18 @@ function ui.draw_menu(mouseX, mouseY)
 
     ui.btnAI,  ui.aiX,  ui.aiY,  ui.aiW,  ui.aiH  = button("Tegen AI spelen", 260)
     ui.btnH2H, ui.hX,   ui.hY,   ui.hW,   ui.hH   = button("Tegen speler (WIP)", 340)
+end
+
+
+--Pickup Button ----
+function drawPickupButton()
+    local x, y, w, h = 100, 500, 150, 40
+    love.graphics.setColor(0.2, 0.6, 0.2)
+    love.graphics.rectangle("fill", x, y, w, h)
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.printf("Pak kaart", x, y + 10, w, "center")
+
+    return {x = x, y = y, w = w, h = h}
 end
 
 return ui

@@ -4,6 +4,7 @@ local ui = require("ui")
 local rules = require("rules")
 local game = require("game")
 
+
 local scene = "menu"  -- "menu" | "playing"
 local selectedMode    -- "ai" | "human"
 
@@ -14,11 +15,13 @@ local ongeldigeZetTimer = 0
 
 toonPotOverlay = false
 
-function startGame(mode)
-    selectedMode = mode          -- bewaren voor later
-    scene        = "playing"
+function love.load()
+    love.graphics.setBackgroundColor(0.9, 0.9, 0.9)
+end
 
-    love.graphics.setBackgroundColor(0.9,0.9,0.9)
+function startGame(mode)
+    selectedMode = mode
+    scene        = "playing"
 
     deck.init()
     player.init(deck)
@@ -27,23 +30,27 @@ function startGame(mode)
     ronde = 0
     ongeldigeZetTimer = 0
 
-    game.mode = mode             -- AI of human
-    game.players[1].hand = player.hand
-    game.players[2].hand = {}    -- blijft zo bij AI; bij human-code straks vullen
+    game.mode = mode
     game.currentPlayer = 1
     game.waitingForAI  = false
+
+    -- koppel hand van de mens aan game-model
+    game.players[1].hand = player.hand
+
+    -- deel 7 kaarten aan de AI
+    game.players[2].hand = {}
+    for i = 1, 7 do
+        table.insert(game.players[2].hand, deck.draw())
+    end
+
+    -- Debug
+    print("\n=== AI-START ===")
+    print("AI heeft nu " .. #game.players[2].hand .. " kaarten op hand:")
+    for i, c in ipairs(game.players[2].hand) do
+        print(string.format("  [%d] %s of %s", i, c.waarde, c.kleur))
+    end
 end
 
-
-function love.load()
-    love.graphics.setBackgroundColor(0.9, 0.9, 0.9)
-    deck.init()
-    player.init(deck)
-
-    -- Startkaart op de pot
-    pot = {}
-    table.insert(pot, deck.draw())
-end
 
 function love.update(dt)
        if scene=="playing" then
@@ -71,6 +78,8 @@ function love.draw()
     love.graphics.setColor(0, 0, 0)
     love.graphics.print("Ronde: " .. ronde, 20, 20)
     love.graphics.print("Kaarten in pot: " .. #pot, 20, 40)
+    
+    pickupButton = drawPickupButton()
 
     --debug ish
     love.graphics.print("Speler aan zet: " .. game.currentPlayer, 20, 60)
@@ -80,28 +89,47 @@ function love.draw()
 end
 
 function love.mousepressed(x, y, button)
-      if scene=="menu" and button==1 then
-        local inside = function(mx,my,bx,by,bw,bh)
-            return mx>bx and mx<bx+bw and my>by and my<by+bh
+    if scene == "menu" and button == 1 then
+        local inside = function(mx, my, bx, by, bw, bh)
+            return mx > bx and mx < bx + bw and my > by and my < by + bh
         end
-        if inside(x,y,ui.aiX,ui.aiY,ui.aiW,ui.aiH) then
+        if inside(x, y, ui.aiX, ui.aiY, ui.aiW, ui.aiH) then
             startGame("ai")
             return
-        elseif inside(x,y,ui.hX,ui.hY,ui.hW,ui.hH) then
+        elseif inside(x, y, ui.hX, ui.hY, ui.hW, ui.hH) then
             startGame("human")
             return
         end
     end
-    
+
+    -- Spelerkaart slepen
     if button == 1 then
         player.startDrag(x, y)
     end
-    -- Toggle toonPotOverlay
-    if x > love.graphics.getWidth() - 150 and y > love.graphics.getHeight() - 50 then
-    toonPotOverlay = not toonPotOverlay
+
+    -- Toon pot overlay toggle
+    if button == 1 and x > love.graphics.getWidth() - 150 and y > love.graphics.getHeight() - 50 then
+        toonPotOverlay = not toonPotOverlay
+    end
+
+    -- Pickup button check
+    if button == 1 and pickupButton then
+        if x >= pickupButton.x and x <= pickupButton.x + pickupButton.w and
+           y >= pickupButton.y and y <= pickupButton.y + pickupButton.h then
+
+            if game.currentPlayer == 1 then
+                for i = #pot, 1, -1 do
+                    table.insert(player.hand, table.remove(pot, i))
+                end
+                print("Speler pakt pot op (" .. #player.hand .. " kaarten)")
+                game.next_turn()
+            else
+                print("Niet jouw beurt.")
+            end
+        end
+    end
 end
 
-end
 
 function love.mousereleased(x, y, button)
     if button ~= 1 then return end
@@ -120,44 +148,13 @@ function love.mousereleased(x, y, button)
 
     if inPot then
         if rules.is_speelbaar(kaart, pot, game.nextMustBeUnder7) then
-            -- Speciale regels verwerken
-            if kaart.waarde == "10" then
-                for i = #pot, 1, -1 do
-                    table.remove(pot, i)
-                end
-                game.play_card(1, kaart, pot)
-                ronde = ronde + 1
-                -- next turn wegehaald want speler mag nog een keer
-                return
-            elseif kaart.waarde == "2" or kaart.waarde == "3" then
-                game.play_card(1, kaart, pot)
-                ronde = ronde + 1
-                game.next_turn()
-                return
-            elseif kaart.waarde == "8" then
-                game.play_card(1, kaart, pot)
-                ronde = ronde + 1
-                -- zelf nog een keer
-                return
-            elseif kaart.waarde == "7" then
-                game.play_card(1, kaart, pot)
-                ronde = ronde + 1
-                game.nextMustBeUnder7 = true
-                game.next_turn()
-                return
-            else
-                game.play_card(1, kaart, pot)
-                ronde = ronde + 1
-                game.next_turn()
-                return
-            end
+            game.handle_card_effects(1, kaart, pot)
+            ronde = ronde + 1
         else
-            -- Ongeldige zet
             table.insert(player.hand, kaart)
             ongeldigeZetTimer = 1.0
         end
     else
-        -- Niet op de pot gelegd
         table.insert(player.hand, kaart)
     end
 end
