@@ -4,6 +4,8 @@ local ui = require("ui")
 local rules = require("rules")
 local game = require("game")
 
+local bgCanvas
+
 
 local scene = "menu"  -- "menu" | "playing"
 local selectedMode    -- "ai" | "human"
@@ -16,8 +18,31 @@ local ongeldigeZetTimer = 0
 toonPotOverlay = false
 
 function love.load()
-    love.graphics.setBackgroundColor(0.9, 0.9, 0.9)
+    
+    bgCanvas = generateGreenFeltBackground(love.graphics.getWidth(), love.graphics.getHeight())
+
+
 end
+
+function generateGreenFeltBackground(w, h)
+    local canvas = love.graphics.newCanvas(w, h)
+    love.graphics.setCanvas(canvas)
+
+    local centerX, centerY = w / 2, h / 2
+    local radius = math.max(w, h) * 0.6
+
+    -- Teken meerdere transparante groene cirkels voor vilt-look
+    for i = 1, 100 do
+        local alpha = 0.02
+        local size = radius * (1 - (i / 100))
+        love.graphics.setColor(0.05, 0.3, 0.1, alpha)
+        love.graphics.circle("fill", centerX, centerY, size)
+    end
+
+    love.graphics.setCanvas()
+    return canvas
+end
+
 
 function startGame(mode)
     selectedMode = mode
@@ -64,27 +89,31 @@ end
 
 
 function love.draw()
+    love.graphics.setBackgroundColor(0.1, 0.4, 0.1)
     if scene=="menu" then
         ui.draw_menu(love.mouse.getX(),love.mouse.getY())
         return
     end
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.draw(bgCanvas, 0, 0)
+    
     ui.draw_pot(pot, ongeldigeZetTimer > 0, toonPotOverlay)
     ui.draw_other_players()
     ui.draw_hand(player.hand, player.draggingCard)
+    
+    
 
     love.graphics.print("Aan de beurt: Speler " .. game.currentPlayer, 20, 20)
-
 
     love.graphics.setColor(0, 0, 0)
     love.graphics.print("Ronde: " .. ronde, 20, 20)
     love.graphics.print("Kaarten in pot: " .. #pot, 20, 40)
     
-    pickupButton = drawPickupButton()
-
     --debug ish
     love.graphics.print("Speler aan zet: " .. game.currentPlayer, 20, 60)
     love.graphics.print("AI-timer: " .. string.format("%.2f", game.aiTimer), 20, 80)
 
+    buttons = drawActionButtons()
 
 end
 
@@ -93,6 +122,7 @@ function love.mousepressed(x, y, button)
         local inside = function(mx, my, bx, by, bw, bh)
             return mx > bx and mx < bx + bw and my > by and my < by + bh
         end
+        
         if inside(x, y, ui.aiX, ui.aiY, ui.aiW, ui.aiH) then
             startGame("ai")
             return
@@ -107,16 +137,11 @@ function love.mousepressed(x, y, button)
         player.startDrag(x, y)
     end
 
-    -- Toon pot overlay toggle
-    if button == 1 and x > love.graphics.getWidth() - 150 and y > love.graphics.getHeight() - 50 then
-        toonPotOverlay = not toonPotOverlay
-    end
-
-    -- Pickup button check
-    if button == 1 and pickupButton then
-        if x >= pickupButton.x and x <= pickupButton.x + pickupButton.w and
-           y >= pickupButton.y and y <= pickupButton.y + pickupButton.h then
-
+    -- Knoppen onderaan controleren (Pak kaart & Pot bekijken)
+    if button == 1 and buttons then
+        -- Pak kaart knop
+        local b = buttons.pickup
+        if x >= b.x and x <= b.x + b.w and y >= b.y and y <= b.y + b.h then
             if game.currentPlayer == 1 then
                 for i = #pot, 1, -1 do
                     table.insert(player.hand, table.remove(pot, i))
@@ -126,6 +151,14 @@ function love.mousepressed(x, y, button)
             else
                 print("Niet jouw beurt.")
             end
+            return
+        end
+
+        -- Pot bekijken knop
+        local b2 = buttons.pot
+        if x >= b2.x and x <= b2.x + b2.w and y >= b2.y and y <= b2.y + b2.h then
+            toonPotOverlay = not toonPotOverlay
+            return
         end
     end
 end
