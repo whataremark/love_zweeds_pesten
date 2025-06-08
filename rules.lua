@@ -1,14 +1,6 @@
+-- Game rule helper functions
 local rules = {}
-
-local function waarde_naar_getal(waarde)
-    local map = {
-        ["2"] = 2, ["3"] = 3, ["4"] = 4, ["5"] = 5,
-        ["6"] = 6, ["7"] = 7, ["8"] = 8, ["9"] = 9,
-        ["10"] = 10, ["jack"] = 11, ["queen"] = 12,
-        ["king"] = 13, ["ace"] = 14
-    }
-    return map[waarde] or 0
-end
+local utils = require("utils")
 
 function rules.is_speelbaar(kaart, pot, onderZevenGedwongen)
     if not kaart then return false end
@@ -16,8 +8,8 @@ function rules.is_speelbaar(kaart, pot, onderZevenGedwongen)
     local bovenste = pot[#pot]
     if not bovenste then return true end -- lege pot → altijd toegestaan
 
-    local waarde = waarde_naar_getal(kaart.waarde)
-    local bovensteWaarde = waarde_naar_getal(bovenste.waarde)
+    local waarde = utils.numeric_value(kaart.waarde)
+    local bovensteWaarde = utils.numeric_value(bovenste.waarde)
 
     -- Speciale kaarten mogen altijd
     if kaart.waarde == "2" or kaart.waarde == "3" or kaart.waarde == "10" then

@@ -1,8 +1,10 @@
-local deck = require("deck")
+local deck  = require("deck")
 local player = require("player")
-local ui = require("ui")
+local ui    = require("ui")
 local rules = require("rules")
-local game = require("game")
+local game  = require("game")
+local ai    = require("ai")
+local utils = require("utils")
 
 local bgCanvas
 
@@ -18,29 +20,8 @@ local ongeldigeZetTimer = 0
 toonPotOverlay = false
 
 function love.load()
-    
-    bgCanvas = generateGreenFeltBackground(love.graphics.getWidth(), love.graphics.getHeight())
-
-
-end
-
-function generateGreenFeltBackground(w, h)
-    local canvas = love.graphics.newCanvas(w, h)
-    love.graphics.setCanvas(canvas)
-
-    local centerX, centerY = w / 2, h / 2
-    local radius = math.max(w, h) * 0.6
-
-    -- Teken meerdere transparante groene cirkels voor vilt-look
-    for i = 1, 100 do
-        local alpha = 0.02
-        local size = radius * (1 - (i / 100))
-        love.graphics.setColor(0.05, 0.3, 0.1, alpha)
-        love.graphics.circle("fill", centerX, centerY, size)
-    end
-
-    love.graphics.setCanvas()
-    return canvas
+    -- Pre-render the background felt texture once
+    bgCanvas = utils.generate_green_felt_background(love.graphics.getWidth(), love.graphics.getHeight())
 end
 
 
@@ -78,12 +59,13 @@ end
 
 
 function love.update(dt)
-       if scene=="playing" then
+    if scene == "playing" then
         player.updateDragging()
-        if ongeldigeZetTimer>0 then ongeldigeZetTimer = ongeldigeZetTimer - dt end
-        game.update(dt,pot)
+        if ongeldigeZetTimer > 0 then
+            ongeldigeZetTimer = ongeldigeZetTimer - dt
+        end
+        ai.update(dt, game, pot)
     end
-
 end
 
 
@@ -119,14 +101,10 @@ end
 
 function love.mousepressed(x, y, button)
     if scene == "menu" and button == 1 then
-        local inside = function(mx, my, bx, by, bw, bh)
-            return mx > bx and mx < bx + bw and my > by and my < by + bh
-        end
-        
-        if inside(x, y, ui.aiX, ui.aiY, ui.aiW, ui.aiH) then
+        if utils.inside(x, y, ui.aiX, ui.aiY, ui.aiW, ui.aiH) then
             startGame("ai")
             return
-        elseif inside(x, y, ui.hX, ui.hY, ui.hW, ui.hH) then
+        elseif utils.inside(x, y, ui.hX, ui.hY, ui.hW, ui.hH) then
             startGame("human")
             return
         end

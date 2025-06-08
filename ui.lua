@@ -1,3 +1,4 @@
+-- Rendering and menu functions
 local ui = {}
 local game = require("game")
 
