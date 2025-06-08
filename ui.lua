@@ -1,13 +1,14 @@
 local ui = {}
+local game = require("game")
 
 local kaartHoogte = 120
 local schaal = kaartHoogte / 500
 local kaartBreedte = 300 * schaal
 local padding = 15
 
+local cardBack = love.graphics.newImage("/png/back.png")
 
 local player = require("player") -- <-- dit is essentieel!
-
 
 function ui.draw_pot(pot, ongeldigeZetActief, toonOverlay)
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
@@ -73,11 +74,31 @@ function ui.draw_pot(pot, ongeldigeZetActief, toonOverlay)
 end
 
 function ui.draw_other_players()
-    local w = love.graphics.getWidth()
+    local game = require("game")
+    local hand = game.players[2].hand
+    local kaartAantal = #hand
+
+    -- Kaartpositie (bovenkant scherm, horizontaal gecentreerd)
+    local kaartBreedte = cardBack:getWidth()
+    local kaartHoogte  = cardBack:getHeight()
+    local schaal       = 0.5  -- zelfde als je eigen kaarten
+
+    local spacing = 90  -- overlap tussen kaarten
+    local totalWidth = spacing * (kaartAantal - 1) + kaartBreedte * schaal
+    local startX = (love.graphics.getWidth() - totalWidth) / 2
+    local y = 60
+
+    -- Titel
     love.graphics.setColor(0, 0, 0)
-    love.graphics.print("Speler 2", w / 2 - 25, 30)
-    love.graphics.rectangle("line", w / 2 - 100, 50, 200, 100)
+    love.graphics.printf("Speler 2", startX, startX + totalWidth, y - 20, "center")
+
+    -- Kaarten
+    for i = 1, kaartAantal do
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.draw(cardBack, startX + (i - 1) * spacing, y, 0, schaal, schaal)
+    end
 end
+
 
 function ui.draw_hand(hand, draggingCard)
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
