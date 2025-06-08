@@ -68,6 +68,7 @@ function game.handle_card_effects(playerIndex, kaart, pot)
             table.remove(pot, i)
         end
         game.lastCardWas10 = true
+        game.extraTurn = true
         if playerIndex == 2 then
             game.waitingForAI = true
             game.aiTimer = 0.5
@@ -77,6 +78,7 @@ function game.handle_card_effects(playerIndex, kaart, pot)
 
     if kaart.waarde == "8" then
         print("Kaart was 8 → speler mag nog een keer")
+        game.extraTurn = true
         if playerIndex == 2 then
             game.waitingForAI = true
             game.aiTimer = 0.5
@@ -104,18 +106,26 @@ function game.ai_turn(pot)
 
     local topCard = get_effective_top_card(pot)
     local topValue = topCard and get_numeric_value(topCard.waarde) or 0
-    print("Bovenste (effectieve dus met 3 meegedacht) kaart in pot: " .. (topCard and (topCard.waarde .. " of " .. topCard.kleur) or "∅"))
+    print("Bovenste (effectieve dus met 3 meegedacht) kaart in pot: " .. 
+    (topCard and (topCard.waarde .. " of " .. topCard.kleur) or "∅"))
 
     local legal = {}
     for _, card in ipairs(ai.hand) do
         local v = get_numeric_value(card.waarde)
         local special = card.waarde == "2" or card.waarde == "3" or card.waarde == "10"
-       if special or not topCard or (game.nextMustBeUnder7 and v <= topValue) or (not game.nextMustBeUnder7 and v >= topValue) then
+       if special or not topCard or (game.nextMustBeUnder7 and v <= topValue) or
+        (not game.nextMustBeUnder7 and v >= topValue) then
             table.insert(legal, card)
         end
     end
 
-    if #legal == 0 then
+   if #legal == 0 then
+    if game.extraTurn then
+        print("AI kan niets spelen in extra beurt → past")
+        game.extraTurn = false
+        game.next_turn()
+        return
+    else
         print("AI kan niets spelen → pakt pot op (" .. #pot .. " kaarten)")
         for i = #pot, 1, -1 do
             table.insert(ai.hand, table.remove(pot, i))
@@ -124,6 +134,7 @@ function game.ai_turn(pot)
         game.next_turn()
         return
     end
+end
 
     table.sort(legal, function(a, b)
         local prio = {["2"] = 1, ["3"] = 1, ["10"] = 1}
