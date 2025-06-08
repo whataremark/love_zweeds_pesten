@@ -1,5 +1,7 @@
 local rules = {}
 
+-- Functie om een kaartwaarde om te zetten naar een getal
+-- wordt gebruikt om te bepalen of een kaart speelbaar is
 local function waarde_naar_getal(waarde)
     local map = {
         ["2"] = 2, ["3"] = 3, ["4"] = 4, ["5"] = 5,

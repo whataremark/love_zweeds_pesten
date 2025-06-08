@@ -91,8 +91,9 @@ function game.handle_card_effects(playerIndex, kaart, pot)
     end
     game.next_turn()
 end
-
+-- =====================================================================================================================
 ---AI SHIT----
+-- =====================================================================================================================
 
 function game.ai_turn(pot)
     local ai = game.players[2]
@@ -104,13 +105,15 @@ function game.ai_turn(pot)
 
     local topCard = get_effective_top_card(pot)
     local topValue = topCard and get_numeric_value(topCard.waarde) or 0
-    print("Bovenste (effectieve dus met 3 meegedacht) kaart in pot: " .. (topCard and (topCard.waarde .. " of " .. topCard.kleur) or "∅"))
+    print("Bovenste (effectieve dus met 3 meegedacht) kaart in pot: " .. 
+    (topCard and (topCard.waarde .. " of " .. topCard.kleur) or "∅"))
 
     local legal = {}
     for _, card in ipairs(ai.hand) do
         local v = get_numeric_value(card.waarde)
         local special = card.waarde == "2" or card.waarde == "3" or card.waarde == "10"
-       if special or not topCard or (game.nextMustBeUnder7 and v <= topValue) or (not game.nextMustBeUnder7 and v >= topValue) then
+       if special or not topCard or (game.nextMustBeUnder7 and v <= topValue) or 
+       (not game.nextMustBeUnder7 and v >= topValue) then
             table.insert(legal, card)
         end
     end
