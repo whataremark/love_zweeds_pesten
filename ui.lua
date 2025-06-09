@@ -237,4 +237,18 @@ function ui.draw_action_buttons()
         pot    = { x = startX + btnW + spacing, y = y, w = btnW, h = btnH }
     }
 end
+
+function ui.draw_end_screen(winner)
+    local w, h = love.graphics.getWidth(), love.graphics.getHeight()
+    love.graphics.setColor(0,0,0,0.7)
+    love.graphics.rectangle("fill",0,0,w,h)
+    love.graphics.setColor(1,1,1)
+    love.graphics.setFont(groteTitelFont)
+    love.graphics.printf("Speler "..winner.." wint!",0,h/2-40,w,"center")
+    love.graphics.setFont(kleineTitelFont)
+    local other = winner == 1 and 2 or 1
+    local game = require("game")
+    local count = #game.players[other].hand
+    love.graphics.printf("Andere speler heeft "..count.." kaarten over",0,h/2+20,w,"center")
+end
 return ui
