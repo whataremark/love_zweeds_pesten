@@ -1,10 +1,13 @@
-local deck = {}
+local drawPile = {}
 
-function deck.init()
-    deck.cards = {}
+--codex-- Load and shuffle a deck with the configured amount of sets
+function drawPile.init(count)
+    count = count or 1
+    drawPile.cards = {}
 
     local kaartmap = "png"
     local bestanden = love.filesystem.getDirectoryItems(kaartmap)
+    local basis = {}
 
     for _, bestand in ipairs(bestanden) do
         if bestand:match("%.png$") then
@@ -14,7 +17,7 @@ function deck.init()
             if waarde and kleur then
                 local afbeelding = love.graphics.newImage(kaartmap .. "/" .. bestand)
 
-                table.insert(deck.cards, {
+                table.insert(basis, {
                     kleur = kleur,
                     waarde = waarde,
                     afbeelding = afbeelding,
@@ -24,20 +27,26 @@ function deck.init()
         end
     end
 
+    for _ = 1, count do
+        for _, card in ipairs(basis) do
+            table.insert(drawPile.cards, card)
+        end
+    end
+
     -- Schudden
     math.randomseed(os.time())
-    for i = #deck.cards, 2, -1 do
+    for i = #drawPile.cards, 2, -1 do
         local j = math.random(i)
-        deck.cards[i], deck.cards[j] = deck.cards[j], deck.cards[i]
+        drawPile.cards[i], drawPile.cards[j] = drawPile.cards[j], drawPile.cards[i]
     end
 end
 
-function deck.draw()
-    return table.remove(deck.cards)
+function drawPile.draw()
+    return table.remove(drawPile.cards)
 end
 
-function deck.count()
-    return #deck.cards
+function drawPile.count()
+    return #drawPile.cards
 end
 
-return deck
+return drawPile

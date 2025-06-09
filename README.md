@@ -5,7 +5,7 @@ De code bestaat uit losse modules voor spelregels, spelerslogica,
 AI en de gebruikersinterface.
 
 ## Spelen
-Installeer [LÖVE](https://love2d.org/) en start de game vanuit deze map:
+Installeer [LÖVE](https://love2d.org/) en start de game vanuit deze map. In het hoofdmenu kun je kiezen of je met één of twee kaartdecks speelt:
 
 ```bash
 love .

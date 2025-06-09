@@ -1,7 +1,8 @@
--- Game rule helper functions
+--codex-- Game rule helper functions
 local rules = {}
 local utils = require("utils")
 
+--codex-- Check if a card can legally be played on the pile
 function rules.is_speelbaar(kaart, pot, onderZevenGedwongen)
     if not kaart then return false end
 
@@ -31,14 +32,14 @@ function rules.is_speelbaar(kaart, pot, onderZevenGedwongen)
     
 end
 
--- Resolve the effect of a played card and advance the game state
-function rules.handle_card_effects(game, playerIndex, kaart, pot)
-    -- Move the card from the hand to the pot first
-    game.play_card(playerIndex, kaart, pot)
+--codex-- Resolve card effects and update turn state
+function rules.handle_card_effects(game, playerIndex, kaart)
+    --codex-- Add the card to the pile then resolve its effect
+    game.play_card(playerIndex, kaart)
 
     -- 10 clears the discard pile and grants another turn
     if kaart.waarde == "10" then
-        utils.transfer_all_cards({}, pot) -- simply clear pot
+        utils.transfer_all_cards({}, game.pot) -- simply clear pot
         game.lastCardWas10 = true
         game.extraTurn = true
         if playerIndex == 2 then
@@ -68,3 +69,4 @@ function rules.handle_card_effects(game, playerIndex, kaart, pot)
     game.next_turn()
 end
 return rules
+
