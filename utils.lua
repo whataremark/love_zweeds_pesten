@@ -1,4 +1,5 @@
 -- Collection of small reusable helper functions
+
 local utils = {}
 
 -- Convert card value names to a numeric ranking.

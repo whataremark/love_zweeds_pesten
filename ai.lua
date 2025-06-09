@@ -52,11 +52,13 @@ function ai.play(game, pot)
         else
             -- Pick up the pot when no card can be played
             utils.transfer_all_cards(game.players[2].hand, pot)
+
             game.next_turn()
         end
         return
     end
     rules.handle_card_effects(game, 2, choice, pot)
+
 end
 
 -- Simple timer based update used to delay the AI's move

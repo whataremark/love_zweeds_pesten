@@ -44,7 +44,5 @@ function game.next_turn()
 end
 
 
-
-
 -- Expose the game state for other modules
 return game
