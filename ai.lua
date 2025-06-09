@@ -1,10 +1,10 @@
--- Basic computer opponent behaviour
+--codex-- Basic computer opponent behaviour
 local utils = require("utils")
 local rules = require("rules")
-local deck = require("deck")
+local drawPile = require("drawpile")
 local ai = {}
 
--- Helper to ignore any '3' cards when determining the top card
+--codex-- Determine the effective top card while skipping any '3' values
 local function effective_top_card(pot)
     for i = #pot, 1, -1 do
         if pot[i].waarde ~= "3" then
@@ -14,7 +14,7 @@ local function effective_top_card(pot)
     return nil
 end
 
--- Heuristic function for card values
+--codex-- Ranking used by the AI to choose between playable cards
 local function get_heuristics(waarde)
     local map = {
         ["2"] = 11, ["3"] = 14, ["4"] = 1, ["5"] = 2,
@@ -25,14 +25,9 @@ local function get_heuristics(waarde)
     return map[waarde] or 0
 end
 
--- Helper: refill a hand to at least 5 cards if possible
-local function refill_hand(hand)
-    while #hand < 5 and deck.count() > 0 do
-        table.insert(hand, deck.draw())
-    end
-end
 
 -- Select the best playable card for the AI or nil when none is possible
+--codex-- Pick the most attractive playable card from the AI hand
 local function choose_card(game, pot)
     local hand = game.players[2].hand
     local top = effective_top_card(pot)
@@ -59,7 +54,7 @@ end
 -- Execute the AI's turn
 -- ...existing code...
 
--- Execute the AI's turn
+--codex-- Execute the AI's turn by choosing or picking up cards
 function ai.play(game, pot)
     local choice = choose_card(game, pot)
     if not choice then
@@ -75,13 +70,14 @@ function ai.play(game, pot)
         end
         return
     end
-    rules.handle_card_effects(game, 2, choice, pot)
-    refill_hand(game.players[2].hand) -- Only refill after a successful play
+    rules.handle_card_effects(game, 2, choice)
+    utils.refill_hand(game.players[2].hand, drawPile) -- refill after a successful play
 end
 
 -- ...existing code...
 
 -- Simple timer based update used to delay the AI's move
+--codex-- Timer helper so the AI waits a bit before acting
 function ai.update(dt, game, pot)
     if game.mode == "ai" and game.waitingForAI then
         game.aiTimer = game.aiTimer - dt

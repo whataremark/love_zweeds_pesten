@@ -2,10 +2,11 @@
 local ui = {}
 local game = require("game")
 
-local kaartHoogte = 120
-local schaal = kaartHoogte / 500
-local kaartBreedte = 300 * schaal
-local padding = 15
+local config = require("config")
+local kaartHoogte = config.cardHeight
+local schaal = config.scale
+local kaartBreedte = config.cardWidth
+local padding = config.cardPadding
 
 local cardBack = love.graphics.newImage("/png/back.png")
 
@@ -14,7 +15,24 @@ local player = require("player") -- <-- dit is essentieel!
 local groteTitelFont = love.graphics.newFont(40)
 local kleineTitelFont = love.graphics.newFont(20)
 
+--codex-- Draw remaining draw pile as stacked card backs with a counter
+function ui.draw_deck(deck)
+    local w, h = love.graphics.getWidth(), love.graphics.getHeight()
+    local kaart_hoogte = 140
+    local x = w / 2 + 120
+    local y = h / 2 - 70
+    local schaal = kaart_hoogte / cardBack:getHeight()
+    local count = deck.count()
+    local zichtbaar = math.min(count, 5)
+    for i = 0, zichtbaar - 1 do
+        love.graphics.setColor(1, 1, 1, 1 - i * 0.15)
+        love.graphics.draw(cardBack, x + i * 2, y - i * 2, math.rad(-i * 2), schaal, schaal)
+    end
+    love.graphics.setColor(0, 0, 0)
+    love.graphics.printf("Deck: " .. count, x - 30, y + kaart_hoogte + 10, 120, "center")
+end
 
+--codex-- Draw the pile of played cards and optional overlay
 function ui.draw_pot(pot, ongeldigeZetActief, toonOverlay)
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
     local x, y = w / 2 - 50, h / 2 - 70
@@ -94,7 +112,7 @@ if toonOverlay then
 end
 end
 
---andere speler kaarten tekenen
+--codex-- Draw the AI player's face-down cards
 function ui.draw_other_players()
     local game = require("game")
     local hand = game.players[2].hand
@@ -121,7 +139,7 @@ function ui.draw_other_players()
     end
 end
 
-
+--codex-- Render the player's hand and follow the dragged card
 function ui.draw_hand(hand, draggingCard)
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
     local kaart_hoogte = 160
@@ -150,6 +168,7 @@ end
 
 -----------------------------------------------------------------
 -- MENU  --------------------------------------------------------
+--codex-- Main menu with mode selection buttons
 function ui.draw_menu(mouseX, mouseY)
     local w,h = love.graphics.getWidth(), love.graphics.getHeight()
     love.graphics.setFont(groteTitelFont)
@@ -170,11 +189,29 @@ function ui.draw_menu(mouseX, mouseY)
 
     ui.btnAI,  ui.aiX,  ui.aiY,  ui.aiW,  ui.aiH  = button("Tegen AI spelen", 260)
     ui.btnH2H, ui.hX,   ui.hY,   ui.hW,   ui.hH   = button("Tegen speler (WIP)", 340)
+
+    local function deckBtn(label,x,y,selected)
+        local bw,bh = 120,40
+        local hover = mouseX>x and mouseX<x+bw and mouseY>y and mouseY<y+bh
+        love.graphics.setColor(selected and 0.4 or hover and 0.8 or 0.6,0.6,0.6)
+        love.graphics.rectangle("fill",x,y,bw,bh,8,8)
+        love.graphics.setColor(0,0,0)
+        love.graphics.printf(label,x,y+10,bw,"center")
+        return hover,x,y,bw,bh
+    end
+
+    love.graphics.setColor(1,1,1)
+    love.graphics.printf("Aantal decks:",0, 410, w, "center")
+    ui.oneX, ui.oneY = (w-260)/2, 440
+    ui.twoX, ui.twoY = ui.oneX+140, 440
+    ui.d1, ui.d1x, ui.d1y, ui.d1w, ui.d1h = deckBtn("1 Deck", ui.oneX, ui.oneY, game.deckCount==1)
+    ui.d2, ui.d2x, ui.d2y, ui.d2w, ui.d2h = deckBtn("2 Decks", ui.twoX, ui.twoY, game.deckCount==2)
 end
 
 
 -- Pickup + Pot bekijkknoppen gecombineerd en gecentreerd
-function drawActionButtons()
+--codex-- Draw buttons to pick up the pile or view it
+function ui.draw_action_buttons()
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
     local btnW, btnH = 150, 40
     local spacing = 20
