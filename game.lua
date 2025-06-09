@@ -23,7 +23,9 @@ game.waitingForAI = false
 game.nextMustBeUnder7 = false
 game.extraTurn = false
 game.winner = nil
+
 game.phase = "setup" -- setup: spelers kiezen open kaarten
+
 
 --codex-- Initialize a new round with a chosen play mode
 function game.start(mode)
@@ -71,9 +73,8 @@ end
 function game.finish_setup()
     utils.refill_hand(game.players[1].hand, drawPile)
     game.phase = "playing"
+
 end
-
-
 
 
 --codex-- Move a card from a player's hand onto the pile
