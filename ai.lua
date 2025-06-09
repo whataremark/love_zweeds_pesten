@@ -1,6 +1,7 @@
 -- Basic computer opponent behaviour
 local utils = require("utils")
 local rules = require("rules")
+local deck = require("deck")
 local ai = {}
 
 -- Helper to ignore any '3' cards when determining the top card
@@ -13,7 +14,7 @@ local function effective_top_card(pot)
     return nil
 end
 
--- Select the best playable card for the AI or nil when none is possible
+-- Heuristic function for card values
 local function get_heuristics(waarde)
     local map = {
         ["2"] = 11, ["3"] = 14, ["4"] = 1, ["5"] = 2,
@@ -22,6 +23,13 @@ local function get_heuristics(waarde)
         ["king"] = 9, ["ace"] = 10
     }
     return map[waarde] or 0
+end
+
+-- Helper: refill a hand to at least 5 cards if possible
+local function refill_hand(hand)
+    while #hand < 5 and deck.count() > 0 do
+        table.insert(hand, deck.draw())
+    end
 end
 
 -- Select the best playable card for the AI or nil when none is possible
@@ -59,13 +67,13 @@ function ai.play(game, pot)
         else
             -- Pick up the pot when no card can be played
             utils.transfer_all_cards(game.players[2].hand, pot)
-
+            -- refill_hand(game.players[2].hand)  -- REMOVE or COMMENT OUT THIS LINE
             game.next_turn()
         end
         return
     end
     rules.handle_card_effects(game, 2, choice, pot)
-
+    refill_hand(game.players[2].hand)
 end
 
 -- Simple timer based update used to delay the AI's move

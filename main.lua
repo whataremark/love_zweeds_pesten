@@ -10,10 +10,8 @@ local utils = require("utils")
 
 local bgCanvas
 
-
 local scene = "menu"  -- "menu" | "playing"
 local selectedMode    -- "ai" | "human"
-
 
 local pot = {}
 local ronde = 0
@@ -21,11 +19,17 @@ local ongeldigeZetTimer = 0
 
 toonPotOverlay = false
 
+-- Helper: refill a hand to at least 5 cards if possible
+local function refill_hand(hand)
+    while #hand < 5 and deck.count() > 0 do
+        table.insert(hand, deck.draw())
+    end
+end
+
 function love.load()
     -- Pre-render the background felt texture once
     bgCanvas = utils.generate_green_felt_background(love.graphics.getWidth(), love.graphics.getHeight())
 end
-
 
 function startGame(mode)
     selectedMode = mode
@@ -59,7 +63,6 @@ function startGame(mode)
     end
 end
 
-
 function love.update(dt)
     if scene == "playing" then
         player.updateDragging()
@@ -69,8 +72,6 @@ function love.update(dt)
         ai.update(dt, game, pot)
     end
 end
-
-
 
 function love.draw()
     love.graphics.setBackgroundColor(0.1, 0.4, 0.1)
@@ -85,8 +86,6 @@ function love.draw()
     ui.draw_other_players()
     ui.draw_hand(player.hand, player.draggingCard)
     
-    
-
     love.graphics.print("Aan de beurt: Speler " .. game.currentPlayer, 20, 20)
 
     love.graphics.setColor(0, 0, 0)
@@ -98,7 +97,6 @@ function love.draw()
     love.graphics.print("AI-timer: " .. string.format("%.2f", game.aiTimer), 20, 80)
 
     buttons = drawActionButtons()
-
 end
 
 function love.mousepressed(x, y, button)
@@ -125,6 +123,7 @@ function love.mousepressed(x, y, button)
             if game.currentPlayer == 1 then
                 -- Alle kaarten uit de pot naar de speler overzetten
                 utils.transfer_all_cards(player.hand, pot)
+                -- refill_hand(player.hand)  -- REMOVE or COMMENT OUT THIS LINE
                 print("Speler pakt pot op (" .. #player.hand .. " kaarten)")
                 game.next_turn()
             else
@@ -141,7 +140,6 @@ function love.mousepressed(x, y, button)
         end
     end
 end
-
 
 function love.mousereleased(x, y, button)
     if button ~= 1 then return end
@@ -163,6 +161,7 @@ function love.mousereleased(x, y, button)
         if rules.is_speelbaar(kaart, pot, game.nextMustBeUnder7) then
             rules.handle_card_effects(game, 1, kaart, pot)
             ronde = ronde + 1
+            refill_hand(player.hand)
         else
             table.insert(player.hand, kaart)
             ongeldigeZetTimer = 1.0

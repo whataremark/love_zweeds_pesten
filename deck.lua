@@ -36,4 +36,8 @@ function deck.draw()
     return table.remove(deck.cards)
 end
 
+function deck.count()
+    return #deck.cards
+end
+
 return deck
