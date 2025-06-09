@@ -150,6 +150,40 @@ function ui.draw_other_players()
         love.graphics.setColor(1, 1, 1)
         love.graphics.draw(cardBack, startX + (i - 1) * spacing, y, 0, schaal, schaal)
     end
+
+    local faceY = y + kaartHoogte * schaal + 20
+    for i,card in ipairs(game.players[2].faceUp) do
+        local sch = kaartHoogte*schaal / card.afbeelding:getHeight()
+        love.graphics.draw(card.afbeelding, startX + (i-1)*spacing, faceY, 0, sch, sch)
+    end
+    local downY = faceY + kaartHoogte*schaal + 10
+    for i=1,#game.players[2].faceDown do
+        love.graphics.draw(cardBack, startX + (i-1)*spacing, downY, 0, schaal, schaal)
+    end
+end
+
+function ui.draw_setup(hand, faceUp)
+    local w, h = love.graphics.getWidth(), love.graphics.getHeight()
+    local slotW, slotH = 100, 140
+    local spacing = 20
+    local totalW = slotW * 3 + spacing * 2
+    local startX = (w - totalW) / 2
+    local y = h/2 - slotH/2
+    ui.setupSlots = {}
+    for i=1,3 do
+        local x = startX + (i-1)*(slotW+spacing)
+        ui.setupSlots[i] = {x=x, y=y, w=slotW, h=slotH}
+        love.graphics.setColor(1,1,1)
+        love.graphics.draw(cardBack, x, y, 0, slotW/cardBack:getWidth(), slotH/cardBack:getHeight())
+        local card = faceUp[i]
+        if card then
+            local sch = slotH / card.afbeelding:getHeight()
+            love.graphics.draw(card.afbeelding, x, y, 0, sch, sch)
+        end
+    end
+    love.graphics.setColor(1,1,1)
+    love.graphics.printf("Kies 3 kaarten voor de open stapels",0,y-40,w,"center")
+    ui.draw_hand(hand, player.draggingCard)
 end
 
 function ui.draw_setup(hand, faceUp)
@@ -204,6 +238,18 @@ function ui.draw_hand(hand, draggingCard)
         local x = x_start + (i - 1) * (kaart_breedte + padding)
         love.graphics.setColor(1, 1, 1)
         love.graphics.draw(kaart.afbeelding, x, y, 0, schaal, schaal)
+    end
+
+    local p = require("game").players[1]
+    local upY = y - kaart_hoogte - 20
+    for i,card in ipairs(p.faceUp) do
+        local x = x_start + (i-1)*(kaart_breedte + padding)
+        love.graphics.draw(card.afbeelding, x, upY, 0, schaal, schaal)
+    end
+    local downY = upY - kaart_hoogte - 10
+    for i=1,#p.faceDown do
+        local x = x_start + (i-1)*(kaart_breedte + padding)
+        love.graphics.draw(cardBack, x, downY, 0, schaal, schaal)
     end
 
     -- sleepkaart bovenop tekenen (volgt muis)
