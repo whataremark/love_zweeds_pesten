@@ -68,6 +68,13 @@ function game.start(mode)
     end
 
     utils.refill_hand(game.players[2].hand, drawPile)
+
+end
+
+function game.finish_setup()
+    utils.refill_hand(game.players[1].hand, drawPile)
+    game.phase = "playing"
+
 end
 
 function game.finish_setup()
