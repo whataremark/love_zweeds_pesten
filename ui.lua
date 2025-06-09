@@ -23,6 +23,14 @@ function ui.draw_pot(pot, ongeldigeZetActief, toonOverlay)
     local bovenste = pot[#pot]
     local voorlaatste = pot[#pot - 1]
 
+     -- Teken achtergrond rechthoek achter pot-kaarten
+        local potW, potH = 200, 230  -- groter dan de kaart
+        local potX = (w - potW) / 2
+        local potY = (h - potH) / 2
+        love.graphics.setColor(1, 1, 1, 0.95)  -- bijna wit, 95% opacity
+        love.graphics.rectangle("line", potX, potY, potW, potH, 18, 18)
+
+        
     -- Teken voorlaatste kaart iets verschoven
     if voorlaatste and voorlaatste.afbeelding then
         local schaal = kaart_hoogte / voorlaatste.afbeelding:getHeight()
@@ -43,13 +51,6 @@ function ui.draw_pot(pot, ongeldigeZetActief, toonOverlay)
             love.graphics.setColor(1, 0, 0)
             love.graphics.print("Ongeldige zet!", x - 10, y + kaart_hoogte + 5)
         end
-         
-        -- Teken achtergrond rechthoek achter pot-kaarten
-        local potW, potH = 200, 230  -- groter dan de kaart
-        local potX = (w - potW) / 2
-        local potY = (h - potH) / 2
-        love.graphics.setColor(1, 1, 1, 0.95)  -- bijna wit, 95% opacity
-        love.graphics.rectangle("line", potX, potY, potW, potH, 18, 18)
 
     end
 

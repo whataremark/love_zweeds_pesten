@@ -1,4 +1,4 @@
--- Core game state without any AI logic. Card effects are handled in rules.lua
+-- Core game state without any AI logic those are present in ai.lua. Card effects are handled in rules.lua
 local game = {}
 local utils = require("utils")
 

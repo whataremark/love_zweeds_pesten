@@ -33,38 +33,46 @@ end
 
 -- Resolve the effect of a played card and advance the game state
 function rules.handle_card_effects(game, playerIndex, kaart, pot)
-    -- Move the card from the hand to the pot first
+    -- Verplaats kaart naar pot
     game.play_card(playerIndex, kaart, pot)
 
-    -- 10 clears the discard pile and grants another turn
+    print("[SPELER " .. playerIndex .. "] Speelt kaart:", kaart.waarde)
+
+    -- Reset altijd eerst flags (fallback)
+    game.extraTurn = false
+    game.lastCardWas10 = false
+    game.nextMustBeUnder7 = false
+
+    -- === Effecten ===
     if kaart.waarde == "10" then
-        utils.transfer_all_cards({}, pot) -- simply clear pot
+        utils.transfer_all_cards({}, pot) -- pot leegmaken
         game.lastCardWas10 = true
         game.extraTurn = true
-        if playerIndex == 2 then
-            game.waitingForAI = true
-            game.aiTimer = 0.5
-        end
-        return
-    end
-
-    -- 8 gives the player an extra turn
-    if kaart.waarde == "8" then
+        print("[RULES] Kaart is 10 dus Pot leeg en extra beurt")
+    elseif kaart.waarde == "8" then
         game.extraTurn = true
-        if playerIndex == 2 then
-            game.waitingForAI = true
-            game.aiTimer = 0.5
-        end
-        return
-    end
-
-    -- 7 enforces that the next card must be lower or equal to 7
-    if kaart.waarde == "7" then
+        print("[RULES] Kaart is 8 dus Extra beurt")
+    elseif kaart.waarde == "7" then
         game.nextMustBeUnder7 = true
+        print("[RULES] Kaart is 7 → Volgende kaart moet lager dan 7")
     else
-        game.nextMustBeUnder7 = false
+        print("[RULES] Geen speciaal effect")
     end
 
-    game.next_turn()
+    print("[STATUS] extraTurn:", game.extraTurn)
+    print("[STATUS] nextMustBeUnder7:", game.nextMustBeUnder7)
+    print("")
+    -- === Volgende beurt ===
+
+    -- AI timer klaarzetten indien nodig
+    if game.extraTurn and playerIndex == 2 then
+        game.waitingForAI = true
+        game.aiTimer = 0.5
+    end
+
+    -- Volgende beurt starten als er geen extra beurt is
+    if not game.extraTurn then
+        game.next_turn()
+    end
 end
 return rules

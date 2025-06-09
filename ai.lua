@@ -19,6 +19,11 @@ local function choose_card(game, pot)
     local top = effective_top_card(pot)
     local topValue = top and utils.numeric_value(top.waarde) or 0
 
+    print("\n[AI] Hand:")
+    for i, card in ipairs(hand) do
+        print(" - " .. card.waarde)
+    end
+
     local legal = {}
     for _, card in ipairs(hand) do
         local v = utils.numeric_value(card.waarde)
@@ -30,7 +35,13 @@ local function choose_card(game, pot)
         end
     end
 
+    print("[AI] Speelbare kaarten:")
+    for i, card in ipairs(legal) do
+        print(" - " .. card.waarde)
+    end
+
     if #legal == 0 then return nil end
+
     table.sort(legal, function(a, b)
         local prio = { ["2"] = 1, ["3"] = 1, ["10"] = 1 }
         local pa = prio[a.waarde] or 2
@@ -38,27 +49,30 @@ local function choose_card(game, pot)
         if pa ~= pb then return pa < pb end
         return utils.numeric_value(a.waarde) < utils.numeric_value(b.waarde)
     end)
+
+    print("[AI] Gekozen kaart: " .. legal[1].waarde)
     return legal[1]
 end
 
 -- Execute the AI's turn
 function ai.play(game, pot)
     local choice = choose_card(game, pot)
+
     if not choice then
         if game.extraTurn then
-            -- No card during an extra turn means pass
+            print("[AI] Geen geldige kaart tijdens extra beurt → past.")
             game.extraTurn = false
             game.next_turn()
         else
-            -- Pick up the pot when no card can be played
+            print("[AI] Geen geldige kaart → pakt pot op (" .. #pot .. " kaarten)")
             utils.transfer_all_cards(game.players[2].hand, pot)
-
             game.next_turn()
         end
         return
     end
-    rules.handle_card_effects(game, 2, choice, pot)
 
+    print("[AI] Speelt kaart: " .. choice.waarde)
+    rules.handle_card_effects(game, 2, choice, pot)
 end
 
 -- Simple timer based update used to delay the AI's move

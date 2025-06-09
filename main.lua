@@ -35,6 +35,14 @@ function startGame(mode)
     player.init(deck)
 
     pot = { deck.draw() }
+    
+    -- Als de eerste kaart een 7 is → activeer de 7-regel
+    local startkaart = pot[#pot]
+    if startkaart.waarde == "7" then
+        game.nextMustBeUnder7 = true
+        print("[INIT] Eerste kaart is een 7 → nextMustBeUnder7 = true")
+    end
+
     ronde = 0
     ongeldigeZetTimer = 0
 
@@ -52,7 +60,7 @@ function startGame(mode)
     end
 
     -- Debug
-    print("\n=== AI-START ===")
+    print("\n=== GAME START ===")
     print("AI heeft nu " .. #game.players[2].hand .. " kaarten op hand:")
     for i, c in ipairs(game.players[2].hand) do
         print(string.format("  [%d] %s of %s", i, c.waarde, c.kleur))
