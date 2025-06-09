@@ -7,7 +7,7 @@ player.dragOffset = { x = 0, y = 0 }
 
 function player.init(deck)
     player.hand = {}
-    for i = 1, 7 do
+    for i = 1, 5 do
         table.insert(player.hand, deck.draw())
     end
 end

@@ -57,6 +57,9 @@ local function choose_card(game, pot)
 end
 
 -- Execute the AI's turn
+-- ...existing code...
+
+-- Execute the AI's turn
 function ai.play(game, pot)
     local choice = choose_card(game, pot)
     if not choice then
@@ -67,14 +70,16 @@ function ai.play(game, pot)
         else
             -- Pick up the pot when no card can be played
             utils.transfer_all_cards(game.players[2].hand, pot)
-            -- refill_hand(game.players[2].hand)  -- REMOVE or COMMENT OUT THIS LINE
+            -- Do NOT refill here!
             game.next_turn()
         end
         return
     end
     rules.handle_card_effects(game, 2, choice, pot)
-    refill_hand(game.players[2].hand)
+    refill_hand(game.players[2].hand) -- Only refill after a successful play
 end
+
+-- ...existing code...
 
 -- Simple timer based update used to delay the AI's move
 function ai.update(dt, game, pot)

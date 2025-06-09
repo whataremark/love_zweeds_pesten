@@ -51,7 +51,7 @@ function startGame(mode)
 
     -- deel 7 kaarten aan de AI
     game.players[2].hand = {}
-    for i = 1, 7 do
+    for i = 1, 5 do
         table.insert(game.players[2].hand, deck.draw())
     end
 
