@@ -41,6 +41,19 @@ function utils.transfer_all_cards(dest, src)
     end
 end
 
+function utils.effective_top_card(pot)
+    for i = #pot, 1, -1 do
+        if pot[i].waarde ~= "3" then
+            print("[UTILS] effective_top_card: " .. pot[i].waarde)
+            return pot[i]
+        else
+            print("[UTILS] 3 GEDTECTEERDE")
+            -- Special case for 3: skip it")
+        end
+    end
+    return nil
+end
+
 --codex-- Ensure a hand always has at least `count` cards by drawing
 --codex-- from the deck module.
 function utils.refill_hand(hand, deck, count)

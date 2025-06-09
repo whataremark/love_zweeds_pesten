@@ -20,3 +20,6 @@ love .
 
 Veel plezier!
 
+
+### BUGS
+als er 7 ligt en je speelt 3 dan werkt de 3 niet en mag je hoger doen.. DUS 7 wordt gereset doordat er nieuwe kaart komt, 

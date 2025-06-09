@@ -6,7 +6,7 @@ local utils = require("utils")
 function rules.is_speelbaar(kaart, pot, onderZevenGedwongen)
     if not kaart then return false end
 
-    local bovenste = pot[#pot]
+    local bovenste = utils.effective_top_card(pot)
     if not bovenste then return true end -- lege pot → altijd toegestaan
 
     local waarde = utils.numeric_value(kaart.waarde)
@@ -17,7 +17,7 @@ function rules.is_speelbaar(kaart, pot, onderZevenGedwongen)
         return true
     end
 
-    -- 7 mag alleen als bovenste kaart 7 of lager is
+    -- 7 mag alleen als bovenste kaart 7 of lager is ## dit is mischien onndodig bedenk ik me
     if kaart.waarde == "7" then
         return bovensteWaarde and bovensteWaarde <= 7
     end
@@ -62,7 +62,9 @@ function rules.handle_card_effects(game, playerIndex, kaart)
     -- 7 enforces that the next card must be lower or equal to 7
     if kaart.waarde == "7" then
         game.nextMustBeUnder7 = true
+        print("[RULES] ZEVEN regel ACTIEF")
     else
+        print("[RULES] ZEVEN regel INACTIEF")
         game.nextMustBeUnder7 = false
     end
 

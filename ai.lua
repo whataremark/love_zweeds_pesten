@@ -4,15 +4,7 @@ local rules = require("rules")
 local drawPile = require("drawpile")
 local ai = {}
 
---codex-- Determine the effective top card while skipping any '3' values
-local function effective_top_card(pot)
-    for i = #pot, 1, -1 do
-        if pot[i].waarde ~= "3" then
-            return pot[i]
-        end
-    end
-    return nil
-end
+
 
 --codex-- Ranking used by the AI to choose between playable cards
 local function get_heuristics(waarde)
@@ -30,7 +22,10 @@ end
 --codex-- Pick the most attractive playable card from the AI hand
 local function choose_card(game, pot)
     local hand = game.players[2].hand
-    local top = effective_top_card(pot)
+    
+    --omdat ik deze functie heb verplaats naar utils.lua
+    local top = utils.effective_top_card(pot)
+    
     local topValue = top and utils.numeric_value(top.waarde) or 0
 
     local legal = {}
