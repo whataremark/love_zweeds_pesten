@@ -33,6 +33,9 @@ function love.update(dt)
             ongeldigeZetTimer = ongeldigeZetTimer - dt
         end
         ai.update(dt, game, game.pot)
+        if game.winner then
+            scene = "gameover"
+        end
     end
 end
 
@@ -41,6 +44,9 @@ function love.draw()
     love.graphics.setBackgroundColor(0.1, 0.4, 0.1)
     if scene=="menu" then
         ui.draw_menu(love.mouse.getX(),love.mouse.getY())
+        return
+    elseif scene=="gameover" then
+        ui.draw_end_screen(game.winner)
         return
     end
     love.graphics.setColor(1, 1, 1)

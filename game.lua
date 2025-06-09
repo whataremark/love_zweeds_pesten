@@ -8,8 +8,8 @@ local player = require("player")
 game.mode = "ai"
 
 game.players = {
-    { hand = {} }, -- Speler 1 (jij)
-    { hand = {} }  -- Speler 2 (AI)
+    { hand = {}, faceUp = {}, faceDown = {} }, -- Speler 1 (jij)
+    { hand = {}, faceUp = {}, faceDown = {} }  -- Speler 2 (AI)
 }
 
 --codex-- Central discard pile and number of full decks used
@@ -22,6 +22,7 @@ game.aiTimer = 0
 game.waitingForAI = false
 game.nextMustBeUnder7 = false
 game.extraTurn = false
+game.winner = nil
 
 --codex-- Initialize a new round with a chosen play mode
 function game.start(mode)
@@ -37,11 +38,31 @@ function game.start(mode)
     game.pot = { drawPile.draw() }
     game.ronde = 0
 
+    -- setup player 1
     game.players[1].hand = player.hand
+    game.players[1].faceDown = {}
+    game.players[1].faceUp = {}
+    for i = 1, 3 do
+        table.insert(game.players[1].faceDown, drawPile.draw())
+    end
+    for i = 1, 3 do
+        table.insert(game.players[1].faceUp, table.remove(game.players[1].hand))
+    end
+
+    -- setup AI player
     game.players[2].hand = {}
-    for i = 1, 5 do
+    game.players[2].faceDown = {}
+    game.players[2].faceUp = {}
+    for i = 1, 6 do
         table.insert(game.players[2].hand, drawPile.draw())
     end
+    for i = 1, 3 do
+        table.insert(game.players[2].faceDown, drawPile.draw())
+        table.insert(game.players[2].faceUp, table.remove(game.players[2].hand))
+    end
+
+    utils.refill_hand(game.players[1].hand, drawPile)
+    utils.refill_hand(game.players[2].hand, drawPile)
 end
 
 
@@ -68,6 +89,11 @@ function game.next_turn()
         game.waitingForAI = true
         game.aiTimer = 0.5
     end
+end
+
+function game.is_winner(index)
+    local p = game.players[index]
+    return #p.hand == 0 and #(p.faceUp or {}) == 0 and #(p.faceDown or {}) == 0
 end
 
 
