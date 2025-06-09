@@ -14,6 +14,17 @@ local function effective_top_card(pot)
 end
 
 -- Select the best playable card for the AI or nil when none is possible
+local function get_heuristics(waarde)
+    local map = {
+        ["2"] = 11, ["3"] = 14, ["4"] = 1, ["5"] = 2,
+        ["6"] = 3, ["7"] = 4, ["8"] = 5, ["9"] = 6,
+        ["10"] = 13, ["jack"] = 8, ["queen"] = 9,
+        ["king"] = 9, ["ace"] = 10
+    }
+    return map[waarde] or 0
+end
+
+-- Select the best playable card for the AI or nil when none is possible
 local function choose_card(game, pot)
     local hand = game.players[2].hand
     local top = effective_top_card(pot)
@@ -32,11 +43,7 @@ local function choose_card(game, pot)
 
     if #legal == 0 then return nil end
     table.sort(legal, function(a, b)
-        local prio = { ["2"] = 1, ["3"] = 1, ["10"] = 1 }
-        local pa = prio[a.waarde] or 2
-        local pb = prio[b.waarde] or 2
-        if pa ~= pb then return pa < pb end
-        return utils.numeric_value(a.waarde) < utils.numeric_value(b.waarde)
+        return get_heuristics(a.waarde) < get_heuristics(b.waarde)
     end)
     return legal[1]
 end
