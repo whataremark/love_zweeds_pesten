@@ -1,5 +1,4 @@
---codex-- Utility fo
- the human player's hand and drag state
+--codex-- Utility for the human player's hand and drag state
 local player = {}
 
 player.hand = {}
@@ -8,7 +7,7 @@ player.dragOffset = { x = 0, y = 0 }
 
 function player.init(deck)
     player.hand = {}
-    for i = 1, 5 do
+    for i = 1, 6 do
         table.insert(player.hand, deck.draw())
     end
 end

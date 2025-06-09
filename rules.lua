@@ -63,12 +63,20 @@ function rules.handle_card_effects(game, playerIndex, kaart)
     if kaart.waarde == "7" then
         game.nextMustBeUnder7 = true
         print("[RULES] ZEVEN regel ACTIEF")
-    else
-        print("[RULES] ZEVEN regel INACTIEF")
+    elseif kaart.waarde ~= "3" then
+        -- A 3 is transparent: keep the previous 7 rule active
         game.nextMustBeUnder7 = false
+        print("[RULES] ZEVEN regel INACTIEF")
+    else
+        -- Card is a 3, do not change the rule
+        print("[RULES] ZEVEN regel BLIJFT ACTIEF")
     end
 
-    game.next_turn()
+    if game.is_winner(playerIndex) then
+        game.winner = playerIndex
+    else
+        game.next_turn()
+    end
 end
 return rules
 
