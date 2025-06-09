@@ -48,6 +48,9 @@ function love.draw()
     elseif scene=="gameover" then
         ui.draw_end_screen(game.winner)
         return
+    elseif game.phase == "setup" then
+        ui.draw_setup(player.hand, game.players[1].faceUp)
+        return
     end
     love.graphics.setColor(1, 1, 1)
     love.graphics.draw(bgCanvas, 0, 0)
@@ -135,6 +138,21 @@ function love.mousereleased(x, y, button)
     local pw, ph = 100, 140
     -- Controleer of de kaart in het potgebied wordt losgelaten
     local inPot = utils.inside(x, y, px, py, pw, ph)
+
+    if game.phase == "setup" then
+        for i,slot in ipairs(ui.setupSlots) do
+            if not game.players[1].faceUp[i] and utils.inside(x,y,slot.x,slot.y,slot.w,slot.h) then
+                game.players[1].faceUp[i] = kaart
+                kaart = nil
+                break
+            end
+        end
+        if kaart then table.insert(player.hand, kaart) end
+        if #game.players[1].faceUp == 3 then
+            game.finish_setup()
+        end
+        return
+    end
 
     if game.currentPlayer ~= 1 then
         table.insert(player.hand, kaart)
