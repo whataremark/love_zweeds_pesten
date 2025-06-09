@@ -1,3 +1,5 @@
+-- Main entry file controlling scenes and user input
+
 local deck  = require("deck")
 local player = require("player")
 local ui    = require("ui")
@@ -121,9 +123,8 @@ function love.mousepressed(x, y, button)
         local b = buttons.pickup
         if x >= b.x and x <= b.x + b.w and y >= b.y and y <= b.y + b.h then
             if game.currentPlayer == 1 then
-                for i = #pot, 1, -1 do
-                    table.insert(player.hand, table.remove(pot, i))
-                end
+                -- Alle kaarten uit de pot naar de speler overzetten
+                utils.transfer_all_cards(player.hand, pot)
                 print("Speler pakt pot op (" .. #player.hand .. " kaarten)")
                 game.next_turn()
             else
@@ -150,7 +151,8 @@ function love.mousereleased(x, y, button)
 
     local px, py = love.graphics.getWidth()/2 - 50, love.graphics.getHeight()/2 - 70
     local pw, ph = 100, 140
-    local inPot = x > px and x < px + pw and y > py and y < py + ph
+    -- Controleer of de kaart in het potgebied wordt losgelaten
+    local inPot = utils.inside(x, y, px, py, pw, ph)
 
     if game.currentPlayer ~= 1 then
         table.insert(player.hand, kaart)
@@ -159,7 +161,7 @@ function love.mousereleased(x, y, button)
 
     if inPot then
         if rules.is_speelbaar(kaart, pot, game.nextMustBeUnder7) then
-            game.handle_card_effects(1, kaart, pot)
+            rules.handle_card_effects(game, 1, kaart, pot)
             ronde = ronde + 1
         else
             table.insert(player.hand, kaart)

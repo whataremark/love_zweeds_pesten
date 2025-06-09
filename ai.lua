@@ -1,4 +1,6 @@
+-- Basic computer opponent behaviour
 local utils = require("utils")
+local rules = require("rules")
 local ai = {}
 
 -- Helper to ignore any '3' cards when determining the top card
@@ -49,16 +51,14 @@ function ai.play(game, pot)
             game.next_turn()
         else
             -- Pick up the pot when no card can be played
-            for i = #pot, 1, -1 do
-                table.insert(game.players[2].hand, table.remove(pot, i))
-            end
+            utils.transfer_all_cards(game.players[2].hand, pot)
+
             game.next_turn()
         end
         return
     end
-    game.handle_card_effects(2, choice, pot)
-    print("\n=== AI-TURN COMPLETE ===")
-    print("AI heeft nu " .. #game.players[2].hand .. " kaarten op hand:")
+    rules.handle_card_effects(game, 2, choice, pot)
+
 end
 
 -- Simple timer based update used to delay the AI's move

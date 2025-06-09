@@ -1,3 +1,5 @@
+-- Collection of small reusable helper functions
+
 local utils = {}
 
 -- Convert card value names to a numeric ranking.
@@ -30,6 +32,13 @@ function utils.generate_green_felt_background(w, h)
     end
     love.graphics.setCanvas()
     return canvas
+end
+
+-- Move all items from src to dest in reverse order so indices remain stable
+function utils.transfer_all_cards(dest, src)
+    for i = #src, 1, -1 do
+        table.insert(dest, table.remove(src, i))
+    end
 end
 
 return utils

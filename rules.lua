@@ -30,4 +30,41 @@ function rules.is_speelbaar(kaart, pot, onderZevenGedwongen)
     return waarde and bovensteWaarde and waarde >= bovensteWaarde
     
 end
+
+-- Resolve the effect of a played card and advance the game state
+function rules.handle_card_effects(game, playerIndex, kaart, pot)
+    -- Move the card from the hand to the pot first
+    game.play_card(playerIndex, kaart, pot)
+
+    -- 10 clears the discard pile and grants another turn
+    if kaart.waarde == "10" then
+        utils.transfer_all_cards({}, pot) -- simply clear pot
+        game.lastCardWas10 = true
+        game.extraTurn = true
+        if playerIndex == 2 then
+            game.waitingForAI = true
+            game.aiTimer = 0.5
+        end
+        return
+    end
+
+    -- 8 gives the player an extra turn
+    if kaart.waarde == "8" then
+        game.extraTurn = true
+        if playerIndex == 2 then
+            game.waitingForAI = true
+            game.aiTimer = 0.5
+        end
+        return
+    end
+
+    -- 7 enforces that the next card must be lower or equal to 7
+    if kaart.waarde == "7" then
+        game.nextMustBeUnder7 = true
+    else
+        game.nextMustBeUnder7 = false
+    end
+
+    game.next_turn()
+end
 return rules

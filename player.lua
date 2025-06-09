@@ -1,3 +1,4 @@
+-- Utility for the human player's hand and drag state
 local player = {}
 
 player.hand = {}

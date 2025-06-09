@@ -12,9 +12,10 @@ love .
 ```
 
 ## Structuur
-- `game.lua` bevat de basis van de speltoestand.
+- `game.lua` bevat alleen het kale spelmodel.
+- `rules.lua` verwerkt de spelregels en kaarteffecten.
 - `ai.lua` regelt de zetten van de tegenstander.
-- `utils.lua` verzamelt kleine hulpmethoden.
+- `utils.lua` bevat herbruikbare hulpfuncties.
 - `ui.lua` tekent de kaarten en menu's.
 
 Veel plezier!

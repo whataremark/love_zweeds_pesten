@@ -1,4 +1,4 @@
--- Core game state without any AI logic. The AI behaviour lives in ai.lua.
+-- Core game state without any AI logic. Card effects are handled in rules.lua
 local game = {}
 local utils = require("utils")
 
@@ -43,44 +43,6 @@ function game.next_turn()
     end
 end
 
-
-
----CARD EFFECTS---
-function game.handle_card_effects(playerIndex, kaart, pot)
-    -- Apply card to the pile and resolve any special effects
-    game.play_card(playerIndex, kaart, pot)
-
-    if kaart.waarde == "10" then
-        print("Kaart was 10 → pot volledig wissen")
-        for i = #pot, 1, -1 do
-            table.remove(pot, i)
-        end
-        game.lastCardWas10 = true
-        game.extraTurn = true
-        if playerIndex == 2 then
-            game.waitingForAI = true
-            game.aiTimer = 0.5
-        end
-        return
-    end
-
-    if kaart.waarde == "8" then
-        print("Kaart was 8 → speler mag nog een keer")
-        game.extraTurn = true
-        if playerIndex == 2 then
-            game.waitingForAI = true
-            game.aiTimer = 0.5
-        end
-        return
-    end
-
-    if kaart.waarde == "7" then
-        game.nextMustBeUnder7 = true
-    else
-        game.nextMustBeUnder7 = false
-    end
-    game.next_turn()
-end
 
 -- Expose the game state for other modules
 return game
