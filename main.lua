@@ -42,6 +42,8 @@ end
 --codex-- Render the current scene and game state
 function love.draw()
     love.graphics.setBackgroundColor(0.1, 0.4, 0.1)
+    -- recalculate layout each frame so scaling works when window size changes
+    ui.calculate()
     if scene=="menu" then
         ui.draw_menu(love.mouse.getX(),love.mouse.getY())
         return

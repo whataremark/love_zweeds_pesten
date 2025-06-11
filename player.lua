@@ -21,8 +21,12 @@ function player.startDrag(x, y)
     local kaartBreedte = config.cardWidth
 
     local w = love.graphics.getWidth()
-    local x_start = (w - (#player.hand * (kaartBreedte + padding))) / 2
-    local y_start = love.graphics.getHeight() - kaartHoogte - 50
+    -- center the row horizontally similar to ui.layout
+    local x_start = (w - (#player.hand * (kaartBreedte + padding) - padding)) / 2
+    -- replicate ui.calculate() logic for the hand Y position
+    local gap = 10
+    local h = love.graphics.getHeight()
+    local y_start = h - 3 * kaartHoogte - 2 * gap - 15
 
     for i, kaart in ipairs(player.hand) do
         local cx = x_start + (i - 1) * (kaartBreedte + padding)
