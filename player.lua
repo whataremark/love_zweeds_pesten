@@ -1,5 +1,4 @@
---codex-- Utility fo
- the human player's hand and drag state
+--codex-- Utility for the human player's hand and drag state
 local player = {}
 
 player.hand = {}
@@ -8,7 +7,7 @@ player.dragOffset = { x = 0, y = 0 }
 
 function player.init(deck)
     player.hand = {}
-    for i = 1, 5 do
+    for i = 1, 6 do
         table.insert(player.hand, deck.draw())
     end
 end
@@ -22,8 +21,12 @@ function player.startDrag(x, y)
     local kaartBreedte = config.cardWidth
 
     local w = love.graphics.getWidth()
-    local x_start = (w - (#player.hand * (kaartBreedte + padding))) / 2
-    local y_start = love.graphics.getHeight() - kaartHoogte - 50
+    -- center the row horizontally similar to ui.layout
+    local x_start = (w - (#player.hand * (kaartBreedte + padding) - padding)) / 2
+    -- replicate ui.calculate() logic for the hand Y position
+    local gap = 10
+    local h = love.graphics.getHeight()
+    local y_start = h - 3 * kaartHoogte - 2 * gap - 15
 
     for i, kaart in ipairs(player.hand) do
         local cx = x_start + (i - 1) * (kaartBreedte + padding)
