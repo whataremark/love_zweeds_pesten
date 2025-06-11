@@ -11,6 +11,7 @@ local utils  = require("utils")
 -- Image for card backs used throughout the UI
 local cardBack = love.graphics.newImage("/png/back.png")
 
+
 -- Fonts for titles and smaller texts
 local titleFont = love.graphics.newFont(40)
 local smallFont = love.graphics.newFont(20)
@@ -54,6 +55,7 @@ function ui.calculate()
     -- Action buttons below the player hand
     ui.pos.btnY   = ui.pos.downY + ch + 10
 end
+
 
 -----------------------------------------------------------------------
 -- Helper to center a row of cards horizontally
@@ -212,6 +214,7 @@ function ui.draw_hand(hand, dragging)
         local mx,my = love.mouse.getPosition()
         local sc = config.cardHeight / dragging.afbeelding:getHeight()
         love.graphics.draw(dragging.afbeelding, mx - player.dragOffset.x, my - player.dragOffset.y, 0, sc, sc)
+
     end
 end
 
@@ -308,6 +311,7 @@ function ui.draw_action_buttons()
     }
 end
 
+
 -----------------------------------------------------------------------
 -- End screen after someone wins
 -----------------------------------------------------------------------
@@ -323,5 +327,6 @@ function ui.draw_end_screen(winner)
     local count = #game.players[other].hand
     love.graphics.printf("Andere speler heeft "..count.." kaarten over",0,h/2+20,w,"center")
 end
+
 
 return ui
