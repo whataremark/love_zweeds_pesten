@@ -1,3 +1,5 @@
+--codex-- Utility fo
+ --the human player's hand and drag state
 local player = {}
 
 player.hand = {}
@@ -6,16 +8,18 @@ player.dragOffset = { x = 0, y = 0 }
 
 function player.init(deck)
     player.hand = {}
-    for i = 1, 7 do
+    for i = 1, 5 do
         table.insert(player.hand, deck.draw())
     end
 end
 
+--codex-- Begin dragging a card from the player's hand
 function player.startDrag(x, y)
-    local padding = 15
-    local kaartHoogte = 120
-    local schaal = kaartHoogte / 500
-    local kaartBreedte = 300 * schaal
+    local config = require("config")
+    local padding = config.cardPadding
+    local kaartHoogte = config.cardHeight
+    local schaal = config.scale
+    local kaartBreedte = config.cardWidth
 
     local w = love.graphics.getWidth()
     local x_start = (w - (#player.hand * (kaartBreedte + padding))) / 2
@@ -35,10 +39,12 @@ function player.startDrag(x, y)
     end
 end
 
+--codex-- Update drag offsets (UI queries mouse position directly)
 function player.updateDragging()
     -- geen xy-opslag nodig; UI berekent dat live
 end
 
+--codex-- Finish dragging and return the selected card
 function player.stopDrag()
     local kaart = player.draggingCard
     player.draggingCard = nil
@@ -46,3 +52,4 @@ function player.stopDrag()
 end
 
 return player
+

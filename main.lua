@@ -1,103 +1,89 @@
-local deck = require("deck")
-local player = require("player")
-local ui = require("ui")
-local rules = require("rules")
-local game = require("game")
+-- Main entry file controlling scenes and user input
 
+local drawPile  = require("drawpile")
+local player = require("player")
+local ui    = require("ui")
+local rules = require("rules")
+local game  = require("game")
+local ai    = require("ai")
+local utils = require("utils")
+
+local bgCanvas
 
 local scene = "menu"  -- "menu" | "playing"
-local selectedMode    -- "ai" | "human"
 
-
-local pot = {}
 local ronde = 0
 local ongeldigeZetTimer = 0
 
 toonPotOverlay = false
 
+
+--codex-- Initialize global resources
 function love.load()
-    love.graphics.setBackgroundColor(0.9, 0.9, 0.9)
-end
-
-function startGame(mode)
-    selectedMode = mode
-    scene        = "playing"
-
-    deck.init()
-    player.init(deck)
-
-    pot = { deck.draw() }
-    ronde = 0
-    ongeldigeZetTimer = 0
-
-    game.mode = mode
-    game.currentPlayer = 1
-    game.waitingForAI  = false
-
-    -- koppel hand van de mens aan game-model
-    game.players[1].hand = player.hand
-
-    -- deel 7 kaarten aan de AI
-    game.players[2].hand = {}
-    for i = 1, 7 do
-        table.insert(game.players[2].hand, deck.draw())
-    end
-
-    -- Debug
-    print("\n=== AI-START ===")
-    print("AI heeft nu " .. #game.players[2].hand .. " kaarten op hand:")
-    for i, c in ipairs(game.players[2].hand) do
-        print(string.format("  [%d] %s of %s", i, c.waarde, c.kleur))
-    end
+    -- Pre-render the background felt texture once
+    bgCanvas = utils.generate_green_felt_background(love.graphics.getWidth(), love.graphics.getHeight())
 end
 
 
+--codex-- Game loop update handling AI and timers
 function love.update(dt)
-       if scene=="playing" then
+    if scene == "playing" then
         player.updateDragging()
-        if ongeldigeZetTimer>0 then ongeldigeZetTimer = ongeldigeZetTimer - dt end
-        game.update(dt,pot)
+        if ongeldigeZetTimer > 0 then
+            ongeldigeZetTimer = ongeldigeZetTimer - dt
+        end
+        ai.update(dt, game, game.pot)
     end
-
 end
 
-
-
+--codex-- Render the current scene and game state
 function love.draw()
+    love.graphics.setBackgroundColor(0.1, 0.4, 0.1)
     if scene=="menu" then
         ui.draw_menu(love.mouse.getX(),love.mouse.getY())
         return
     end
-    ui.draw_pot(pot, ongeldigeZetTimer > 0, toonPotOverlay)
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.draw(bgCanvas, 0, 0)
+
+    ui.draw_pot(game.pot, ongeldigeZetTimer > 0, toonPotOverlay)
+    ui.draw_deck(drawPile)
     ui.draw_other_players()
     ui.draw_hand(player.hand, player.draggingCard)
-
+    
     love.graphics.print("Aan de beurt: Speler " .. game.currentPlayer, 20, 20)
-
 
     love.graphics.setColor(0, 0, 0)
     love.graphics.print("Ronde: " .. ronde, 20, 20)
-    love.graphics.print("Kaarten in pot: " .. #pot, 20, 40)
+    love.graphics.print("Kaarten in pot: " .. #game.pot, 20, 40)
     
-    pickupButton = drawPickupButton()
-
     --debug ish
     love.graphics.print("Speler aan zet: " .. game.currentPlayer, 20, 60)
     love.graphics.print("AI-timer: " .. string.format("%.2f", game.aiTimer), 20, 80)
 
-
+    buttons = ui.draw_action_buttons()
 end
 
+--codex-- Handle mouse clicks for menus and card actions
 function love.mousepressed(x, y, button)
     if scene == "menu" and button == 1 then
-        local inside = function(mx, my, bx, by, bw, bh)
-            return mx > bx and mx < bx + bw and my > by and my < by + bh
-        end
-        if inside(x, y, ui.aiX, ui.aiY, ui.aiW, ui.aiH) then
-            startGame("ai")
+        if utils.inside(x, y, ui.d1x, ui.d1y, ui.d1w, ui.d1h) then
+            game.deckCount = 1
             return
-        elseif inside(x, y, ui.hX, ui.hY, ui.hW, ui.hH) then
-            startGame("human")
+        elseif utils.inside(x, y, ui.d2x, ui.d2y, ui.d2w, ui.d2h) then
+            game.deckCount = 2
+            return
+        elseif utils.inside(x, y, ui.aiX, ui.aiY, ui.aiW, ui.aiH) then
+            game.start("ai")
+            scene = "playing"
+            ronde = 0
+            ongeldigeZetTimer = 0
+            return
+        elseif utils.inside(x, y, ui.hX, ui.hY, ui.hW, ui.hH) then
+            game.start("human")
+            scene = "playing"
+            ronde = 0
+            ongeldigeZetTimer = 0
             return
         end
     end
@@ -107,30 +93,32 @@ function love.mousepressed(x, y, button)
         player.startDrag(x, y)
     end
 
-    -- Toon pot overlay toggle
-    if button == 1 and x > love.graphics.getWidth() - 150 and y > love.graphics.getHeight() - 50 then
-        toonPotOverlay = not toonPotOverlay
-    end
-
-    -- Pickup button check
-    if button == 1 and pickupButton then
-        if x >= pickupButton.x and x <= pickupButton.x + pickupButton.w and
-           y >= pickupButton.y and y <= pickupButton.y + pickupButton.h then
-
+    -- Knoppen onderaan controleren (Pak kaart & Pot bekijken)
+    if button == 1 and buttons then
+        -- Pak kaart knop
+        local b = buttons.pickup
+        if x >= b.x and x <= b.x + b.w and y >= b.y and y <= b.y + b.h then
             if game.currentPlayer == 1 then
-                for i = #pot, 1, -1 do
-                    table.insert(player.hand, table.remove(pot, i))
-                end
+                -- Alle kaarten uit de pot naar de speler overzetten
+                utils.transfer_all_cards(player.hand, game.pot)
                 print("Speler pakt pot op (" .. #player.hand .. " kaarten)")
                 game.next_turn()
             else
                 print("Niet jouw beurt.")
             end
+            return
+        end
+
+        -- Pot bekijken knop
+        local b2 = buttons.pot
+        if x >= b2.x and x <= b2.x + b2.w and y >= b2.y and y <= b2.y + b2.h then
+            toonPotOverlay = not toonPotOverlay
+            return
         end
     end
 end
 
-
+--codex-- Drop a dragged card onto the table or return it
 function love.mousereleased(x, y, button)
     if button ~= 1 then return end
 
@@ -139,7 +127,8 @@ function love.mousereleased(x, y, button)
 
     local px, py = love.graphics.getWidth()/2 - 50, love.graphics.getHeight()/2 - 70
     local pw, ph = 100, 140
-    local inPot = x > px and x < px + pw and y > py and y < py + ph
+    -- Controleer of de kaart in het potgebied wordt losgelaten
+    local inPot = utils.inside(x, y, px, py, pw, ph)
 
     if game.currentPlayer ~= 1 then
         table.insert(player.hand, kaart)
@@ -147,9 +136,10 @@ function love.mousereleased(x, y, button)
     end
 
     if inPot then
-        if rules.is_speelbaar(kaart, pot, game.nextMustBeUnder7) then
-            game.handle_card_effects(1, kaart, pot)
+        if rules.is_speelbaar(kaart, game.pot, game.nextMustBeUnder7) then
+            rules.handle_card_effects(game, 1, kaart)
             ronde = ronde + 1
+            utils.refill_hand(player.hand, drawPile)
         else
             table.insert(player.hand, kaart)
             ongeldigeZetTimer = 1.0

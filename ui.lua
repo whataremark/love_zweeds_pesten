@@ -1,14 +1,38 @@
+-- Rendering and menu functions
 local ui = {}
+local game = require("game")
 
-local kaartHoogte = 120
-local schaal = kaartHoogte / 500
-local kaartBreedte = 300 * schaal
-local padding = 15
+local config = require("config")
+local kaartHoogte = config.cardHeight
+local schaal = config.scale
+local kaartBreedte = config.cardWidth
+local padding = config.cardPadding
 
+local cardBack = love.graphics.newImage("/png/back.png")
 
 local player = require("player") -- <-- dit is essentieel!
 
+local groteTitelFont = love.graphics.newFont(40)
+local kleineTitelFont = love.graphics.newFont(20)
 
+--codex-- Draw remaining draw pile as stacked card backs with a counter
+function ui.draw_deck(deck)
+    local w, h = love.graphics.getWidth(), love.graphics.getHeight()
+    local kaart_hoogte = 140
+    local x = w / 2 + 120
+    local y = h / 2 - 70
+    local schaal = kaart_hoogte / cardBack:getHeight()
+    local count = deck.count()
+    local zichtbaar = math.min(count, 5)
+    for i = 0, zichtbaar - 1 do
+        love.graphics.setColor(1, 1, 1, 1 - i * 0.15)
+        love.graphics.draw(cardBack, x + i * 2, y - i * 2, math.rad(-i * 2), schaal, schaal)
+    end
+    love.graphics.setColor(0, 0, 0)
+    love.graphics.printf("Deck: " .. count, x - 30, y + kaart_hoogte + 10, 120, "center")
+end
+
+--codex-- Draw the pile of played cards and optional overlay
 function ui.draw_pot(pot, ongeldigeZetActief, toonOverlay)
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
     local x, y = w / 2 - 50, h / 2 - 70
@@ -35,53 +59,90 @@ function ui.draw_pot(pot, ongeldigeZetActief, toonOverlay)
             love.graphics.setColor(1, 0, 0, 0.5)
             love.graphics.rectangle("line", x, y, 100, kaart_hoogte)
             love.graphics.setColor(1, 0, 0)
-            love.graphics.print("❌ Ongeldige zet!", x - 10, y + kaart_hoogte + 5)
+            love.graphics.print("Ongeldige zet!", x - 10, y + kaart_hoogte + 5)
         end
+         
+        -- Teken achtergrond rechthoek achter pot-kaarten
+        local potW, potH = 200, 230  -- groter dan de kaart
+        local potX = (w - potW) / 2
+        local potY = (h - potH) / 2
+        love.graphics.setColor(1, 1, 1, 0.95)  -- bijna wit, 95% opacity
+        love.graphics.rectangle("line", potX, potY, potW, potH, 18, 18)
+
     end
 
-    -- Pot bekijken knop
-    love.graphics.setColor(0.2, 0.2, 0.2)
-    love.graphics.rectangle("fill", w - 150, h - 50, 140, 40, 8)
-    
+-- Overlay met alle kaarten (compact, tussen boven- en onderkant)
+if toonOverlay then
+    local screenW = love.graphics.getWidth()
+    local screenH = love.graphics.getHeight()
+
+    local overlayW = 300
+    local overlayH = screenH - 300  -- genoeg ruimte boven en onder
+    local overlayX = screenW - overlayW - 20
+    local overlayY = 130  -- onder de bovenste kaarten
+
+    -- Achtergrond van de overlay
+    love.graphics.setColor(0.2, 0.5, 0.3, 0.97)  -- zachtere groen
+    love.graphics.rectangle("fill", overlayX, overlayY, overlayW, overlayH, 12)
+
+    -- Header
     love.graphics.setColor(1, 1, 1)
-    love.graphics.print("📂 Pot bekijken", w - 140, h - 40)
+    love.graphics.printf(" Pot kaarten", overlayX, overlayY + 10, overlayW, "center")
 
-    -- Overlay met alle kaarten
-    if toonOverlay then
-        love.graphics.setColor(1, 1, 1, 0.92)
-        love.graphics.rectangle("fill", 20, 20, w - 40, h - 40, 12)  -- met afgeronde hoeken
+    -- Kaarten tekenen
+    local startX = overlayX + 20
+    local startY = overlayY + 40
+    local maxPerRow = 3
+    local padding = 15
+    local kaart_hoogte = 70
 
-        local startX = 60
-        local startY = 80
-        local maxPerRow = 7
-        local padding = 20
-        local kaart_hoogte = 100
-
-        for i, kaart in ipairs(pot) do
-            local rij = math.floor((i - 1) / maxPerRow)
-            local kolom = (i - 1) % maxPerRow
-            local schaal = kaart_hoogte / kaart.afbeelding:getHeight()
-            local x = startX + kolom * (90 + padding)
-            local y = startY + rij * (kaart_hoogte + padding)
-            love.graphics.setColor(1, 1, 1)
-            love.graphics.draw(kaart.afbeelding, x, y, 0, schaal, schaal)
-        end
-
+    for i, kaart in ipairs(pot) do
+        local rij = math.floor((i - 1) / maxPerRow)
+        local kolom = (i - 1) % maxPerRow
+        local schaal = kaart_hoogte / kaart.afbeelding:getHeight()
+        local x = startX + kolom * (90 + padding)
+        local y = startY + rij * (kaart_hoogte + padding)
         love.graphics.setColor(1, 1, 1)
-        love.graphics.print("Klik nogmaals op de knop om te sluiten", startX, startY - 30)
+        love.graphics.draw(kaart.afbeelding, x, y, 0, schaal, schaal)
+    end
+
+    -- Footer
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.printf("Klik op de knop om te sluiten", overlayX, overlayY + overlayH - 25, overlayW, "center")
+end
+end
+
+--codex-- Draw the AI player's face-down cards
+function ui.draw_other_players()
+    local game = require("game")
+    local hand = game.players[2].hand
+    local kaartAantal = #hand
+
+    -- Kaartpositie (bovenkant scherm, horizontaal gecentreerd)
+    local kaartBreedte = cardBack:getWidth()
+    local kaartHoogte  = cardBack:getHeight()
+    local schaal       = 0.5  -- zelfde als je eigen kaarten
+
+    local spacing = 90  -- overlap tussen kaarten
+    local totalWidth = spacing * (kaartAantal - 1) + kaartBreedte * schaal
+    local startX = (love.graphics.getWidth() - totalWidth) / 2
+    local y = 60
+
+    -- Titel
+    love.graphics.setColor(0, 0, 0)
+    love.graphics.printf("Speler 2", startX, startX + totalWidth, y - 20, "center")
+
+    -- Kaarten
+    for i = 1, kaartAantal do
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.draw(cardBack, startX + (i - 1) * spacing, y, 0, schaal, schaal)
     end
 end
 
-function ui.draw_other_players()
-    local w = love.graphics.getWidth()
-    love.graphics.setColor(0, 0, 0)
-    love.graphics.print("Speler 2", w / 2 - 25, 30)
-    love.graphics.rectangle("line", w / 2 - 100, 50, 200, 100)
-end
-
+--codex-- Render the player's hand and follow the dragged card
 function ui.draw_hand(hand, draggingCard)
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
-    local kaart_hoogte = 120
+    local kaart_hoogte = 160
     local padding = 15
     local schaal = kaart_hoogte / 500 -- schatting originele PNG hoogte
     local kaart_breedte = 300 * schaal
@@ -107,10 +168,13 @@ end
 
 -----------------------------------------------------------------
 -- MENU  --------------------------------------------------------
+--codex-- Main menu with mode selection buttons
 function ui.draw_menu(mouseX, mouseY)
     local w,h = love.graphics.getWidth(), love.graphics.getHeight()
+    love.graphics.setFont(groteTitelFont)
     love.graphics.setColor(1,1,1)
-    love.graphics.printf("Zweeds Pesten",0,150,w,"center")
+    love.graphics.printf("Zweeds Pesten", 0, 150, w, "center")
+    love.graphics.setFont(kleineTitelFont)
 
     local function button(txt,y)
         local bw,bh = 280,60
@@ -125,18 +189,52 @@ function ui.draw_menu(mouseX, mouseY)
 
     ui.btnAI,  ui.aiX,  ui.aiY,  ui.aiW,  ui.aiH  = button("Tegen AI spelen", 260)
     ui.btnH2H, ui.hX,   ui.hY,   ui.hW,   ui.hH   = button("Tegen speler (WIP)", 340)
+
+    local function deckBtn(label,x,y,selected)
+        local bw,bh = 120,40
+        local hover = mouseX>x and mouseX<x+bw and mouseY>y and mouseY<y+bh
+        love.graphics.setColor(selected and 0.4 or hover and 0.8 or 0.6,0.6,0.6)
+        love.graphics.rectangle("fill",x,y,bw,bh,8,8)
+        love.graphics.setColor(0,0,0)
+        love.graphics.printf(label,x,y+10,bw,"center")
+        return hover,x,y,bw,bh
+    end
+
+    love.graphics.setColor(1,1,1)
+    love.graphics.printf("Aantal decks:",0, 410, w, "center")
+    ui.oneX, ui.oneY = (w-260)/2, 440
+    ui.twoX, ui.twoY = ui.oneX+140, 440
+    ui.d1, ui.d1x, ui.d1y, ui.d1w, ui.d1h = deckBtn("1 Deck", ui.oneX, ui.oneY, game.deckCount==1)
+    ui.d2, ui.d2x, ui.d2y, ui.d2w, ui.d2h = deckBtn("2 Decks", ui.twoX, ui.twoY, game.deckCount==2)
 end
 
 
---Pickup Button ----
-function drawPickupButton()
-    local x, y, w, h = 100, 500, 150, 40
+-- Pickup + Pot bekijkknoppen gecombineerd en gecentreerd
+--codex-- Draw buttons to pick up the pile or view it
+function ui.draw_action_buttons()
+    local w, h = love.graphics.getWidth(), love.graphics.getHeight()
+    local btnW, btnH = 150, 40
+    local spacing = 20
+    local totalW = btnW * 2 + spacing
+    local startX = (w - totalW) / 2
+    local y = h - btnH - 20
+
+    -- === Pak kaart knop ===
     love.graphics.setColor(0.2, 0.6, 0.2)
-    love.graphics.rectangle("fill", x, y, w, h)
+    love.graphics.rectangle("fill", startX, y, btnW, btnH, 8)
     love.graphics.setColor(1, 1, 1)
-    love.graphics.printf("Pak kaart", x, y + 10, w, "center")
+    love.graphics.printf("Pak kaart", startX, y + 10, btnW, "center")
 
-    return {x = x, y = y, w = w, h = h}
+    -- === Pot bekijken knop ===
+    love.graphics.setColor(0.2, 0.2, 0.2)
+    love.graphics.rectangle("fill", startX + btnW + spacing, y, btnW, btnH, 8)
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.printf("Pot bekijken", startX + btnW + spacing, y + 10, btnW, "center")
+
+    -- Return knopposities voor klikdetectie
+    return {
+        pickup = { x = startX, y = y, w = btnW, h = btnH },
+        pot    = { x = startX + btnW + spacing, y = y, w = btnW, h = btnH }
+    }
 end
-
 return ui
