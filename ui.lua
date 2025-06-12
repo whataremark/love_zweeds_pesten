@@ -274,6 +274,7 @@ function ui.draw_hand(hand, dragging)
         love.graphics.draw(dragging.afbeelding, mx - player.dragOffset.x, my - player.dragOffset.y, 0, sc, sc)
 
     end
+end
 
 -----------------------------------------------------------------------
 -- Setup screen where the player chooses three face-up cards
