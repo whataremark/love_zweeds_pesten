@@ -1,43 +1,59 @@
---codex-- Utility fo
- --the human player's hand and drag state
+--the human player's hand and drag state
 local player = {}
 
-player.hand = {}
+--voor het scrollen van de hand
+player.scrollOffset = 0  -- pixels
+
+player.players = {
+    {
+        hand = {},
+        faceUp = {},
+        faceDown = {}
+    },
+    {
+        hand = {},
+        faceUp = {},
+        faceDown = {}
+    }
+}
+
 player.draggingCard = nil
 player.dragOffset = { x = 0, y = 0 }
 
+player.selectedFaceUp = {}
+
+
+
 function player.init(deck)
-    player.hand = {}
-    for i = 1, 5 do
-        table.insert(player.hand, deck.draw())
+    for i, p in ipairs(player.players) do
+        p.hand = {}
+        p.faceUp = {}
+        p.faceDown = {}
+        for j = 1, 6 do
+            table.insert(p.hand, deck.draw())
+        end
+        for j = 1, 3 do
+            table.insert(p.faceDown, deck.draw())
+        end
     end
 end
 
 --codex-- Begin dragging a card from the player's hand
 function player.startDrag(x, y)
-    local config = require("config")
-    local padding = config.cardPadding
-    local kaartHoogte = config.cardHeight
-    local schaal = config.scale
-    local kaartBreedte = config.cardWidth
+    local ui = require("ui")
+    local positions = ui.get_card_positions(player.players[1].hand)
 
-    local w = love.graphics.getWidth()
-    local x_start = (w - (#player.hand * (kaartBreedte + padding))) / 2
-    local y_start = love.graphics.getHeight() - kaartHoogte - 50
-
-    for i, kaart in ipairs(player.hand) do
-        local cx = x_start + (i - 1) * (kaartBreedte + padding)
-        local cy = y_start
-
-        if x > cx and x < cx + kaartBreedte and y > cy and y < cy + kaartHoogte then
+    for i, pos in ipairs(positions) do
+        if x >= pos.x and x <= pos.x + pos.w and y >= pos.y and y <= pos.y + pos.h then
+            local kaart = table.remove(player.players[1].hand, i)
             player.draggingCard = kaart
-            player.dragOffset.x = x - cx
-            player.dragOffset.y = y - cy
-            table.remove(player.hand, i)
+            player.dragOffset.x = x - pos.x
+            player.dragOffset.y = y - pos.y
             break
         end
     end
 end
+
 
 --codex-- Update drag offsets (UI queries mouse position directly)
 function player.updateDragging()

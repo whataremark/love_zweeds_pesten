@@ -2,9 +2,8 @@
 local utils = require("utils")
 local rules = require("rules")
 local drawPile = require("drawpile")
+local player = require("player")
 local ai = {}
-
-
 
 --codex-- Ranking used by the AI to choose between playable cards
 local function get_heuristics(waarde)
@@ -17,11 +16,9 @@ local function get_heuristics(waarde)
     return map[waarde] or 0
 end
 
-
 -- Select the best playable card for the AI or nil when none is possible
---codex-- Pick the most attractive playable card from the AI hand
 local function choose_card(game, pot)
-    local hand = game.players[2].hand
+    local hand = player.players[2].hand
     
     --omdat ik deze functie heb verplaats naar utils.lua
     local top = utils.effective_top_card(pot)
@@ -59,14 +56,14 @@ function ai.play(game, pot)
             game.next_turn()
         else
             -- Pick up the pot when no card can be played
-            utils.transfer_all_cards(game.players[2].hand, pot)
+            utils.transfer_all_cards(player.players[2].hand, pot)
             -- Do NOT refill here!
             game.next_turn()
         end
         return
     end
     rules.handle_card_effects(game, 2, choice)
-    utils.refill_hand(game.players[2].hand, drawPile) -- refill after a successful play
+    utils.refill_hand(player.players[2].hand, drawPile) -- refill after a successful play
 end
 
 -- ...existing code...

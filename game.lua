@@ -7,11 +7,6 @@ local player = require("player")
 -- default mode is against the AI
 game.mode = "ai"
 
-game.players = {
-    { hand = {} }, -- Speler 1 (jij)
-    { hand = {} }  -- Speler 2 (AI)
-}
-
 --codex-- Central discard pile and number of full decks used
 game.pot = {}
 game.deckCount = 1 --codex-- Selected number of decks to use
@@ -22,6 +17,8 @@ game.aiTimer = 0
 game.waitingForAI = false
 game.nextMustBeUnder7 = false
 game.extraTurn = false
+game.state = "selectFaceUp"
+
 
 --codex-- Initialize a new round with a chosen play mode
 function game.start(mode)
@@ -37,10 +34,10 @@ function game.start(mode)
     game.pot = { drawPile.draw() }
     game.ronde = 0
 
-    game.players[1].hand = player.hand
-    game.players[2].hand = {}
-    for i = 1, 5 do
-        table.insert(game.players[2].hand, drawPile.draw())
+    -- Niks nodig voor player 1 (die is al geïnit door player.init)
+    -- Vul hand voor speler 2
+for i = 1, 5 do
+    table.insert(player.players[2].hand, drawPile.draw())
     end
 end
 
@@ -50,7 +47,7 @@ end
 --codex-- Move a card from a player's hand onto the pile
 function game.play_card(playerIndex, kaart)
     table.insert(game.pot, kaart)
-    local hand = game.players[playerIndex].hand
+    local hand = player.players[playerIndex].hand
     for i = 1, #hand do
         local k = hand[i]
         if k.waarde == kaart.waarde and k.kleur == kaart.kleur then
@@ -62,7 +59,7 @@ end
 
 function game.next_turn()
     -- Advance to the next player and notify the AI when needed
-    game.currentPlayer = (game.currentPlayer % #game.players) + 1
+    game.currentPlayer = (game.currentPlayer % #player.players) + 1
 
     if game.mode == "ai" and game.currentPlayer == 2 then
         game.waitingForAI = true

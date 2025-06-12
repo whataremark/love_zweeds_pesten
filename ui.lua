@@ -1,21 +1,62 @@
 -- Rendering and menu functions
 local ui = {}
 local game = require("game")
-
 local config = require("config")
+local player = require("player") 
+
 local kaartHoogte = config.cardHeight
 local schaal = config.scale
 local kaartBreedte = config.cardWidth
 local padding = config.cardPadding
-
 local cardBack = love.graphics.newImage("/png/back.png")
 
-local player = require("player") -- <-- dit is essentieel!
-
+--fonts for titles
 local groteTitelFont = love.graphics.newFont(40)
 local kleineTitelFont = love.graphics.newFont(20)
 
---codex-- Draw remaining draw pile as stacked card backs with a counter
+----------------------MENU---------------------------------------
+function ui.draw_menu(mouseX, mouseY)
+    local w,h = love.graphics.getWidth(), love.graphics.getHeight()
+    love.graphics.setFont(groteTitelFont)
+    love.graphics.setColor(1,1,1)
+    love.graphics.printf("Zweeds Pesten", 0, 150, w, "center")
+    love.graphics.setFont(kleineTitelFont)
+
+    local function button(txt,y)
+        local bw,bh = 280,60
+        local bx     = (w-bw)/2
+        local hover  = mouseX>bx and mouseX<bx+bw and mouseY>y and mouseY<y+bh
+        love.graphics.setColor(hover and 0.8 or 0.6,0.6,0.6)
+        love.graphics.rectangle("fill",bx,y,bw,bh,8,8)
+        love.graphics.setColor(0,0,0)
+        love.graphics.printf(txt,bx,y+18,bw,"center")
+        return hover,bx, y, bw,bh
+    end
+
+    ui.btnAI,  ui.aiX,  ui.aiY,  ui.aiW,  ui.aiH  = button("Tegen AI spelen", 260)
+    ui.btnH2H, ui.hX,   ui.hY,   ui.hW,   ui.hH   = button("Tegen speler (WIP)", 340)
+
+    local function deckBtn(label,x,y,selected)
+        local bw,bh = 120,40
+        local hover = mouseX>x and mouseX<x+bw and mouseY>y and mouseY<y+bh
+        love.graphics.setColor(selected and 0.4 or hover and 0.8 or 0.6,0.6,0.6)
+        love.graphics.rectangle("fill",x,y,bw,bh,8,8)
+        love.graphics.setColor(0,0,0)
+        love.graphics.printf(label,x,y+10,bw,"center")
+        return hover,x,y,bw,bh
+    end
+
+    love.graphics.setColor(1,1,1)
+    love.graphics.printf("Aantal decks:",0, 410, w, "center")
+    ui.oneX, ui.oneY = (w-260)/2, 440
+    ui.twoX, ui.twoY = ui.oneX+140, 440
+    ui.d1, ui.d1x, ui.d1y, ui.d1w, ui.d1h = deckBtn("1 Deck", ui.oneX, ui.oneY, game.deckCount==1)
+    ui.d2, ui.d2x, ui.d2y, ui.d2w, ui.d2h = deckBtn("2 Decks", ui.twoX, ui.twoY, game.deckCount==2)
+end
+
+
+
+--Remaining cards (de POT)
 function ui.draw_deck(deck)
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
     local kaart_hoogte = 140
@@ -112,100 +153,124 @@ if toonOverlay then
 end
 end
 
---codex-- Draw the AI player's face-down cards
-function ui.draw_other_players()
-    local game = require("game")
-    local hand = game.players[2].hand
-    local kaartAantal = #hand
 
-    -- Kaartpositie (bovenkant scherm, horizontaal gecentreerd)
-    local kaartBreedte = cardBack:getWidth()
-    local kaartHoogte  = cardBack:getHeight()
-    local schaal       = 0.5  -- zelfde als je eigen kaarten
-
-    local spacing = 90  -- overlap tussen kaarten
-    local totalWidth = spacing * (kaartAantal - 1) + kaartBreedte * schaal
-    local startX = (love.graphics.getWidth() - totalWidth) / 2
-    local y = 60
-
-    -- Titel
-    love.graphics.setColor(0, 0, 0)
-    love.graphics.printf("Speler 2", startX, startX + totalWidth, y - 20, "center")
-
-    -- Kaarten
-    for i = 1, kaartAantal do
-        love.graphics.setColor(1, 1, 1)
-        love.graphics.draw(cardBack, startX + (i - 1) * spacing, y, 0, schaal, schaal)
-    end
-end
-
---codex-- Render the player's hand and follow the dragged card
-function ui.draw_hand(hand, draggingCard)
+function ui.draw_player_area(playerData, index, totalPlayers)
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
-    local kaart_hoogte = 160
-    local padding = 15
-    local schaal = kaart_hoogte / 500 -- schatting originele PNG hoogte
+    local hand = playerData.hand
+    if not hand then return end
+
+    local kaart_hoogte = config.cardHeight
+    local schaal = config.scale
     local kaart_breedte = 300 * schaal
-    local x_start = (w - (#hand * (kaart_breedte + padding))) / 2
-    local y = h - kaart_hoogte - 50
-    
+    local padding = 15
+    local visibleCards = config.visibleCards
+    local scrollOffset = player.scrollOffset or 0
 
-    -- Teken alle kaarten in hand
-    for i, kaart in ipairs(hand) do
-        local x = x_start + (i - 1) * (kaart_breedte + padding)
+    local boxHeight = kaart_hoogte + 40
+    local boxY = index == 1 and (h - boxHeight - 10) or 10
+    local boxX = 40
+    local boxWidth = w - 80
+
+    -- Teken achtergrondbox
+    love.graphics.setColor(1, 1, 1, 0.97)
+    love.graphics.rectangle("line", boxX, boxY, boxWidth, boxHeight, 18, 18)
+
+    -- Handkaarten tekenen
+    local beginIndex, eindIndex
+    local zichtbareKaarten = 6
+    if index == 1 then
+        beginIndex = math.floor(player.scrollOffset / (kaart_breedte + padding)) + 1
+    else
+        beginIndex = 1
+    end
+    eindIndex = math.min(#hand, beginIndex + zichtbareKaarten - 1)
+    local contentWidth = visibleCards * (kaart_breedte + padding)
+    local x_start = (w - contentWidth) / 2
+
+    for i = beginIndex, eindIndex do
+        local x = x_start + (i - beginIndex) * (kaart_breedte + padding)
+        local y = boxY + 20
         love.graphics.setColor(1, 1, 1)
-        love.graphics.draw(kaart.afbeelding, x, y, 0, schaal, schaal)
+        if index == 1 then
+            love.graphics.draw(hand[i].afbeelding, x, y, 0, schaal, schaal)
+        else
+            love.graphics.draw(cardBack, x, y, 0, schaal, schaal)
+        end
     end
 
-    -- sleepkaart bovenop tekenen (volgt muis)
-    if draggingCard then
-        local mx, my = love.mouse.getPosition()
-        local x = mx - player.dragOffset.x
-        local y = my - player.dragOffset.y
-        love.graphics.draw(draggingCard.afbeelding, x, y, 0, schaal, schaal)
+    -- Naam (alleen AI bovenaan)
+    if index ~= 1 then
+        love.graphics.setColor(0, 0, 0)
+        love.graphics.printf("Speler " .. index, boxX, boxY + boxHeight + 5, boxWidth, "center")
     end
+
+    ---DICHTE KAARTEN EN OPEN KAARTEN---
+    -- Zelfde schaal & afmetingen als handkaarten
+    local kaartHoogte = config.cardHeight
+    local schaal = config.scale * 1.5  -- iets groter
+    local kaartBreedte = config.cardWidth
+    local spacing = config.cardSpacing + 100
+    local totaalBreedte = kaartBreedte * 3 + spacing * 2
+    local startX = (w - totaalBreedte) / 2
+    local w = love.graphics.getWidth()
+
+
+    -- === Dichte kaarten
+    if playerData.faceDown then
+        local y = index == 1
+            and (boxY - kaartHoogte - 10)      -- voor speler 1: boven de box
+            or (boxY + boxHeight + 70)         -- voor AI: onder de box
+
+        for i = 1, 3 do
+            love.graphics.setColor(1, 1, 1)
+            love.graphics.draw(cardBack, startX + (i - 1) * spacing, y, 0, schaal, schaal)
+        end
+    end
+
+    -- === Open kaarten
+    if playerData.faceUp and #playerData.faceUp > 0 then
+        local y = index == 1
+            and (boxY - 2 * kaartHoogte - 20)   -- boven faceDown bij speler 1
+            or (boxY + boxHeight + kaartHoogte + 20) -- onder faceDown bij AI
+
+        for i = 1, 3 do
+            local kaart = playerData.faceUp[i]
+            if kaart and kaart.afbeelding then
+                love.graphics.setColor(1, 1, 1)
+                love.graphics.draw(kaart.afbeelding, x, y, 0, schaal, schaal)
+
+            end
+        end
+    end 
+
+    if player.selectedFaceUp[i] then
+    love.graphics.setColor(0, 1, 0)
+    love.graphics.rectangle("line", x, y, kaart_breedte, kaart_hoogte)
+end
+    
+    if game.state == "selectFaceUp" and index == 1 then
+        local btnW, btnH = 200, 50
+        local btnX = (love.graphics.getWidth() - btnW) / 2
+        local btnY = love.graphics.getHeight() - 80
+        love.graphics.setColor(0.2, 0.6, 0.2)
+        love.graphics.rectangle("fill", btnX, btnY, btnW, btnH, 10)
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.printf("Bevestig selectie", btnX, btnY + 15, btnW, "center")
+
+        -- Sla positie op voor klikdetectie
+        ui.confirmBtn = {x = btnX, y = btnY, w = btnW, h = btnH}
 end
 
------------------------------------------------------------------
--- MENU  --------------------------------------------------------
---codex-- Main menu with mode selection buttons
-function ui.draw_menu(mouseX, mouseY)
-    local w,h = love.graphics.getWidth(), love.graphics.getHeight()
-    love.graphics.setFont(groteTitelFont)
-    love.graphics.setColor(1,1,1)
-    love.graphics.printf("Zweeds Pesten", 0, 150, w, "center")
-    love.graphics.setFont(kleineTitelFont)
+    -- Naam gecentreerd onder de box
+    love.graphics.setColor(0, 0, 0)
+    love.graphics.printf("Speler " .. index, boxX, boxY - 25, boxWidth, "center")
+end
 
-    local function button(txt,y)
-        local bw,bh = 280,60
-        local bx     = (w-bw)/2
-        local hover  = mouseX>bx and mouseX<bx+bw and mouseY>y and mouseY<y+bh
-        love.graphics.setColor(hover and 0.8 or 0.6,0.6,0.6)
-        love.graphics.rectangle("fill",bx,y,bw,bh,8,8)
-        love.graphics.setColor(0,0,0)
-        love.graphics.printf(txt,bx,y+18,bw,"center")
-        return hover,bx, y, bw,bh
+
+function ui.draw_all_players(players)
+    for i, speler in ipairs(players) do
+        ui.draw_player_area(speler, i, #players)
     end
-
-    ui.btnAI,  ui.aiX,  ui.aiY,  ui.aiW,  ui.aiH  = button("Tegen AI spelen", 260)
-    ui.btnH2H, ui.hX,   ui.hY,   ui.hW,   ui.hH   = button("Tegen speler (WIP)", 340)
-
-    local function deckBtn(label,x,y,selected)
-        local bw,bh = 120,40
-        local hover = mouseX>x and mouseX<x+bw and mouseY>y and mouseY<y+bh
-        love.graphics.setColor(selected and 0.4 or hover and 0.8 or 0.6,0.6,0.6)
-        love.graphics.rectangle("fill",x,y,bw,bh,8,8)
-        love.graphics.setColor(0,0,0)
-        love.graphics.printf(label,x,y+10,bw,"center")
-        return hover,x,y,bw,bh
-    end
-
-    love.graphics.setColor(1,1,1)
-    love.graphics.printf("Aantal decks:",0, 410, w, "center")
-    ui.oneX, ui.oneY = (w-260)/2, 440
-    ui.twoX, ui.twoY = ui.oneX+140, 440
-    ui.d1, ui.d1x, ui.d1y, ui.d1w, ui.d1h = deckBtn("1 Deck", ui.oneX, ui.oneY, game.deckCount==1)
-    ui.d2, ui.d2x, ui.d2y, ui.d2w, ui.d2h = deckBtn("2 Decks", ui.twoX, ui.twoY, game.deckCount==2)
 end
 
 
@@ -237,4 +302,30 @@ function ui.draw_action_buttons()
         pot    = { x = startX + btnW + spacing, y = y, w = btnW, h = btnH }
     }
 end
+
+
+function ui.get_card_positions(hand)
+    local positions = {}
+    local w, h = love.graphics.getWidth(), love.graphics.getHeight()
+
+    local kaart_hoogte = 160
+    local schaal = kaart_hoogte / 500 -- schatting originele PNG hoogte
+    local kaart_breedte = 300 * schaal
+    local padding = 15
+
+    local zichtbareKaarten = 6
+    local scrollOffset = require("player").scrollOffset or 0
+
+    local x_start = (w - (zichtbareKaarten * (kaart_breedte + padding))) / 2 - scrollOffset
+    local y = h - kaart_hoogte - 50
+
+    for i, kaart in ipairs(hand) do
+        local x = x_start + (i - 1) * (kaart_breedte + padding)
+        table.insert(positions, { x = x, y = y, w = kaart_breedte, h = kaart_hoogte })
+    end
+
+    return positions
+end
+
+
 return ui

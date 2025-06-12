@@ -48,10 +48,17 @@ function love.draw()
 
     ui.draw_pot(game.pot, ongeldigeZetTimer > 0, toonPotOverlay)
     ui.draw_deck(drawPile)
-    ui.draw_other_players()
-    ui.draw_hand(player.hand, player.draggingCard)
-    
-    love.graphics.print("Aan de beurt: Speler " .. game.currentPlayer, 20, 20)
+    ui.draw_all_players(player.players)
+    -- Sleepkaart bovenop tekenen (volgt muis)
+    if player.draggingCard then
+        local kaart = player.draggingCard
+        local mx, my = love.mouse.getPosition()
+        local schaal = 160 / 500
+        local x = mx - player.dragOffset.x
+        local y = my - player.dragOffset.y
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.draw(kaart.afbeelding, x, y, 0, schaal, schaal)
+    end
 
     love.graphics.setColor(0, 0, 0)
     love.graphics.print("Ronde: " .. ronde, 20, 20)
@@ -93,6 +100,52 @@ function love.mousepressed(x, y, button)
         player.startDrag(x, y)
     end
 
+    if game.state == "selectFaceUp" and button == 1 then
+    print("selectFaceUp")
+    local hand = player.hand
+
+    -- Klik op een kaart om te selecteren of deselecteren
+    for i, card in ipairs(hand) do
+        local pos = ui.get_card_positions(hand)[i]
+        local cardX, cardY, w, h = pos.x, pos.y, config.cardWidth, config.cardHeight
+        if x > cardX and x < cardX + w and y > cardY and y < cardY + h then
+            if player.selectedFaceUp[i] then
+                player.selectedFaceUp[i] = nil
+            elseif table.count(player.selectedFaceUp) < 3 then
+                player.selectedFaceUp[i] = true
+            end
+        end
+    end
+
+    -- Klik op de bevestigingsknop
+    if ui.confirmBtn then
+        local b = ui.confirmBtn
+        if x > b.x and x < b.x + b.w and y > b.y and y < b.y + b.h then
+            local selected = {}
+            for i, v in pairs(player.selectedFaceUp) do
+                table.insert(selected, player.hand[i])
+            end
+
+            if #selected == 3 then
+                player.faceUp = selected
+
+                -- Verwijder geselecteerde kaarten uit hand
+                for i = #player.hand, 1, -1 do
+                    if player.selectedFaceUp[i] then
+                        table.remove(player.hand, i)
+                    end
+                end
+
+                game.state = "playing"
+                print("Kaarten geselecteerd, spel begint")
+            else
+                print("Selecteer precies 3 kaarten!")
+            end
+        end
+    end
+end
+
+
     -- Knoppen onderaan controleren (Pak kaart & Pot bekijken)
     if button == 1 and buttons then
         -- Pak kaart knop
@@ -100,8 +153,8 @@ function love.mousepressed(x, y, button)
         if x >= b.x and x <= b.x + b.w and y >= b.y and y <= b.y + b.h then
             if game.currentPlayer == 1 then
                 -- Alle kaarten uit de pot naar de speler overzetten
-                utils.transfer_all_cards(player.hand, game.pot)
-                print("Speler pakt pot op (" .. #player.hand .. " kaarten)")
+                utils.transfer_all_cards(player.players[1].hand, game.pot)
+                print("Speler pakt pot op (" .. #player.players[1].hand .. " kaarten)")
                 game.next_turn()
             else
                 print("Niet jouw beurt.")
@@ -118,6 +171,14 @@ function love.mousepressed(x, y, button)
     end
 end
 
+function love.wheelmoved(x, y)
+    if game.currentPlayer == 1 then
+        local scrollSnelheid = 60  -- pixels per scroll
+        player.scrollOffset = math.max(0, player.scrollOffset - y * scrollSnelheid)
+    end
+end
+
+
 --codex-- Drop a dragged card onto the table or return it
 function love.mousereleased(x, y, button)
     if button ~= 1 then return end
@@ -131,20 +192,21 @@ function love.mousereleased(x, y, button)
     local inPot = utils.inside(x, y, px, py, pw, ph)
 
     if game.currentPlayer ~= 1 then
-        table.insert(player.hand, kaart)
+        table.insert(player.players[1].hand, kaart)
         return
     end
+
 
     if inPot then
         if rules.is_speelbaar(kaart, game.pot, game.nextMustBeUnder7) then
             rules.handle_card_effects(game, 1, kaart)
             ronde = ronde + 1
-            utils.refill_hand(player.hand, drawPile)
+            utils.refill_hand(player.players[1].hand, drawPile)
         else
-            table.insert(player.hand, kaart)
+            table.insert(player.players[1].hand, kaart)
             ongeldigeZetTimer = 1.0
         end
     else
-        table.insert(player.hand, kaart)
+        table.insert(player.players[1].hand, kaart)
     end
 end

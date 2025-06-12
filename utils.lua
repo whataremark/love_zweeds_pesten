@@ -54,13 +54,18 @@ function utils.effective_top_card(pot)
     return nil
 end
 
---codex-- Ensure a hand always has at least `count` cards by drawing
---codex-- from the deck module.
+--codex-- Ensure a hand always has at least `X` cards by drawing from the deck module.
 function utils.refill_hand(hand, deck, count)
     count = count or 5
     while #hand < count and deck.count() > 0 do
         table.insert(hand, deck.draw())
     end
+end
+
+function table.count(tbl)
+    local c = 0
+    for _ in pairs(tbl) do c = c + 1 end
+    return c
 end
 
 return utils
