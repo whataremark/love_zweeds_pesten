@@ -53,6 +53,7 @@ function love.draw()
     elseif game.phase == "setup" then
         ui.draw_setup(player.hand, game.players[1].faceUp)
         return
+
     end
     love.graphics.setColor(1, 1, 1)
     love.graphics.draw(bgCanvas, 0, 0)

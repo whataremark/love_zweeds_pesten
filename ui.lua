@@ -127,6 +127,7 @@ function ui.draw_pot(pot, invalidTimer, showOverlay)
         love.graphics.rectangle("line", x, y, cw, ch)
     end
 
+
     -------------------------------------------------------------------
     -- Optional overlay showing the full pile contents
     -------------------------------------------------------------------
@@ -170,10 +171,12 @@ function ui.draw_other_player(index)
     love.graphics.rectangle("line", zoneX-10, ui.pos.aiDownY-10, zoneW+20, zoneH+20, 8)
     love.graphics.setColor(1,1,1)
 
+
     -- Face-down row
     local x = row_start(#p.faceDown)
     for i=1,#p.faceDown do
         love.graphics.draw(cardBack, x + (i-1)*(ui.cardWidth + config.cardPadding), ui.pos.aiDownY, 0, s, s)
+
     end
 
     -- Face-up row
@@ -181,6 +184,7 @@ function ui.draw_other_player(index)
     for i,card in ipairs(p.faceUp) do
         local sc = ui.cardHeight / card.afbeelding:getHeight()
         love.graphics.draw(card.afbeelding, x + (i-1)*(ui.cardWidth + config.cardPadding), ui.pos.aiUpY, 0, sc, sc)
+
     end
 
     -- Hand (hidden) row
@@ -200,6 +204,7 @@ function ui.draw_other_player(index)
     love.graphics.printf(label, zoneX, ui.pos.aiDownY - 25, zoneW, "center")
     love.graphics.circle("line", zoneX-20, ui.pos.aiDownY + ui.cardHeight, 10)
     love.graphics.print(tostring(index), zoneX-24, ui.pos.aiDownY + ui.cardHeight - 6)
+
     love.graphics.setColor(1,1,1)
 end
 
@@ -227,6 +232,7 @@ function ui.draw_hand(hand, dragging)
     love.graphics.setColor(1,1,1,0.2)
     love.graphics.rectangle("line", zoneX-10, ui.pos.handY-10, zoneW+20, zoneH+20, 8)
     love.graphics.setColor(1,1,1)
+
 
     -- Face-down cards (bottom row)
     local x = row_start(#p.faceDown)
@@ -266,8 +272,8 @@ function ui.draw_hand(hand, dragging)
         local mx,my = love.mouse.getPosition()
         local sc = ui.cardHeight / dragging.afbeelding:getHeight()
         love.graphics.draw(dragging.afbeelding, mx - player.dragOffset.x, my - player.dragOffset.y, 0, sc, sc)
+
     end
-end
 
 -----------------------------------------------------------------------
 -- Setup screen where the player chooses three face-up cards
@@ -288,6 +294,7 @@ function ui.draw_setup(hand, faceUp)
             local sc = slotH / card.afbeelding:getHeight()
             love.graphics.draw(card.afbeelding, sx, ui.pos.upY, 0, sc, sc)
         end
+
     end
     love.graphics.setColor(1,1,1)
     love.graphics.printf("Kies 3 kaarten voor de open stapels", 0, ui.pos.upY - 40, love.graphics.getWidth(), "center")
@@ -295,6 +302,7 @@ function ui.draw_setup(hand, faceUp)
 end
 
 -----------------------------------------------------------------------
+
 -- Main menu drawing (mostly unchanged)
 -----------------------------------------------------------------------
 function ui.draw_menu(mx, my)
