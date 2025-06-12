@@ -26,7 +26,6 @@ game.winner = nil
 
 game.phase = "setup" -- setup: spelers kiezen open kaarten
 
-
 --codex-- Initialize a new round with a chosen play mode
 function game.start(mode)
     drawPile.init(game.deckCount)

@@ -11,13 +11,15 @@ local utils  = require("utils")
 -- Image for card backs used throughout the UI
 local cardBack = love.graphics.newImage("/png/back.png")
 
-
 -- Fonts for titles and smaller texts
 local titleFont = love.graphics.newFont(40)
 local smallFont = love.graphics.newFont(20)
 
 -- Precomputed layout table filled each frame
 ui.pos = {}
+ui.scale = 1
+ui.cardHeight = config.cardHeight
+ui.cardWidth = config.cardWidth
 
 -- Slots used during the setup phase when players choose face up cards
 ui.setupSlots = {}
@@ -32,8 +34,12 @@ ui.setupSlots = {}
 --]]
 function ui.calculate()
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
-    local ch = config.cardHeight
-    local cw = config.cardWidth
+    -- Scale cards down on small screens so everything fits
+    ui.scale = math.min(1, h / 900)
+    ui.cardHeight = config.cardHeight * ui.scale
+    ui.cardWidth  = config.cardWidth  * ui.scale
+    local ch = ui.cardHeight
+    local cw = ui.cardWidth
     local gap = 10             -- space between rows
 
     -- Player 2 (AI) rows at the top
@@ -56,13 +62,12 @@ function ui.calculate()
     ui.pos.btnY   = ui.pos.downY + ch + 10
 end
 
-
 -----------------------------------------------------------------------
 -- Helper to center a row of cards horizontally
 -----------------------------------------------------------------------
 local function row_start(count)
     local w = love.graphics.getWidth()
-    return (w - (count * (config.cardWidth + config.cardPadding) - config.cardPadding)) / 2
+    return (w - (count * (ui.cardWidth + config.cardPadding) - config.cardPadding)) / 2
 end
 
 -----------------------------------------------------------------------
@@ -72,7 +77,7 @@ function ui.draw_deck(deck)
     local count = deck.count()
     local x = ui.pos.deckX
     local y = ui.pos.deckY
-    local s = config.scale
+    local s = ui.scale
 
     -- Draw up to five backs with small offsets for a stack look
     local visible = math.min(count, 5)
@@ -84,7 +89,7 @@ function ui.draw_deck(deck)
     -- Counter below the stack
     love.graphics.setColor(0,0,0)
     love.graphics.setFont(smallFont)
-    love.graphics.printf("Deck: "..count, x, y + config.cardHeight + 5, config.cardWidth, "center")
+    love.graphics.printf("Deck: "..count, x, y + ui.cardHeight + 5, ui.cardWidth, "center")
 end
 
 -----------------------------------------------------------------------
@@ -93,8 +98,8 @@ end
 function ui.draw_pot(pot, invalidTimer, showOverlay)
     local x = ui.pos.potX
     local y = ui.pos.potY
-    local ch = config.cardHeight
-    local cw = config.cardWidth
+    local ch = ui.cardHeight
+    local cw = ui.cardWidth
 
     -- Background box so the pot area is always visible
     love.graphics.setColor(1,1,1,0.95)
@@ -121,6 +126,7 @@ function ui.draw_pot(pot, invalidTimer, showOverlay)
         love.graphics.setColor(1,0,0,0.5)
         love.graphics.rectangle("line", x, y, cw, ch)
     end
+
 
     -------------------------------------------------------------------
     -- Optional overlay showing the full pile contents
@@ -152,34 +158,63 @@ end
 -----------------------------------------------------------------------
 -- Draw the AI (player 2) cards in three rows at the top
 -----------------------------------------------------------------------
-function ui.draw_other_player()
-    local p = game.players[2]
-    local s = config.scale
+function ui.draw_other_player(index)
+    local p = game.players[index]
+    local s = ui.scale
+
+    -- Determine widest row to draw a background box
+    local maxCount = math.max(#p.faceDown, #p.faceUp, #p.hand)
+    local zoneW = maxCount * (ui.cardWidth + config.cardPadding) - config.cardPadding
+    local zoneX = row_start(maxCount)
+    local zoneH = ui.cardHeight*3 + 2*10
+    love.graphics.setColor(1,1,1,0.2)
+    love.graphics.rectangle("line", zoneX-10, ui.pos.aiDownY-10, zoneW+20, zoneH+20, 8)
+    love.graphics.setColor(1,1,1)
+
 
     -- Face-down row
     local x = row_start(#p.faceDown)
     for i=1,#p.faceDown do
-        love.graphics.draw(cardBack, x + (i-1)*(config.cardWidth + config.cardPadding), ui.pos.aiDownY, 0, s, s)
+        love.graphics.draw(cardBack, x + (i-1)*(ui.cardWidth + config.cardPadding), ui.pos.aiDownY, 0, s, s)
+
     end
 
     -- Face-up row
     x = row_start(#p.faceUp)
     for i,card in ipairs(p.faceUp) do
-        local sc = config.cardHeight / card.afbeelding:getHeight()
-        love.graphics.draw(card.afbeelding, x + (i-1)*(config.cardWidth + config.cardPadding), ui.pos.aiUpY, 0, sc, sc)
+        local sc = ui.cardHeight / card.afbeelding:getHeight()
+        love.graphics.draw(card.afbeelding, x + (i-1)*(ui.cardWidth + config.cardPadding), ui.pos.aiUpY, 0, sc, sc)
+
     end
 
     -- Hand (hidden) row
     x = row_start(#p.hand)
     for i=1,#p.hand do
-        love.graphics.draw(cardBack, x + (i-1)*(config.cardWidth + config.cardPadding), ui.pos.aiHandY, 0, s, s)
+        love.graphics.draw(cardBack, x + (i-1)*(ui.cardWidth + config.cardPadding), ui.pos.aiHandY, 0, s, s)
     end
 
-    -- Label above the rows
-    love.graphics.setColor(0,0,0)
+    -- Label above the rows with simple ID circle
+    local label = "Speler "..index
     love.graphics.setFont(smallFont)
-    love.graphics.printf("Speler 2", 0, ui.pos.aiDownY - 25, love.graphics.getWidth(), "center")
+    if game.currentPlayer == index then
+        love.graphics.setColor(0,0.8,0)
+    else
+        love.graphics.setColor(0,0,0)
+    end
+    love.graphics.printf(label, zoneX, ui.pos.aiDownY - 25, zoneW, "center")
+    love.graphics.circle("line", zoneX-20, ui.pos.aiDownY + ui.cardHeight, 10)
+    love.graphics.print(tostring(index), zoneX-24, ui.pos.aiDownY + ui.cardHeight - 6)
+
     love.graphics.setColor(1,1,1)
+end
+
+-----------------------------------------------------------------------
+-- Loop through all non-human players and draw their zones
+-----------------------------------------------------------------------
+function ui.draw_other_players()
+    for i=2,#game.players do
+        ui.draw_other_player(i)
+    end
 end
 
 -----------------------------------------------------------------------
@@ -187,43 +222,65 @@ end
 -----------------------------------------------------------------------
 function ui.draw_hand(hand, dragging)
     local p = game.players[1]
-    local s = config.scale
+    local s = ui.scale
+
+    -- Draw a light rectangle behind the whole player zone
+    local maxCount = math.max(#p.faceDown, #p.faceUp, #hand)
+    local zoneW = maxCount * (ui.cardWidth + config.cardPadding) - config.cardPadding
+    local zoneX = row_start(maxCount)
+    local zoneH = ui.cardHeight*3 + 2*10
+    love.graphics.setColor(1,1,1,0.2)
+    love.graphics.rectangle("line", zoneX-10, ui.pos.handY-10, zoneW+20, zoneH+20, 8)
+    love.graphics.setColor(1,1,1)
+
 
     -- Face-down cards (bottom row)
     local x = row_start(#p.faceDown)
     for i=1,#p.faceDown do
-        love.graphics.draw(cardBack, x + (i-1)*(config.cardWidth + config.cardPadding), ui.pos.downY, 0, s, s)
+        love.graphics.draw(cardBack, x + (i-1)*(ui.cardWidth + config.cardPadding), ui.pos.downY, 0, s, s)
     end
 
     -- Face-up cards above that
     x = row_start(#p.faceUp)
     for i,card in ipairs(p.faceUp) do
-        local sc = config.cardHeight / card.afbeelding:getHeight()
-        love.graphics.draw(card.afbeelding, x + (i-1)*(config.cardWidth + config.cardPadding), ui.pos.upY, 0, sc, sc)
+        local sc = ui.cardHeight / card.afbeelding:getHeight()
+        love.graphics.draw(card.afbeelding, x + (i-1)*(ui.cardWidth + config.cardPadding), ui.pos.upY, 0, sc, sc)
     end
 
     -- Actual hand on the third row
     x = row_start(#hand)
     for i,card in ipairs(hand) do
-        local sc = config.cardHeight / card.afbeelding:getHeight()
-        love.graphics.draw(card.afbeelding, x + (i-1)*(config.cardWidth + config.cardPadding), ui.pos.handY, 0, sc, sc)
+        local sc = ui.cardHeight / card.afbeelding:getHeight()
+        love.graphics.draw(card.afbeelding, x + (i-1)*(ui.cardWidth + config.cardPadding), ui.pos.handY, 0, sc, sc)
     end
+
+    -- Label below the zone indicating the player
+    local label = "Speler 1"
+    love.graphics.setFont(smallFont)
+    if game.currentPlayer == 1 then
+        love.graphics.setColor(0,0.8,0)
+    else
+        love.graphics.setColor(0,0,0)
+    end
+    love.graphics.printf(label, zoneX, ui.pos.downY + ui.cardHeight + 5, zoneW, "center")
+    love.graphics.circle("line", zoneX-20, ui.pos.downY + ui.cardHeight, 10)
+    love.graphics.print("1", zoneX-24, ui.pos.downY + ui.cardHeight - 6)
+    love.graphics.setColor(1,1,1)
 
     -- Dragging card follows the mouse
     if dragging then
         local mx,my = love.mouse.getPosition()
-        local sc = config.cardHeight / dragging.afbeelding:getHeight()
+        local sc = ui.cardHeight / dragging.afbeelding:getHeight()
         love.graphics.draw(dragging.afbeelding, mx - player.dragOffset.x, my - player.dragOffset.y, 0, sc, sc)
 
     end
-end
 
 -----------------------------------------------------------------------
 -- Setup screen where the player chooses three face-up cards
 -----------------------------------------------------------------------
 function ui.draw_setup(hand, faceUp)
     ui.calculate()
-    local slotW, slotH = config.cardWidth, config.cardHeight
+    local slotW, slotH = ui.cardWidth, ui.cardHeight
     local spacing = config.cardPadding
     ui.setupSlots = {}
     local x = row_start(3)
@@ -231,12 +288,13 @@ function ui.draw_setup(hand, faceUp)
         local sx = x + (i-1)*(slotW+spacing)
         ui.setupSlots[i] = {x=sx, y=ui.pos.upY, w=slotW, h=slotH}
         love.graphics.setColor(1,1,1)
-        love.graphics.draw(cardBack, sx, ui.pos.upY, 0, config.scale, config.scale)
+        love.graphics.draw(cardBack, sx, ui.pos.upY, 0, ui.scale, ui.scale)
         local card = faceUp[i]
         if card then
             local sc = slotH / card.afbeelding:getHeight()
             love.graphics.draw(card.afbeelding, sx, ui.pos.upY, 0, sc, sc)
         end
+
     end
     love.graphics.setColor(1,1,1)
     love.graphics.printf("Kies 3 kaarten voor de open stapels", 0, ui.pos.upY - 40, love.graphics.getWidth(), "center")
@@ -244,6 +302,7 @@ function ui.draw_setup(hand, faceUp)
 end
 
 -----------------------------------------------------------------------
+
 -- Main menu drawing (mostly unchanged)
 -----------------------------------------------------------------------
 function ui.draw_menu(mx, my)
@@ -311,7 +370,6 @@ function ui.draw_action_buttons()
     }
 end
 
-
 -----------------------------------------------------------------------
 -- End screen after someone wins
 -----------------------------------------------------------------------
@@ -327,6 +385,5 @@ function ui.draw_end_screen(winner)
     local count = #game.players[other].hand
     love.graphics.printf("Andere speler heeft "..count.." kaarten over",0,h/2+20,w,"center")
 end
-
 
 return ui

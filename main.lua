@@ -50,7 +50,6 @@ function love.draw()
     elseif scene=="gameover" then
         ui.draw_end_screen(game.winner)
         return
-
     elseif game.phase == "setup" then
         ui.draw_setup(player.hand, game.players[1].faceUp)
         return

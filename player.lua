@@ -15,10 +15,11 @@ end
 --codex-- Begin dragging a card from the player's hand
 function player.startDrag(x, y)
     local config = require("config")
+    local ui = require("ui")
     local padding = config.cardPadding
-    local kaartHoogte = config.cardHeight
-    local schaal = config.scale
-    local kaartBreedte = config.cardWidth
+    local kaartHoogte = ui.cardHeight
+    local schaal = ui.scale
+    local kaartBreedte = ui.cardWidth
 
     local w = love.graphics.getWidth()
     -- center the row horizontally similar to ui.layout
