@@ -8,19 +8,20 @@ player.players = {
     {
         hand = {},
         faceUp = {},
-        faceDown = {}
+        faceDown = {},
+        selectedFaceUp = {}  -- toegevoegd hier
     },
     {
         hand = {},
         faceUp = {},
         faceDown = {}
+        -- AI hoeft dit waarschijnlijk niet
     }
 }
 
 player.draggingCard = nil
 player.dragOffset = { x = 0, y = 0 }
 
-player.selectedFaceUp = {}
 
 
 

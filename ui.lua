@@ -170,6 +170,8 @@ function ui.draw_player_area(playerData, index, totalPlayers)
     local boxY = index == 1 and (h - boxHeight - 10) or 10
     local boxX = 40
     local boxWidth = w - 80
+    local speler = player.players[1]
+
 
     -- Teken achtergrondbox
     love.graphics.setColor(1, 1, 1, 0.97)
@@ -195,6 +197,11 @@ function ui.draw_player_area(playerData, index, totalPlayers)
             love.graphics.draw(hand[i].afbeelding, x, y, 0, schaal, schaal)
         else
             love.graphics.draw(cardBack, x, y, 0, schaal, schaal)
+            if speler.selectedFaceUp[i] then
+                love.graphics.setColor(0, 1, 0)
+                love.graphics.rectangle("line", x, y, kaart_breedte, kaart_hoogte)
+            end
+
         end
     end
 
@@ -243,23 +250,21 @@ function ui.draw_player_area(playerData, index, totalPlayers)
         end
     end 
 
-    if player.selectedFaceUp[i] then
-    love.graphics.setColor(0, 1, 0)
-    love.graphics.rectangle("line", x, y, kaart_breedte, kaart_hoogte)
-end
-    
-    if game.state == "selectFaceUp" and index == 1 then
+   
+    -- Alleen voor speler (index == 1) en alleen tijdens selectie
+    if index == 1 and game.state == "selectFaceUp" then
         local btnW, btnH = 200, 50
-        local btnX = (love.graphics.getWidth() - btnW) / 2
-        local btnY = love.graphics.getHeight() - 80
+        local btnX = (w - btnW) / 2
+        local btnY = boxY - config.cardHeight * 2.5
+
         love.graphics.setColor(0.2, 0.6, 0.2)
-        love.graphics.rectangle("fill", btnX, btnY, btnW, btnH, 10)
+        love.graphics.rectangle("fill", btnX, btnY, btnW, btnH, 8)
         love.graphics.setColor(1, 1, 1)
         love.graphics.printf("Bevestig selectie", btnX, btnY + 15, btnW, "center")
 
-        -- Sla positie op voor klikdetectie
-        ui.confirmBtn = {x = btnX, y = btnY, w = btnW, h = btnH}
-end
+        -- Bewaar positie voor klikdetectie
+        ui.confirmBtn = { x = btnX, y = btnY, w = btnW, h = btnH }
+    end
 
     -- Naam gecentreerd onder de box
     love.graphics.setColor(0, 0, 0)

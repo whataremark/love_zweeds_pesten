@@ -62,7 +62,10 @@ function utils.refill_hand(hand, deck, count)
     end
 end
 
-function table.count(tbl)
+-- Voeg een 'table' namespace toe
+utils.table = {}
+
+function utils.table.count(tbl)
     local c = 0
     for _ in pairs(tbl) do c = c + 1 end
     return c

@@ -7,6 +7,7 @@ local rules = require("rules")
 local game  = require("game")
 local ai    = require("ai")
 local utils = require("utils")
+local config = require("config")
 
 local bgCanvas
 
@@ -101,49 +102,59 @@ function love.mousepressed(x, y, button)
     end
 
     if game.state == "selectFaceUp" and button == 1 then
-    print("selectFaceUp")
-    local hand = player.hand
+    local speler = player.players[1]
+    local hand = speler.hand
+    local posities = ui.get_card_positions(hand)
 
-    -- Klik op een kaart om te selecteren of deselecteren
-    for i, card in ipairs(hand) do
-        local pos = ui.get_card_positions(hand)[i]
-        local cardX, cardY, w, h = pos.x, pos.y, config.cardWidth, config.cardHeight
-        if x > cardX and x < cardX + w and y > cardY and y < cardY + h then
-            if player.selectedFaceUp[i] then
-                player.selectedFaceUp[i] = nil
-            elseif table.count(player.selectedFaceUp) < 3 then
-                player.selectedFaceUp[i] = true
+    local kaartGeselecteerd = false
+
+    for i, kaart in ipairs(hand) do
+        local pos = posities[i]
+        local x1, y1, w, h = pos.x, pos.y, pos.w, pos.h
+
+        if x > x1 and x < x1 + w and y > y1 and y < y1 + h then
+            kaartGeselecteerd = true
+            if speler.selectedFaceUp[i] then
+                speler.selectedFaceUp[i] = nil
+            elseif utils.table.count(speler.selectedFaceUp) < 3 then
+
+                speler.selectedFaceUp[i] = true
             end
+            break
         end
     end
 
-    -- Klik op de bevestigingsknop
-    if ui.confirmBtn then
+    -- Alleen als er geen kaart werd aangeklikt, check dan de bevestigingsknop
+    if not kaartGeselecteerd and ui.confirmBtn then
         local b = ui.confirmBtn
         if x > b.x and x < b.x + b.w and y > b.y and y < b.y + b.h then
             local selected = {}
-            for i, v in pairs(player.selectedFaceUp) do
-                table.insert(selected, player.hand[i])
+            for i, _ in pairs(speler.selectedFaceUp) do
+                table.insert(selected, speler.hand[i])
             end
 
             if #selected == 3 then
-                player.faceUp = selected
+                speler.faceUp = selected
 
                 -- Verwijder geselecteerde kaarten uit hand
-                for i = #player.hand, 1, -1 do
-                    if player.selectedFaceUp[i] then
-                        table.remove(player.hand, i)
+                local nieuweHand = {}
+                for i, kaart in ipairs(speler.hand) do
+                    if not speler.selectedFaceUp[i] then
+                        table.insert(nieuweHand, kaart)
                     end
                 end
+                speler.hand = nieuweHand
 
+                speler.selectedFaceUp = {}
                 game.state = "playing"
-                print("Kaarten geselecteerd, spel begint")
+                print("Selectie bevestigd")
             else
-                print("Selecteer precies 3 kaarten!")
+                print("Je moet precies 3 kaarten kiezen.")
             end
         end
     end
 end
+
 
 
     -- Knoppen onderaan controleren (Pak kaart & Pot bekijken)
