@@ -216,6 +216,12 @@ function ui.draw_player_area(playerData, index, totalPlayers)
     for i = beginIndex, eindIndex do
         local x = x_start + (i - beginIndex) * (kaart_breedte + padding)
         local y = boxY + 20
+        if hand[i].selected then
+            love.graphics.setColor(0,1,0)
+            love.graphics.setLineWidth(3)
+            love.graphics.rectangle("line", x, y, kaart_breedte, kaart_hoogte)
+            love.graphics.setColor(1,1,1)
+        end
         love.graphics.setColor(1, 1, 1)
         if index == 1 then
             love.graphics.draw(hand[i].afbeelding, x, y, 0, schaal, schaal)
@@ -266,7 +272,7 @@ function ui.draw_action_buttons()
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
     local btnW, btnH = 150, 40
     local spacing = 20
-    local totalW = btnW * 2 + spacing
+    local totalW = btnW * 3 + spacing * 2
     local startX = (w - totalW) / 2
     local y = h - btnH - 20
 
@@ -276,16 +282,23 @@ function ui.draw_action_buttons()
     love.graphics.setColor(1, 1, 1)
     love.graphics.printf("Pak kaart", startX, y + 10, btnW, "center")
 
+    -- === Speel kaart knop ===
+    love.graphics.setColor(0.2, 0.4, 0.8)
+    love.graphics.rectangle("fill", startX + btnW + spacing, y, btnW, btnH, 8)
+    love.graphics.setColor(1,1,1)
+    love.graphics.printf("Speel", startX + btnW + spacing, y + 10, btnW, "center")
+
     -- === Pot bekijken knop ===
     love.graphics.setColor(0.2, 0.2, 0.2)
-    love.graphics.rectangle("fill", startX + btnW + spacing, y, btnW, btnH, 8)
+    love.graphics.rectangle("fill", startX + (btnW + spacing) * 2, y, btnW, btnH, 8)
     love.graphics.setColor(1, 1, 1)
-    love.graphics.printf("Pot bekijken", startX + btnW + spacing, y + 10, btnW, "center")
+    love.graphics.printf("Pot", startX + (btnW + spacing) * 2, y + 10, btnW, "center")
 
     -- Return knopposities voor klikdetectie
     return {
         pickup = { x = startX, y = y, w = btnW, h = btnH },
-        pot    = { x = startX + btnW + spacing, y = y, w = btnW, h = btnH }
+        play   = { x = startX + btnW + spacing, y = y, w = btnW, h = btnH },
+        pot    = { x = startX + (btnW + spacing) * 2, y = y, w = btnW, h = btnH }
     }
 end
 
@@ -311,6 +324,18 @@ function ui.get_card_positions(hand)
     end
 
     return positions
+end
+
+function ui.draw_end_screen(winner, players)
+    local w,h = love.graphics.getWidth(), love.graphics.getHeight()
+    love.graphics.setColor(0,0,0,0.7)
+    love.graphics.rectangle('fill',0,0,w,h)
+    love.graphics.setColor(1,1,1)
+    local text = "Speler "..winner.." wint!"
+    love.graphics.printf(text,0,h/2-40,w,'center')
+    local other = winner==1 and 2 or 1
+    local rest = #players[other].hand
+    love.graphics.printf("Tegenstander heeft "..rest.." kaarten over",0,h/2,w,'center')
 end
 
 

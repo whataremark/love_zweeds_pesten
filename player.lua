@@ -1,4 +1,4 @@
---the human player's hand and drag state
+--informatie over spelers en kaartselectie
 local player = {}
 
 --voor het scrollen van de hand
@@ -17,9 +17,6 @@ player.players = {
     }
 }
 
-player.draggingCard = nil
-player.dragOffset = { x = 0, y = 0 }
-
 function player.init(deck)
     -- Speler 1
     player.players[1].hand = {}
@@ -37,33 +34,26 @@ function player.init(deck)
     end
 end
 
---codex-- Begin dragging a card from the player's hand
-function player.startDrag(x, y)
-    local ui = require("ui")
-    local positions = ui.get_card_positions(player.players[1].hand)
+-- tel hoeveel kaarten momenteel geselecteerd zijn
+function player.count_selected(hand)
+    local c = 0
+    for _,k in ipairs(hand) do
+        if k.selected then c = c + 1 end
+    end
+    return c
+end
 
-    for i, pos in ipairs(positions) do
-        if x >= pos.x and x <= pos.x + pos.w and y >= pos.y and y <= pos.y + pos.h then
-            local kaart = table.remove(player.players[1].hand, i)
-            player.draggingCard = kaart
-            player.dragOffset.x = x - pos.x
-            player.dragOffset.y = y - pos.y
-            break
+-- Toggle de selectie van een kaart uit de hand
+function player.toggle_select(hand, index)
+    local kaart = hand[index]
+    if not kaart then return end
+    if kaart.selected then
+        kaart.selected = false
+    else
+        if player.count_selected(hand) < 3 then
+            kaart.selected = true
         end
     end
-end
-
-
---codex-- Update drag offsets (UI queries mouse position directly)
-function player.updateDragging()
-    -- geen xy-opslag nodig; UI berekent dat live
-end
-
---codex-- Finish dragging and return the selected card
-function player.stopDrag()
-    local kaart = player.draggingCard
-    player.draggingCard = nil
-    return kaart
 end
 
 return player
