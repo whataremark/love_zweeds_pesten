@@ -8,34 +8,32 @@ player.players = {
     {
         hand = {},
         faceUp = {},
-        faceDown = {},
-        selectedFaceUp = {}  -- toegevoegd hier
+        faceDown = {}
     },
     {
         hand = {},
         faceUp = {},
         faceDown = {}
-        -- AI hoeft dit waarschijnlijk niet
     }
 }
 
 player.draggingCard = nil
 player.dragOffset = { x = 0, y = 0 }
 
-
-
-
 function player.init(deck)
-    for i, p in ipairs(player.players) do
-        p.hand = {}
-        p.faceUp = {}
-        p.faceDown = {}
-        for j = 1, 6 do
-            table.insert(p.hand, deck.draw())
-        end
-        for j = 1, 3 do
-            table.insert(p.faceDown, deck.draw())
-        end
+    -- Speler 1
+    player.players[1].hand = {}
+    player.players[1].faceUp = {}
+    player.players[1].faceDown = {}
+
+    -- Speler 2
+    player.players[2].hand = {}
+    player.players[2].faceUp = {}
+    player.players[2].faceDown = {}
+
+    -- Kaarten uitdelen aan speler 1 (bijv. 5 handkaarten)
+    for i = 1, 5 do
+        table.insert(player.players[1].hand, deck.draw())
     end
 end
 

@@ -17,8 +17,6 @@ game.aiTimer = 0
 game.waitingForAI = false
 game.nextMustBeUnder7 = false
 game.extraTurn = false
-game.state = "selectFaceUp"
-
 
 --codex-- Initialize a new round with a chosen play mode
 function game.start(mode)

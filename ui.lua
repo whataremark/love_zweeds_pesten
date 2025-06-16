@@ -154,24 +154,48 @@ end
 end
 
 
+-- teken de 3 dichte kaarten onder de handkaarten
+function ui.draw_facedown_cards(player, index, totalPlayers)
+    local w, h = love.graphics.getWidth(), love.graphics.getHeight()
+
+    -- Verticale spacing per speler
+    local spacingY = 220
+    local baseY = 100 + (index - 1) * spacingY
+
+    -- Kaartgrootte en schaal
+    local kaartHoogte = 140
+    local kaartBreedte = cardBack:getWidth()
+    local schaal = 0.4  -- kleiner dan handkaarten
+    local spacing = 90 * schaal
+
+    -- Positie: onder handkaarten
+    local aantal = math.min(#player.faceDown, 3)
+    local totalWidth = spacing * (aantal - 1) + kaartBreedte * schaal
+    local startX = (w - totalWidth) / 2
+    local y = baseY + 100  -- onder de hand
+
+    for i = 1, aantal do
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.draw(cardBack, startX + (i - 1) * spacing, y, 0, schaal, schaal)
+    end
+end
+
 function ui.draw_player_area(playerData, index, totalPlayers)
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
     local hand = playerData.hand
     if not hand then return end
 
-    local kaart_hoogte = config.cardHeight
-    local schaal = config.scale
+    local kaart_hoogte = 160
+    local schaal = kaart_hoogte / 500
     local kaart_breedte = 300 * schaal
     local padding = 15
-    local visibleCards = config.visibleCards
+    local visibleCards = 6
     local scrollOffset = player.scrollOffset or 0
 
     local boxHeight = kaart_hoogte + 40
     local boxY = index == 1 and (h - boxHeight - 10) or 10
     local boxX = 40
     local boxWidth = w - 80
-    local speler = player.players[1]
-
 
     -- Teken achtergrondbox
     love.graphics.setColor(1, 1, 1, 0.97)
@@ -197,11 +221,6 @@ function ui.draw_player_area(playerData, index, totalPlayers)
             love.graphics.draw(hand[i].afbeelding, x, y, 0, schaal, schaal)
         else
             love.graphics.draw(cardBack, x, y, 0, schaal, schaal)
-            if speler.selectedFaceUp[i] then
-                love.graphics.setColor(0, 1, 0)
-                love.graphics.rectangle("line", x, y, kaart_breedte, kaart_hoogte)
-            end
-
         end
     end
 
@@ -211,66 +230,28 @@ function ui.draw_player_area(playerData, index, totalPlayers)
         love.graphics.printf("Speler " .. index, boxX, boxY + boxHeight + 5, boxWidth, "center")
     end
 
-    ---DICHTE KAARTEN EN OPEN KAARTEN---
-    -- Zelfde schaal & afmetingen als handkaarten
-    local kaartHoogte = config.cardHeight
-    local schaal = config.scale * 1.5  -- iets groter
-    local kaartBreedte = config.cardWidth
-    local spacing = config.cardSpacing + 100
-    local totaalBreedte = kaartBreedte * 3 + spacing * 2
-    local startX = (w - totaalBreedte) / 2
-    local w = love.graphics.getWidth()
 
+   
 
-    -- === Dichte kaarten
+    -- FaceDown (alleen als ze bestaan)
     if playerData.faceDown then
-        local y = index == 1
-            and (boxY - kaartHoogte - 10)      -- voor speler 1: boven de box
-            or (boxY + boxHeight + 70)         -- voor AI: onder de box
+        local aantal = math.min(#playerData.faceDown, 3)
+        local kaartHoogte = 140
+        local schaal = 0.4
+        local spacing = 90 * schaal
+        local totalWidth = spacing * (aantal - 1) + cardBack:getWidth() * schaal
+        local startX = (w - totalWidth) / 2
+        local y = boxY + 20
 
-        for i = 1, 3 do
+        for i = 1, aantal do
             love.graphics.setColor(1, 1, 1)
             love.graphics.draw(cardBack, startX + (i - 1) * spacing, y, 0, schaal, schaal)
         end
     end
-
-    -- === Open kaarten
-    if playerData.faceUp and #playerData.faceUp > 0 then
-        local y = index == 1
-            and (boxY - 2 * kaartHoogte - 20)   -- boven faceDown bij speler 1
-            or (boxY + boxHeight + kaartHoogte + 20) -- onder faceDown bij AI
-
-        for i = 1, 3 do
-            local kaart = playerData.faceUp[i]
-            if kaart and kaart.afbeelding then
-                love.graphics.setColor(1, 1, 1)
-                love.graphics.draw(kaart.afbeelding, x, y, 0, schaal, schaal)
-
-            end
-        end
-    end 
-
-   
-    -- Alleen voor speler (index == 1) en alleen tijdens selectie
-    if index == 1 and game.state == "selectFaceUp" then
-        local btnW, btnH = 200, 50
-        local btnX = (w - btnW) / 2
-        local btnY = boxY - config.cardHeight * 2.5
-
-        love.graphics.setColor(0.2, 0.6, 0.2)
-        love.graphics.rectangle("fill", btnX, btnY, btnW, btnH, 8)
-        love.graphics.setColor(1, 1, 1)
-        love.graphics.printf("Bevestig selectie", btnX, btnY + 15, btnW, "center")
-
-        -- Bewaar positie voor klikdetectie
-        ui.confirmBtn = { x = btnX, y = btnY, w = btnW, h = btnH }
-    end
-
-    -- Naam gecentreerd onder de box
+    -- Naam
     love.graphics.setColor(0, 0, 0)
-    love.graphics.printf("Speler " .. index, boxX, boxY - 25, boxWidth, "center")
+    love.graphics.print("Speler " .. index, 20, boxY - 25)
 end
-
 
 function ui.draw_all_players(players)
     for i, speler in ipairs(players) do

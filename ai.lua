@@ -5,6 +5,8 @@ local drawPile = require("drawpile")
 local player = require("player")
 local ai = {}
 
+
+
 --codex-- Ranking used by the AI to choose between playable cards
 local function get_heuristics(waarde)
     local map = {
@@ -16,7 +18,9 @@ local function get_heuristics(waarde)
     return map[waarde] or 0
 end
 
+
 -- Select the best playable card for the AI or nil when none is possible
+--codex-- Pick the most attractive playable card from the AI hand
 local function choose_card(game, pot)
     local hand = player.players[2].hand
     
