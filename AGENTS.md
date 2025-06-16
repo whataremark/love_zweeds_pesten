@@ -70,6 +70,23 @@ Deze gids is bedoeld om OpenAI Codex en andere AI-agents te helpen bij het begri
 
 ## THINGS TO ADD
 - fix the known bugs
-- BIG FEATURE: aan het begin van het spel worden er naast het uitdelen van de kaarten aan de spelers (moeten er 6 zijn...) ook nog 3 dichte (back.png) kaarten voor de persoon neergelgd (deze moeten wel vaststaan dus het systeem moet weten welke dit zijn) voordat we dan begin met de normale spelverloop moeten de spelers van de 3 kaarten die ze hebben er 3 op de blinde kaarten voor hun leggen, ze kunnen dan kiezen welllke dit gaan worden.. sllimste is je beste kaarten, vervolgens start het spel normaal. als dan de pot op is en alle kaarten zijn op mogen de spelers aan hun eerder opengelgde 3 kaarten beginnen en die 1 voor 1 wegspelen..  als ze dat gedaan hebben dan kunenn ze op 1 dichte kaart klikken om hem te tonen. als ze die niet kunnen leggen pakken ze de stapel door op pak stapel te drukken. kan dit wel gaat het spel verder. de speler die als eerst alle kaarten ( dus ook de dichte) weg heeft gespleed wint!
+- In plaats van drag-&-drop voor kaartspelen, willen we klikken om kaarten te selecteren:
+
+1. Verwijder alle drag-start, drag-move en drag-stop functies.
+2. Voeg in elk kaart-object een boolean `kaart.selected = false` toe.
+3. In `love.mousepressed(x,y,button)` (fase “selectFaceUp”):
+   - Bepaal voor elke kaart met `ui.get_card_positions(hand)` de bounding box.
+   - Als je met de muis op de kaart klikt, togglet `kaart.selected` (maar alleen als er nog <3 kaarten geselecteerd zijn).
+4. Teken in `ui.draw_player_area` of `ui.draw_hand` vóór je `draw`:
+   ```lua
+   if kaart.selected then
+     love.graphics.setColor(0,1,0)
+     love.graphics.setLineWidth(3)
+     love.graphics.rectangle("line", x, y, kaartW, kaartH)
+     love.graphics.setColor(1,1,1)
+   end
+
+Zorg dat het overal goed werkt!!!
+
 - make a end screen so when one of the players has 0 cards in their hands it is displayed who won, might add nice information like how many cards the other player has
 
