@@ -21,5 +21,12 @@ love .
 Veel plezier!
 
 
+### Nieuw
+- Kaarten worden nu geselecteerd met muiskliks in plaats van slepen.
+- Het spel toont een eindscreen zodra iemand geen kaarten meer heeft.
+
+
 ### BUGS
-als er 7 ligt en je speelt 3 dan werkt de 3 niet en mag je hoger doen.. DUS 7 wordt gereset doordat er nieuwe kaart komt, 
+Geen bekende bugs op dit moment. Het probleem waarbij een gespeelde "3" de
+"7"-regel ongedaan maakte, is opgelost.
+

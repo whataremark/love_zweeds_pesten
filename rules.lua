@@ -46,6 +46,7 @@ function rules.handle_card_effects(game, playerIndex, kaart)
             game.waitingForAI = true
             game.aiTimer = 0.5
         end
+        game.check_winner()
         return
     end
 
@@ -56,6 +57,7 @@ function rules.handle_card_effects(game, playerIndex, kaart)
             game.waitingForAI = true
             game.aiTimer = 0.5
         end
+        game.check_winner()
         return
     end
 
@@ -63,12 +65,14 @@ function rules.handle_card_effects(game, playerIndex, kaart)
     if kaart.waarde == "7" then
         game.nextMustBeUnder7 = true
         print("[RULES] ZEVEN regel ACTIEF")
-    else
+    elseif kaart.waarde ~= "3" then
+        -- 3 is 'doorzichtig' en heft de 7-regel niet op
         print("[RULES] ZEVEN regel INACTIEF")
         game.nextMustBeUnder7 = false
     end
 
     game.next_turn()
+    game.check_winner()
 end
 return rules
 

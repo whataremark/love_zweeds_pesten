@@ -17,6 +17,7 @@ game.aiTimer = 0
 game.waitingForAI = false
 game.nextMustBeUnder7 = false
 game.extraTurn = false
+game.winner = nil
 
 --codex-- Initialize a new round with a chosen play mode
 function game.start(mode)
@@ -63,6 +64,16 @@ function game.next_turn()
         game.waitingForAI = true
         game.aiTimer = 0.5
     end
+end
+
+function game.check_winner()
+    for i,speler in ipairs(player.players) do
+        if #speler.hand == 0 then
+            game.winner = i
+            return i
+        end
+    end
+    return nil
 end
 
 

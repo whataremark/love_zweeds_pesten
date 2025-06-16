@@ -42,7 +42,16 @@ function drawPile.init(count)
 end
 
 function drawPile.draw()
-    return table.remove(drawPile.cards)
+    local c = table.remove(drawPile.cards)
+    if not c then return nil end
+    -- maak een kopie zodat geselecteerde staat per kaart uniek is
+    return {
+        kleur = c.kleur,
+        waarde = c.waarde,
+        afbeelding = c.afbeelding,
+        naam = c.naam,
+        selected = false
+    }
 end
 
 function drawPile.count()
