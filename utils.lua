@@ -59,6 +59,7 @@ function utils.refill_hand(hand, deck, count)
     count = count or 5
     while #hand < count and deck.count() > 0 do
         table.insert(hand, deck.draw())
+        print("[UTILS] Hand aangevuld met kaart: " .. hand[#hand].waarde)
     end
 end
 

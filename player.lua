@@ -1,5 +1,6 @@
 --informatie over spelers en kaartselectie
 local player = {}
+local rules = require("rules")
 
 --voor het scrollen van de hand
 player.scrollOffset = 0  -- pixels
@@ -43,15 +44,44 @@ function player.count_selected(hand)
     return c
 end
 
--- Toggle de selectie van een kaart uit de hand
-function player.toggle_select(hand, index)
+function player.toggle_select(hand, index, phase)
     local kaart = hand[index]
     if not kaart then return end
+
+    -- Zorg dat we altijd een fase hebben: default = "playing"
+    local p = phase or "playing"
+    -- Debug print
+    print(("toggle_select: fase=%s, kaart=%s"):format(p, kaart.waarde))
+
+    -- Verzamel huidige selectie
+    local selected = {}
+    for _, k in ipairs(hand) do
+        if k.selected then
+            table.insert(selected, k)
+        end
+    end
+    print("  reeds geselecteerd:", #selected)
+
     if kaart.selected then
         kaart.selected = false
+        print("  → deselect", kaart.waarde)
     else
-        if player.count_selected(hand) < 3 then
-            kaart.selected = true
+        if p == "selectFaceUp" then
+            if #selected < 3 then
+                kaart.selected = true
+                print("  → select (blind)", kaart.waarde)
+            end
+
+        else  -- speel-fase
+            if #selected == 0 then
+                kaart.selected = true
+                print("  → select eerste kaart", kaart.waarde)
+            elseif rules.can_select_for_play(selected, kaart) then
+                kaart.selected = true
+                print("  → select extra gelijkwaardige kaart", kaart.waarde)
+            else
+                print("  → mag niet selecteren:", kaart.waarde)
+            end
         end
     end
 end

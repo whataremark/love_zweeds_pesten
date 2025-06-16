@@ -74,5 +74,80 @@ function rules.handle_card_effects(game, playerIndex, kaart)
     game.next_turn()
     game.check_winner()
 end
+
+
+-- Bepaalt of je tijdens de normale speel-fase een kaart mag toevoegen
+function rules.can_select_for_play(selectedCards, newCard)
+    -- eerste kaart mag altijd
+    if #selectedCards == 0 then
+        return true
+    end
+    -- vergelijk numerieke waarden
+    local eersteWaarde = utils.numeric_value(selectedCards[1].waarde)
+    local nieuweWaarde = utils.numeric_value(newCard.waarde)
+    return eersteWaarde == nieuweWaarde
+end
+
+-- Speel alle geselecteerde kaarten in één keer
+function rules.play_selected_cards(game, playerIndex)
+    local speler = require("player").players[playerIndex]
+    local selected = {}
+
+    -- 1) Verzamelen en uit hand halen (backwards om veilig te removen)
+    for i = #speler.hand, 1, -1 do
+        local k = speler.hand[i]
+        if k.selected then
+            table.insert(selected, 1, table.remove(speler.hand, i))
+        end
+    end
+
+    if #selected == 0 then
+        print("Er zijn geen kaarten geselecteerd.")
+        return
+    end
+
+    
+       -- BRUNZYN check
+    if #selected == 4 then
+        for _, k in ipairs(selected) do
+            table.insert(game.pot, k)
+        end
+        utils.transfer_all_cards({}, game.pot)
+        game.extraTurn = true
+        print("[RULES] BRUNZYN! Pot cleared en extra beurt")
+        game.check_winner()
+        return
+    end
+    
+    -- 2) Check: alle kaarten moeten dezelfde numeric_value hebben
+    local eersteWaarde = utils.numeric_value(selected[1].waarde)
+    for _, k in ipairs(selected) do
+        if utils.numeric_value(k.waarde) ~= eersteWaarde then
+            print("Je kunt alleen meerdere kaarten spelen als ze dezelfde waarde hebben.")
+            -- return kaarten naar hand
+            for _, c in ipairs(selected) do
+                table.insert(speler.hand, c)
+            end
+            return
+        end
+    end
+
+    -- 3) Leg ze allemaal in de pot
+    for _, k in ipairs(selected) do
+        table.insert(game.pot, k)
+    end
+
+    -- 4) Handig: reset selectie-flags in hand (of nieuwe kaarten)
+    for _, k in ipairs(speler.hand) do
+        k.selected = false
+    end
+
+    -- 5) Handel effect van de laatste kaart af
+    local laatste = selected[#selected]
+    rules.handle_card_effects(game, playerIndex, laatste)
+end
+
+
+
 return rules
 

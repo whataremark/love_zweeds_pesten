@@ -92,12 +92,12 @@ function love.mousepressed(x, y, button)
         end
     end
 
-    -- Kaartselectie
     if scene == "playing" and button == 1 then
         local positions = ui.get_card_positions(player.players[1].hand)
-        for i,pos in ipairs(positions) do
-            if utils.inside(x,y,pos.x,pos.y,pos.w,pos.h) then
-                player.toggle_select(player.players[1].hand, i)
+        for i, pos in ipairs(positions) do
+            if utils.inside(x, y, pos.x, pos.y, pos.w, pos.h) then
+                -- phase is game.state, wat "selectFaceUp" of "playing" hoort te zijn
+                player.toggle_select(player.players[1].hand, i, game.state)
                 return
             end
         end
@@ -119,27 +119,35 @@ function love.mousepressed(x, y, button)
             return
         end
 
-        -- Speel knop
-        local bp = buttons.play
-        if x >= bp.x and x <= bp.x + bp.w and y >= bp.y and y <= bp.y + bp.h then
+
+            -- === Speel-knop ===
+    if button == 1 and buttons and buttons.play then
+        local b = buttons.play
+        if x >= b.x and x <= b.x + b.w
+        and  y >= b.y and y <= b.y + b.h then
+
             if game.currentPlayer == 1 then
-                for i=#player.players[1].hand,1,-1 do
-                    if player.players[1].hand[i].selected then
-                        local kaart = player.players[1].hand[i]
-                        if rules.is_speelbaar(kaart, game.pot, game.nextMustBeUnder7) then
-                            rules.handle_card_effects(game,1,kaart)
-                            ronde = ronde + 1
-                            utils.refill_hand(player.players[1].hand, drawPile)
-                        else
-                            ongeldigeZetTimer = 1.0
-                        end
-                        kaart.selected = false
-                        break
-                    end
+                -- 1) Speel alle geselecteerde kaarten
+                require("rules").play_selected_cards(game, 1)
+
+                -- 2) Vul je hand weer aan tot 3 kaarten
+                local speler = player.players[1]
+                utils.refill_hand(speler.hand, drawPile, 3)
+
+                -- 3) Ronde tellen / volgende beurt
+                ronde = ronde + 1
+                --reset selectie in hand
+                for _, k in ipairs(speler.hand) do
+                    k.selected = false
+                    print("")
                 end
+            else
+                print("Niet jouw beurt.")
             end
+
             return
         end
+    end
 
         -- Pot bekijken knop
         local b2 = buttons.pot
@@ -154,5 +162,18 @@ function love.wheelmoved(x, y)
     if game.currentPlayer == 1 then
         local scrollSnelheid = 60  -- pixels per scroll
         player.scrollOffset = math.max(0, player.scrollOffset - y * scrollSnelheid)
+    end
+end
+
+function love.keypressed(key)
+    -- Alleen als we in de speel-scène zijn en de speler aan zet is
+    if key == "space" and scene == "playing" and game.currentPlayer == 1 then
+        local b = buttons.play
+        if b then
+            -- Simuleer een muisklik in het midden van de Play-knop
+            local clickX = b.x + b.w/2
+            local clickY = b.y + b.h/2
+            love.mousepressed(clickX, clickY, 1)
+        end
     end
 end

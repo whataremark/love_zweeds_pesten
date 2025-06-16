@@ -213,22 +213,36 @@ function ui.draw_player_area(playerData, index, totalPlayers)
     local contentWidth = visibleCards * (kaart_breedte + padding)
     local x_start = (w - contentWidth) / 2
 
+    
+
     for i = beginIndex, eindIndex do
+        local kaart = hand[i]
+        local img   = (index == 1) and kaart.afbeelding or cardBack
+
+        -- bereken x,y
         local x = x_start + (i - beginIndex) * (kaart_breedte + padding)
         local y = boxY + 20
-        if hand[i].selected then
-            love.graphics.setColor(0,1,0)
-            love.graphics.setLineWidth(3)
-            love.graphics.rectangle("line", x, y, kaart_breedte, kaart_hoogte)
-            love.graphics.setColor(1,1,1)
+
+        love.graphics.push()
+        love.graphics.translate(x, y)
+        love.graphics.scale(schaal, schaal)
+
+        -- teken de kaart
+        love.graphics.draw(img, 0, 0)
+
+        -- selectie-border
+        if kaart.selected then
+            love.graphics.setColor(60, 1, 0)
+            love.graphics.setLineWidth(3 / schaal)
+            love.graphics.rectangle("line", 0, 0, img:getWidth(), img:getHeight())
+            -- **reset** de lijnbreedte zodat volgende UI-nodes weer normaal zijn:
+            love.graphics.setLineWidth(1)
+            love.graphics.setColor(1, 1, 1)
         end
-        love.graphics.setColor(1, 1, 1)
-        if index == 1 then
-            love.graphics.draw(hand[i].afbeelding, x, y, 0, schaal, schaal)
-        else
-            love.graphics.draw(cardBack, x, y, 0, schaal, schaal)
-        end
+
+        love.graphics.pop()
     end
+
 
     -- Naam (alleen AI bovenaan)
     if index ~= 1 then
@@ -280,7 +294,7 @@ function ui.draw_action_buttons()
     love.graphics.setColor(0.2, 0.6, 0.2)
     love.graphics.rectangle("fill", startX, y, btnW, btnH, 8)
     love.graphics.setColor(1, 1, 1)
-    love.graphics.printf("Pak kaart", startX, y + 10, btnW, "center")
+    love.graphics.printf("Pak pot", startX, y + 10, btnW, "center")
 
     -- === Speel kaart knop ===
     love.graphics.setColor(0.2, 0.4, 0.8)
@@ -292,7 +306,7 @@ function ui.draw_action_buttons()
     love.graphics.setColor(0.2, 0.2, 0.2)
     love.graphics.rectangle("fill", startX + (btnW + spacing) * 2, y, btnW, btnH, 8)
     love.graphics.setColor(1, 1, 1)
-    love.graphics.printf("Pot", startX + (btnW + spacing) * 2, y + 10, btnW, "center")
+    love.graphics.printf("Bekijk Pot", startX + (btnW + spacing) * 2, y + 10, btnW, "center")
 
     -- Return knopposities voor klikdetectie
     return {

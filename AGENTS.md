@@ -70,23 +70,6 @@ Deze gids is bedoeld om OpenAI Codex en andere AI-agents te helpen bij het begri
 
 ## THINGS TO ADD
 - fix the known bugs
-- In plaats van drag-&-drop voor kaartspelen, willen we klikken om kaarten te selecteren:
-
-1. Verwijder alle drag-start, drag-move en drag-stop functies.
-2. Voeg in elk kaart-object een boolean `kaart.selected = false` toe.
-3. In `love.mousepressed(x,y,button)` (fase “selectFaceUp”):
-   - Bepaal voor elke kaart met `ui.get_card_positions(hand)` de bounding box.
-   - Als je met de muis op de kaart klikt, togglet `kaart.selected` (maar alleen als er nog <3 kaarten geselecteerd zijn).
-4. Teken in `ui.draw_player_area` of `ui.draw_hand` vóór je `draw`:
-   ```lua
-   if kaart.selected then
-     love.graphics.setColor(0,1,0)
-     love.graphics.setLineWidth(3)
-     love.graphics.rectangle("line", x, y, kaartW, kaartH)
-     love.graphics.setColor(1,1,1)
-   end
-
-Zorg dat het overal goed werkt!!!
-
+- 
 - make a end screen so when one of the players has 0 cards in their hands it is displayed who won, might add nice information like how many cards the other player has
 
