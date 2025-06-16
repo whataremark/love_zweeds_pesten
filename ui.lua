@@ -188,7 +188,7 @@ function ui.draw_player_area(playerData, index, totalPlayers)
     local kaart_hoogte = 160
     local schaal = kaart_hoogte / 500
     local kaart_breedte = 300 * schaal
-    local padding = 15
+    local padding = 15 --mag mischien weg
     local visibleCards = 6
     local scrollOffset = player.scrollOffset or 0
 

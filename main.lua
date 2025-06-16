@@ -124,23 +124,30 @@ function love.mousepressed(x, y, button)
     if button == 1 and buttons and buttons.play then
         local b = buttons.play
         if x >= b.x and x <= b.x + b.w
-        and  y >= b.y and y <= b.y + b.h then
+        and y >= b.y and y <= b.y + b.h then
 
             if game.currentPlayer == 1 then
-                -- 1) Speel alle geselecteerde kaarten
-                require("rules").play_selected_cards(game, 1)
+                -- 1) Probeer alle geselecteerde kaarten te spelen
+                local ok = require("rules").play_selected_cards(game, 1)
 
-                -- 2) Vul je hand weer aan tot 3 kaarten
-                local speler = player.players[1]
-                utils.refill_hand(speler.hand, drawPile, 3)
+                if ok then
+                    -- 2) Vul je hand weer aan tot 3 kaarten
+                    local speler = player.players[1]
+                    utils.refill_hand(speler.hand, drawPile, 3)
 
-                -- 3) Ronde tellen / volgende beurt
-                ronde = ronde + 1
-                --reset selectie in hand
-                for _, k in ipairs(speler.hand) do
-                    k.selected = false
-                    print("")
+                    -- 3) Ronde tellen / volgende beurt
+                    ronde = ronde + 1
+
+                    -- 4) Reset selectie in de (aangevulde) hand
+                    for _, k in ipairs(speler.hand) do
+                        k.selected = false
+                    end
+
+                else
+                    -- Ongeldige zet: toon rood randje
+                    ongeldigeZetTimer = 1.0
                 end
+
             else
                 print("Niet jouw beurt.")
             end
@@ -148,6 +155,7 @@ function love.mousepressed(x, y, button)
             return
         end
     end
+
 
         -- Pot bekijken knop
         local b2 = buttons.pot

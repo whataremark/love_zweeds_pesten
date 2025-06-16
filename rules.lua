@@ -88,65 +88,76 @@ function rules.can_select_for_play(selectedCards, newCard)
     return eersteWaarde == nieuweWaarde
 end
 
--- Speel alle geselecteerde kaarten in één keer
 function rules.play_selected_cards(game, playerIndex)
-    local speler = require("player").players[playerIndex]
+    local speler   = require("player").players[playerIndex]
     local selected = {}
 
-    -- 1) Verzamelen en uit hand halen (backwards om veilig te removen)
+    -- 1) Verzamelen en uit hand halen (backwards)
     for i = #speler.hand, 1, -1 do
-        local k = speler.hand[i]
-        if k.selected then
+        if speler.hand[i].selected then
             table.insert(selected, 1, table.remove(speler.hand, i))
         end
     end
 
     if #selected == 0 then
         print("Er zijn geen kaarten geselecteerd.")
-        return
+        return false
     end
 
-    
-       -- BRUNZYN check
+    -- 2) BRUNZYN (vier gelijke)
     if #selected == 4 then
+        local eersteVal = utils.numeric_value(selected[1].waarde)
+        -- Check of ze allemaal gelijk zijn
+        for _, k in ipairs(selected) do
+            if utils.numeric_value(k.waarde) ~= eersteVal then
+                -- Niet allemaal gelijk: ongeldige zet
+                for _, c in ipairs(selected) do table.insert(speler.hand, c) end
+                return false
+            end
+        end
+        -- Check speelbaarheid per kaart
+        for _, k in ipairs(selected) do
+            if not rules.is_speelbaar(k, game.pot, game.nextMustBeUnder7) then
+                print("Niet alle geselecteerde kaarten mogen nu gespeeld worden.")
+                for _, c in ipairs(selected) do table.insert(speler.hand, c) end
+                return false
+            end
+        end
+        -- Leg ze in pot
         for _, k in ipairs(selected) do
             table.insert(game.pot, k)
         end
+        -- Leeg pot, extra beurt
         utils.transfer_all_cards({}, game.pot)
         game.extraTurn = true
-        print("[RULES] BRUNZYN! Pot cleared en extra beurt")
+        print("[RULES] BRUNZYN! Pot geleegd en extra beurt")
         game.check_winner()
-        return
+        return true
     end
-    
-    -- 2) Check: alle kaarten moeten dezelfde numeric_value hebben
-    local eersteWaarde = utils.numeric_value(selected[1].waarde)
+
+    -- 3) Normale meervoud-selectie: check equal value én speelbaarheid
+    local eersteVal = utils.numeric_value(selected[1].waarde)
     for _, k in ipairs(selected) do
-        if utils.numeric_value(k.waarde) ~= eersteWaarde then
-            print("Je kunt alleen meerdere kaarten spelen als ze dezelfde waarde hebben.")
-            -- return kaarten naar hand
-            for _, c in ipairs(selected) do
-                table.insert(speler.hand, c)
-            end
-            return
+        if utils.numeric_value(k.waarde) ~= eersteVal
+           or not rules.is_speelbaar(k, game.pot, game.nextMustBeUnder7) then
+            print("INCORRECTE SELECTIE")
+            for _, c in ipairs(selected) do table.insert(speler.hand, c) end
+            return false
         end
     end
 
-    -- 3) Leg ze allemaal in de pot
+    -- 4) Speel alle geselecteerde kaarten (één voor één, met effecten)
     for _, k in ipairs(selected) do
-        table.insert(game.pot, k)
+        rules.handle_card_effects(game, playerIndex, k)
     end
 
-    -- 4) Handig: reset selectie-flags in hand (of nieuwe kaarten)
+    -- 5) Reset selectie-flags
     for _, k in ipairs(speler.hand) do
         k.selected = false
     end
 
-    -- 5) Handel effect van de laatste kaart af
-    local laatste = selected[#selected]
-    rules.handle_card_effects(game, playerIndex, laatste)
+    return true
 end
-
 
 
 return rules
