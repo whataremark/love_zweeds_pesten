@@ -55,8 +55,6 @@ function love.draw()
     ui.draw_deck(drawPile)
     ui.draw_all_players(player.players)
     
-    love.graphics.print("Aan de beurt: Speler " .. game.currentPlayer, 20, 20)
-
     love.graphics.setColor(0, 0, 0)
     love.graphics.print("Ronde: " .. ronde, 20, 20)
     love.graphics.print("Kaarten in pot: " .. #game.pot, 20, 40)

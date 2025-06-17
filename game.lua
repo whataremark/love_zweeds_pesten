@@ -23,20 +23,25 @@ game.winner = nil
 function game.start(mode)
     drawPile.init(game.deckCount)
     player.init(drawPile)
-
-    game.mode = mode or "ai"
+    print("[GAME] Nieuwe ronde gestart met " .. game.deckCount .. " decks")
+    game.mode          = mode or "ai"
     game.currentPlayer = 1
-    game.waitingForAI = false
-    game.nextMustBeUnder7 = false
-    game.extraTurn = false
+    game.waitingForAI  = false
+    game.extraTurn     = false
+    game.winner        = nil
 
+    -- Zet de pot en check meteen de 7-regel
     game.pot = { drawPile.draw() }
+    game.nextMustBeUnder7 = (game.pot[1].waarde == "7")
+    if game.nextMustBeUnder7 then
+        print("[GAME] Eerste kaart is een 7, 7-regel actief")
+    end
+
     game.ronde = 0
 
-    -- Niks nodig voor player 1 (die is al geïnit door player.init)
-    -- Vul hand voor speler 2
-for i = 1, 5 do
-    table.insert(player.players[2].hand, drawPile.draw())
+    -- Vul de AI-hand
+    for i = 1, 5 do
+        table.insert(player.players[2].hand, drawPile.draw())
     end
 end
 
