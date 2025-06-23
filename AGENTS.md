@@ -66,10 +66,10 @@ Deze gids is bedoeld om OpenAI Codex en andere AI-agents te helpen bij het begri
 
 ## known bugs:
 
-- als er 3 wordt gedaan wordt de 7 daarna niet meer herkend...
+- Soms doet de AI 2 moves achter elkaar, dat mag niet, alleen als er een 8 of 10 wordt gedaan zoals beschreven, zoek waardoor dit komt, leg het uuit en verander het
 
 ## THINGS TO ADD
 - fix the known bugs
+-  Organize the lua files better so its more coherent en meer overzichtelijk, 
 - 
-- make a end screen so when one of the players has 0 cards in their hands it is displayed who won, might add nice information like how many cards the other player has
 
