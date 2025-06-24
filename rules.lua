@@ -35,6 +35,7 @@ end
 --codex-- Resolve card effects and update turn state
 function rules.handle_card_effects(game, playerIndex, kaart)
     --codex-- Add the card to the pile then resolve its effect
+    local hadExtraTurn = game.extraTurn
     game.play_card(playerIndex, kaart)
 
     -- 10 clears the discard pile and grants another turn
@@ -71,6 +72,9 @@ function rules.handle_card_effects(game, playerIndex, kaart)
         game.nextMustBeUnder7 = false
     end
 
+    if hadExtraTurn then
+        game.extraTurn = false --codex: consume stored extra turn
+    end
     game.next_turn()
     game.check_winner()
 end
