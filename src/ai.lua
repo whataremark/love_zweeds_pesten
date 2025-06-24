@@ -1,8 +1,8 @@
 --codex-- Basic computer opponent behaviour
-local utils = require("utils")
-local rules = require("rules")
-local drawPile = require("drawpile")
-local player = require("player")
+local utils    = require("src.utils")
+local rules    = require("src.rules")
+local drawPile = require("src.drawpile")
+local player   = require("src.player")
 local ai = {}
 
 
@@ -61,12 +61,14 @@ function ai.play(game, pot)
         else
             -- Pick up the pot when no card can be played
             utils.transfer_all_cards(player.players[2].hand, pot)
-            -- Do NOT refill here!
+            for _,c in ipairs(player.players[2].hand) do c.selected = false end --codex
+            print("[AI] pakt pot op, heeft nu " .. #player.players[2].hand .. " kaarten")
             game.next_turn()
         end
         return
     end
     rules.handle_card_effects(game, 2, choice)
+    print("[AI] speelt " .. choice.waarde .. " van " .. choice.kleur)
     utils.refill_hand(player.players[2].hand, drawPile) -- refill after a successful play
 end
 

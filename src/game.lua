@@ -1,8 +1,8 @@
 --codex-- Core game state without any AI logic. Card effects are handled in rules.lua
 local game = {}
-local utils    = require("utils")
-local drawPile = require("drawpile")
-local player = require("player")
+local utils    = require("src.utils")
+local drawPile = require("src.drawpile")
+local player   = require("src.player")
 
 -- default mode is against the AI
 game.mode = "ai"
@@ -56,6 +56,7 @@ function game.play_card(playerIndex, kaart)
         local k = hand[i]
         if k.waarde == kaart.waarde and k.kleur == kaart.kleur then
             table.remove(hand, i)
+            print("[GAME] Speler " .. playerIndex .. " speelt " .. kaart.waarde .. " van " .. kaart.kleur)
             return
         end
     end
