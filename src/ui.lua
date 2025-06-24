@@ -8,7 +8,8 @@ local kaartHoogte = config.cardHeight
 local schaal = config.scale
 local kaartBreedte = config.cardWidth
 local padding = config.cardPadding
-local cardBack = love.graphics.newImage("assets/cards/back.png")
+--codex card back image
+local cardBack = love.graphics.newImage("assets/cards/png/back.png")
 
 --fonts for titles
 local groteTitelFont = love.graphics.newFont(40)

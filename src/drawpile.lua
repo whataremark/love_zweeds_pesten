@@ -5,7 +5,8 @@ function drawPile.init(count)
     count = count or 1
     drawPile.cards = {}
 
-    local kaartmap = "assets/cards"
+    --codex path to the folder with card PNGs
+    local kaartmap = "assets/cards/png"
     local bestanden = love.filesystem.getDirectoryItems(kaartmap)
     local basis = {}
 
