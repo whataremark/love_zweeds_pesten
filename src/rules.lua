@@ -1,6 +1,6 @@
 --codex-- Game rule helper functions
 local rules = {}
-local utils = require("utils")
+local utils = require("src.utils")
 
 --codex-- Check if a card can legally be played on the pile
 function rules.is_speelbaar(kaart, pot, onderZevenGedwongen)
@@ -93,7 +93,7 @@ function rules.can_select_for_play(selectedCards, newCard)
 end
 
 function rules.play_selected_cards(game, playerIndex)
-    local speler   = require("player").players[playerIndex]
+    local speler   = require("src.player").players[playerIndex]
     local selected = {}
 
     -- 1) Verzamelen en uit hand halen (backwards)
@@ -108,8 +108,10 @@ function rules.play_selected_cards(game, playerIndex)
         return false
     end
 
-    -- 2) BRUNZYN (vier gelijke)
-    if #selected == 4 then
+    -- 2) BRUNZYN (vier gelijke of drie + topkaart)
+    local topCard = game.pot[#game.pot]
+    local isTripBrunzyn = (#selected == 3 and topCard and utils.numeric_value(topCard.waarde) == utils.numeric_value(selected[1].waarde))
+    if #selected == 4 or isTripBrunzyn then
         local eersteVal = utils.numeric_value(selected[1].waarde)
         -- Check of ze allemaal gelijk zijn
         for _, k in ipairs(selected) do
@@ -134,7 +136,11 @@ function rules.play_selected_cards(game, playerIndex)
         -- Leeg pot, extra beurt
         utils.transfer_all_cards({}, game.pot)
         game.extraTurn = true
-        print("[RULES] BRUNZYN! Pot geleegd en extra beurt")
+        if isTripBrunzyn then
+            print("[RULES] BRUNZYN met topkaart! Pot geleegd en extra beurt")
+        else
+            print("[RULES] BRUNZYN! Pot geleegd en extra beurt")
+        end
         game.check_winner()
         return true
     end

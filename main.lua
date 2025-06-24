@@ -1,12 +1,12 @@
 -- Main entry file controlling scenes and user input
 
-local drawPile  = require("drawpile")
-local player = require("player")
-local ui    = require("ui")
-local rules = require("rules")
-local game  = require("game")
-local ai    = require("ai")
-local utils = require("utils")
+local drawPile = require("src.drawpile")
+local player   = require("src.player")
+local ui       = require("src.ui")
+local rules    = require("src.rules")
+local game     = require("src.game")
+local ai       = require("src.ai")
+local utils    = require("src.utils")
 
 local bgCanvas
 
@@ -109,10 +109,12 @@ function love.mousepressed(x, y, button)
             if game.currentPlayer == 1 then
                 -- Alle kaarten uit de pot naar de speler overzetten
                 utils.transfer_all_cards(player.players[1].hand, game.pot)
-                print("Speler pakt pot op (" .. #player.players[1].hand .. " kaarten)")
+                --codex: clear any selection after picking up
+                for _,c in ipairs(player.players[1].hand) do c.selected = false end
+                print("[GAME] Speler pakt pot op, nu " .. #player.players[1].hand .. " kaarten")
                 game.next_turn()
             else
-                print("Niet jouw beurt.")
+                print("[GAME] Niet jouw beurt.")
             end
             return
         end
@@ -126,7 +128,7 @@ function love.mousepressed(x, y, button)
 
             if game.currentPlayer == 1 then
                 -- 1) Probeer alle geselecteerde kaarten te spelen
-                local ok = require("rules").play_selected_cards(game, 1)
+                local ok = require("src.rules").play_selected_cards(game, 1)
 
                 if ok then
                     -- 2) Vul je hand weer aan tot 3 kaarten
@@ -147,7 +149,7 @@ function love.mousepressed(x, y, button)
                 end
 
             else
-                print("Niet jouw beurt.")
+                print("[GAME] Niet jouw beurt.")
             end
 
             return
@@ -167,7 +169,11 @@ end
 function love.wheelmoved(x, y)
     if game.currentPlayer == 1 then
         local scrollSnelheid = 60  -- pixels per scroll
-        player.scrollOffset = math.max(0, player.scrollOffset - y * scrollSnelheid)
+        local cfg = require("src.config")
+        local cardSpace = cfg.cardWidth + cfg.cardPadding
+        local visible = math.floor((love.graphics.getWidth() - 80 + cfg.cardPadding) / cardSpace)
+        local maxOffset = math.max(0, (#player.players[1].hand - visible) * cardSpace)
+        player.scrollOffset = math.max(0, math.min(maxOffset, player.scrollOffset - y * scrollSnelheid))
     end
 end
 

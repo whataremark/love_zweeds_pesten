@@ -1,14 +1,14 @@
 -- Rendering and menu functions
 local ui = {}
-local game = require("game")
-local config = require("config")
-local player = require("player") 
+local game   = require("src.game")
+local config = require("src.config")
+local player = require("src.player")
 
 local kaartHoogte = config.cardHeight
 local schaal = config.scale
 local kaartBreedte = config.cardWidth
 local padding = config.cardPadding
-local cardBack = love.graphics.newImage("/png/back.png")
+local cardBack = love.graphics.newImage("assets/cards/back.png")
 
 --fonts for titles
 local groteTitelFont = love.graphics.newFont(40)
@@ -188,14 +188,15 @@ function ui.draw_player_area(playerData, index, totalPlayers)
     local kaart_hoogte = 160
     local schaal = kaart_hoogte / 500
     local kaart_breedte = 300 * schaal
-    local padding = 15 --mag mischien weg
-    local visibleCards = 6
-    local scrollOffset = player.scrollOffset or 0
-
+    local padding = 15 --codex
     local boxHeight = kaart_hoogte + 40
     local boxY = index == 1 and (h - boxHeight - 10) or 10
     local boxX = 40
     local boxWidth = w - 80
+
+    local cardSpace = kaart_breedte + padding
+    local visibleCards = math.floor((boxWidth + padding) / cardSpace)
+    local scrollOffset = player.scrollOffset or 0
 
     -- Teken achtergrondbox
     love.graphics.setColor(1, 1, 1, 0.97)
@@ -203,15 +204,15 @@ function ui.draw_player_area(playerData, index, totalPlayers)
 
     -- Handkaarten tekenen
     local beginIndex, eindIndex
-    local zichtbareKaarten = 6
     if index == 1 then
-        beginIndex = math.floor(player.scrollOffset / (kaart_breedte + padding)) + 1
+        beginIndex = math.floor(scrollOffset / cardSpace) + 1
     else
         beginIndex = 1
     end
-    eindIndex = math.min(#hand, beginIndex + zichtbareKaarten - 1)
-    local contentWidth = visibleCards * (kaart_breedte + padding)
-    local x_start = (w - contentWidth) / 2
+    eindIndex = math.min(#hand, beginIndex + visibleCards - 1)
+    local fractional = scrollOffset % cardSpace
+    local contentWidth = visibleCards * cardSpace
+    local x_start = boxX + (boxWidth - contentWidth) / 2 - fractional
 
     
 
@@ -325,11 +326,13 @@ function ui.get_card_positions(hand)
     local schaal = kaart_hoogte / 500 -- schatting originele PNG hoogte
     local kaart_breedte = 300 * schaal
     local padding = 15
+    local boxWidth = w - 80
+    local cardSpace = kaart_breedte + padding
+    local visibleCards = math.floor((boxWidth + padding) / cardSpace)
+    local scrollOffset = require("src.player").scrollOffset or 0
+    local fractional = scrollOffset % cardSpace
 
-    local zichtbareKaarten = 6
-    local scrollOffset = require("player").scrollOffset or 0
-
-    local x_start = (w - (zichtbareKaarten * (kaart_breedte + padding))) / 2 - scrollOffset
+    local x_start = 40 + (boxWidth - visibleCards * cardSpace) / 2 - fractional
     local y = h - kaart_hoogte - 50
 
     for i, kaart in ipairs(hand) do

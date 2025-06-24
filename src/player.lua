@@ -1,6 +1,6 @@
 --informatie over spelers en kaartselectie
 local player = {}
-local rules = require("rules")
+local rules = require("src.rules")
 
 --voor het scrollen van de hand
 player.scrollOffset = 0  -- pixels

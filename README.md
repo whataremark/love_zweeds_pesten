@@ -12,6 +12,7 @@ love .
 ```
 
 ## Structuur
+De bronbestanden staan in de map `src/`:
 - `game.lua` bevat alleen het kale spelmodel.
 - `rules.lua` verwerkt de spelregels en kaarteffecten.
 - `ai.lua` regelt de zetten van de tegenstander.
