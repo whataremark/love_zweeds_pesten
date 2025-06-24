@@ -330,14 +330,18 @@ function ui.get_card_positions(hand)
     local cardSpace = kaart_breedte + padding
     local visibleCards = math.floor((boxWidth + padding) / cardSpace)
     local scrollOffset = require("src.player").scrollOffset or 0
-    local fractional = scrollOffset % cardSpace
 
-    local x_start = 40 + (boxWidth - visibleCards * cardSpace) / 2 - fractional
+    -- bepaal welke indices zichtbaar zijn --codex
+    local beginIndex = math.floor(scrollOffset / cardSpace) + 1
+    local eindIndex = math.min(#hand, beginIndex + visibleCards - 1)
+    local fractional = scrollOffset % cardSpace
+    local contentWidth = visibleCards * cardSpace
+    local x_start = 40 + (boxWidth - contentWidth) / 2 - fractional
     local y = h - kaart_hoogte - 50
 
-    for i, kaart in ipairs(hand) do
-        local x = x_start + (i - 1) * (kaart_breedte + padding)
-        table.insert(positions, { x = x, y = y, w = kaart_breedte, h = kaart_hoogte })
+    for i = beginIndex, eindIndex do
+        local x = x_start + (i - beginIndex) * (kaart_breedte + padding)
+        table.insert(positions, { x = x, y = y, w = kaart_breedte, h = kaart_hoogte, index = i })
     end
 
     return positions

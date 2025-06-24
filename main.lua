@@ -92,10 +92,10 @@ function love.mousepressed(x, y, button)
 
     if scene == "playing" and button == 1 then
         local positions = ui.get_card_positions(player.players[1].hand)
-        for i, pos in ipairs(positions) do
+        for _, pos in ipairs(positions) do
             if utils.inside(x, y, pos.x, pos.y, pos.w, pos.h) then
                 -- phase is game.state, wat "selectFaceUp" of "playing" hoort te zijn
-                player.toggle_select(player.players[1].hand, i, game.state)
+                player.toggle_select(player.players[1].hand, pos.index, game.state)
                 return
             end
         end
