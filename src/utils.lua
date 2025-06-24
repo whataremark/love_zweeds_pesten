@@ -1,6 +1,7 @@
 -- Collection of small reusable helper functions
 
 local utils = {}
+local config = require("src.config")
 
 -- Convert card value names to a numeric ranking.
 function utils.numeric_value(value)
@@ -44,10 +45,14 @@ end
 function utils.effective_top_card(pot)
     for i = #pot, 1, -1 do
         if pot[i].waarde ~= "3" then
-            print("[UTILS] effective_top_card: " .. pot[i].waarde)
+            if config.debug then
+                print("[UTILS] effective_top_card: " .. pot[i].waarde)
+            end
             return pot[i]
         else
-            print("[UTILS] 3 GEDTECTEERDE")
+            if config.debug then
+                print("[UTILS] 3 GEDTECTEERDE")
+            end
             -- Special case for 3: skip it")
         end
     end
