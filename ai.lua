@@ -75,7 +75,8 @@ end
 -- Simple timer based update used to delay the AI's move
 --codex-- Timer helper so the AI waits a bit before acting
 function ai.update(dt, game, pot)
-    if game.mode == "ai" and game.waitingForAI then
+    if game.mode == "ai" and game.currentPlayer == 2
+    and game.waitingForAI then
         game.aiTimer = game.aiTimer - dt
         if game.aiTimer <= 0 then
             game.waitingForAI = false

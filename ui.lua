@@ -180,97 +180,135 @@ function ui.draw_facedown_cards(player, index, totalPlayers)
     end
 end
 
+------------------------------TEKEN KAARTEN  -----------------------------------
+
 function ui.draw_player_area(playerData, index, totalPlayers)
-    local w, h = love.graphics.getWidth(), love.graphics.getHeight()
-    local hand = playerData.hand
-    if not hand then return end
+    ------------------------------------------------------------------
+    -- Basisgegevens
+    ------------------------------------------------------------------
+    local w, h  = love.graphics.getWidth(), love.graphics.getHeight()
+    local hand  = playerData.hand or {}
+    if #hand == 0 then return end
 
-    local kaart_hoogte = 160
-    local schaal = kaart_hoogte / 500
-    local kaart_breedte = 300 * schaal
-    local padding = 15 --mag mischien weg
-    local visibleCards = 6
-    local scrollOffset = player.scrollOffset or 0
+    -- kaartafmetingen (bron 500×300 px, doel 160 px hoog)
+    local CARD_H_SRC, CARD_W_SRC = 500, 300
+    local CARD_H      = 160
+    local SCALE_BASE  = CARD_H / CARD_H_SRC        -- ≈ 0.32
+    local CARD_W      = CARD_W_SRC * SCALE_BASE
+    local PADDING     = 15
 
-    local boxHeight = kaart_hoogte + 40
-    local boxY = index == 1 and (h - boxHeight - 10) or 10
-    local boxX = 40
-    local boxWidth = w - 80
+    ------------------------------------------------------------------
+    -- Hand-box
+    ------------------------------------------------------------------
+    local boxH   = CARD_H + 40
+    local boxY   = (index == 1) and (h - boxH - 10) or 10
+    local boxX   = 40
+    local boxW   = w - 80
 
-    -- Teken achtergrondbox
     love.graphics.setColor(1, 1, 1, 0.97)
-    love.graphics.rectangle("line", boxX, boxY, boxWidth, boxHeight, 18, 18)
+    love.graphics.rectangle("line", boxX, boxY, boxW, boxH, 18, 18)
 
-    -- Handkaarten tekenen
-    local beginIndex, eindIndex
-    local zichtbareKaarten = 6
+    ------------------------------------------------------------------
+    -- TEKENEN: Speler 1  (scrollbaar)
+    ------------------------------------------------------------------
     if index == 1 then
-        beginIndex = math.floor(player.scrollOffset / (kaart_breedte + padding)) + 1
+        local cardSpace    = CARD_W + PADDING
+        local minVisible   = 6
+        local fitVisible   = math.floor((boxW - 2 * PADDING) / cardSpace)
+        local visibleCards = math.max(minVisible, fitVisible)
+
+        playerData.scrollOffset = playerData.scrollOffset or 0
+        local maxScroll = math.max(0, (#hand - visibleCards) * cardSpace)
+        playerData.scrollOffset = math.min(
+            math.max(playerData.scrollOffset, 0), maxScroll)
+
+        local beginIdx = math.floor(playerData.scrollOffset / cardSpace) + 1
+        local endIdx   = math.min(#hand, beginIdx + visibleCards - 1)
+
+        local drawn    = endIdx - beginIdx + 1
+        local contentW = drawn * CARD_W + (drawn - 1) * PADDING
+        local xStart   = (w - contentW) / 2
+        local yCards   = boxY + 20
+
+        for i = beginIdx, endIdx do
+            local kaart = hand[i]
+            local x     = xStart + (i - beginIdx) * cardSpace
+
+            love.graphics.push()
+            love.graphics.translate(x, yCards)
+            love.graphics.scale(SCALE_BASE, SCALE_BASE)
+            love.graphics.draw(kaart.afbeelding, 0, 0)
+
+            if kaart.selected then
+                love.graphics.setColor(60, 1, 0)
+                love.graphics.setLineWidth(3 / SCALE_BASE)
+                love.graphics.rectangle("line", 0, 0,
+                                        kaart.afbeelding:getWidth(),
+                                        kaart.afbeelding:getHeight())
+                love.graphics.setLineWidth(1)
+                love.graphics.setColor(1, 1, 1)
+            end
+            love.graphics.pop()
+        end
+
+       ------------------------------------------------------------------
+    -- TEKENEN: AI / overige spelers – vaste 8 px padding
+    ------------------------------------------------------------------
     else
-        beginIndex = 1
-    end
-    eindIndex = math.min(#hand, beginIndex + zichtbareKaarten - 1)
-    local contentWidth = visibleCards * (kaart_breedte + padding)
-    local x_start = (w - contentWidth) / 2
+        local totalCards    = #hand
+        local FIXED_PAD     = 8                          -- constante ruimte
+        local backW_src     = cardBack:getWidth()
+        local backH_src     = cardBack:getHeight()
 
-    
+        -- AI-kaarten mogen nooit hoger zijn dan die van speler 1
+        local maxScale      = CARD_H / backH_src
 
-    for i = beginIndex, eindIndex do
-        local kaart = hand[i]
-        local img   = (index == 1) and kaart.afbeelding or cardBack
+        -- Past alles inclusief paddings in de boxbreedte?
+        local availW        = boxW - 2 * PADDING - (totalCards - 1) * FIXED_PAD
+        local scaleOpp      = math.min(maxScale,
+                                        availW / (totalCards * backW_src))
 
-        -- bereken x,y
-        local x = x_start + (i - beginIndex) * (kaart_breedte + padding)
-        local y = boxY + 20
+        -- ondergrens zodat er altijd wat zichtbaar is
+        scaleOpp            = math.max(scaleOpp, 0.1)
 
-        love.graphics.push()
-        love.graphics.translate(x, y)
-        love.graphics.scale(schaal, schaal)
+        local backW_scaled  = backW_src * scaleOpp
+        local contentW      = totalCards * backW_scaled
+                            + (totalCards - 1) * FIXED_PAD
+        local xStart        = (w - contentW) / 2
+        local yCards        = boxY + 20
 
-        -- teken de kaart
-        love.graphics.draw(img, 0, 0)
-
-        -- selectie-border
-        if kaart.selected then
-            love.graphics.setColor(60, 1, 0)
-            love.graphics.setLineWidth(3 / schaal)
-            love.graphics.rectangle("line", 0, 0, img:getWidth(), img:getHeight())
-            -- **reset** de lijnbreedte zodat volgende UI-nodes weer normaal zijn:
-            love.graphics.setLineWidth(1)
-            love.graphics.setColor(1, 1, 1)
+        for i = 1, totalCards do
+            local x = xStart + (i - 1) * (backW_scaled + FIXED_PAD)
+            love.graphics.draw(cardBack, x, yCards, 0, scaleOpp, scaleOpp)
         end
-
-        love.graphics.pop()
-    end
+    end   -- sluit het if-index-blok
 
 
-    -- Naam (alleen AI bovenaan)
-    if index ~= 1 then
-        love.graphics.setColor(0, 0, 0)
-        love.graphics.printf("Speler " .. index, boxX, boxY + boxHeight + 5, boxWidth, "center")
-    end
 
-
-   
-
-    -- FaceDown (alleen als ze bestaan)
-    if playerData.faceDown then
-        local aantal = math.min(#playerData.faceDown, 3)
-        local kaartHoogte = 140
-        local schaal = 0.4
-        local spacing = 90 * schaal
-        local totalWidth = spacing * (aantal - 1) + cardBack:getWidth() * schaal
-        local startX = (w - totalWidth) / 2
-        local y = boxY + 20
-
-        for i = 1, aantal do
-            love.graphics.setColor(1, 1, 1)
-            love.graphics.draw(cardBack, startX + (i - 1) * spacing, y, 0, schaal, schaal)
-        end
-    end
-    -- Naam
+    ------------------------------------------------------------------
+    -- Naam-label
+    ------------------------------------------------------------------
     love.graphics.setColor(0, 0, 0)
     love.graphics.print("Speler " .. index, 20, boxY - 25)
+
+    ------------------------------------------------------------------
+    -- Face-down kaarten (optioneel)
+    ------------------------------------------------------------------
+    if playerData.faceDown and #playerData.faceDown > 0 then
+        local nFD       = math.min(#playerData.faceDown, 3)
+        local fdScale   = 0.4
+        local fdSpace   = 90 * fdScale
+        local totalW    = fdSpace * (nFD - 1) + cardBack:getWidth() * fdScale
+        local xFDStart  = (w - totalW) / 2
+        local yFD       = boxY + 20
+
+        for i = 1, nFD do
+            love.graphics.setColor(1, 1, 1)
+            love.graphics.draw(cardBack,
+                               xFDStart + (i - 1) * fdSpace, yFD,
+                               0, fdScale, fdScale)
+        end
+    end
 end
 
 function ui.draw_all_players(players)
@@ -317,28 +355,59 @@ function ui.draw_action_buttons()
 end
 
 
+--------------------------------------------------------------------
+-- Geeft alleen hit-boxen terug voor kaarten die nu zichtbaar zijn
+--------------------------------------------------------------------
 function ui.get_card_positions(hand)
-    local positions = {}
-    local w, h = love.graphics.getWidth(), love.graphics.getHeight()
+    local wScr, hScr = love.graphics.getWidth(), love.graphics.getHeight()
 
-    local kaart_hoogte = 160
-    local schaal = kaart_hoogte / 500 -- schatting originele PNG hoogte
-    local kaart_breedte = 300 * schaal
-    local padding = 15
+    -- *** Dezelfde constante waarden als in draw_player_area ***
+    local CARD_H_SRC, CARD_W_SRC = 500, 300
+    local CARD_H      = 160
+    local SCALE       = CARD_H / CARD_H_SRC
+    local CARD_W      = CARD_W_SRC * SCALE
+    local PADDING     = 15
+    local cardSpace   = CARD_W + PADDING
+    
 
-    local zichtbareKaarten = 6
-    local scrollOffset = require("player").scrollOffset or 0
+    -- Hand-box en Y-positie matchen draw_player_area
+    local boxH        = CARD_H + 40
+    local yCards      = hScr - boxH - 10 + 20              -- = boxY + 20
 
-    local x_start = (w - (zichtbareKaarten * (kaart_breedte + padding))) / 2 - scrollOffset
-    local y = h - kaart_hoogte - 50
+    -- Zichtbare vensterbreedte (minimaal 6 kaarten)
+    local boxW        = wScr - 80
+    local minVis      = 6
+    local fitVis      = math.floor((boxW - 2 * PADDING) / cardSpace)
+    local visible     = math.max(minVis, fitVis)
 
-    for i, kaart in ipairs(hand) do
-        local x = x_start + (i - 1) * (kaart_breedte + padding)
-        table.insert(positions, { x = x, y = y, w = kaart_breedte, h = kaart_hoogte })
+    -- Scroll-offset komt alléén van speler-object
+    local p           = require("player").players[1]
+    local scroll      = p.scrollOffset or 0
+    local beginIdx    = math.floor(scroll / cardSpace) + 1
+    local endIdx      = math.min(#hand, beginIdx + visible - 1)
+
+    -- X-start om het getekende venster te centreren
+    local drawn       = endIdx - beginIdx + 1
+    local contentW    = drawn * CARD_W + (drawn - 1) * PADDING
+    local xStart      = (wScr - contentW) / 2
+
+    -- Positielijst vullen
+    local pos = {}
+    for i = 1, #hand do
+        if i >= beginIdx and i <= endIdx then
+            local col = i - beginIdx
+            local x   = xStart + col * cardSpace          -- géén -scroll meer
+            pos[i]    = { x = x, y = yCards, w = CARD_W, h = CARD_H }
+        else
+            -- Onzichtbare kaarten krijgen lege hit-box
+            pos[i]    = { x = 0, y = 0, w = 0, h = 0 }
+        end
     end
-
-    return positions
+    return pos
 end
+
+
+
 
 function ui.draw_end_screen(winner, players)
     local w,h = love.graphics.getWidth(), love.graphics.getHeight()

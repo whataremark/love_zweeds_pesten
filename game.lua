@@ -62,14 +62,16 @@ function game.play_card(playerIndex, kaart)
 end
 
 function game.next_turn()
-    -- Advance to the next player and notify the AI when needed
     game.currentPlayer = (game.currentPlayer % #player.players) + 1
 
     if game.mode == "ai" and game.currentPlayer == 2 then
         game.waitingForAI = true
-        game.aiTimer = 0.5
+        game.aiTimer      = 0.5
+    else
+        game.waitingForAI = false
+        game.aiTimer      = 0        -- safety: timer stilzetten
     end
-end
+end     
 
 function game.check_winner()
     for i,speler in ipairs(player.players) do

@@ -63,4 +63,8 @@ function utils.refill_hand(hand, deck, count)
     end
 end
 
+function utils.deselect_all(t)
+    for _, k in ipairs(t) do k.selected = false end
+end
+
 return utils

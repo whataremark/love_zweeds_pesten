@@ -66,110 +66,114 @@ function love.draw()
     buttons = ui.draw_action_buttons()
 end
 
---codex-- Handle mouse clicks for menus and card actions
+--codex-- Handle mouse clicks for menus, buttons en kaart-acties
 function love.mousepressed(x, y, button)
+    ------------------------------------------------------------------
+    --  MENU-SCENE
+    ------------------------------------------------------------------
     if scene == "menu" and button == 1 then
         if utils.inside(x, y, ui.d1x, ui.d1y, ui.d1w, ui.d1h) then
-            game.deckCount = 1
-            return
+            game.deckCount = 1;   return
         elseif utils.inside(x, y, ui.d2x, ui.d2y, ui.d2w, ui.d2h) then
-            game.deckCount = 2
-            return
+            game.deckCount = 2;   return
         elseif utils.inside(x, y, ui.aiX, ui.aiY, ui.aiW, ui.aiH) then
-            game.start("ai")
-            scene = "playing"
-            ronde = 0
-            ongeldigeZetTimer = 0
+            game.start("ai");     scene = "playing"
+            ronde = 0;            ongeldigeZetTimer = 0
             return
         elseif utils.inside(x, y, ui.hX, ui.hY, ui.hW, ui.hH) then
-            game.start("human")
-            scene = "playing"
-            ronde = 0
-            ongeldigeZetTimer = 0
+            game.start("human");  scene = "playing"
+            ronde = 0;            ongeldigeZetTimer = 0
             return
         end
     end
 
+    ------------------------------------------------------------------
+    --  PLAYING-SCENE
+    ------------------------------------------------------------------
     if scene == "playing" and button == 1 then
-        local positions = ui.get_card_positions(player.players[1].hand)
-        for i, pos in ipairs(positions) do
-            if utils.inside(x, y, pos.x, pos.y, pos.w, pos.h) then
-                -- phase is game.state, wat "selectFaceUp" of "playing" hoort te zijn
-                player.toggle_select(player.players[1].hand, i, game.state)
+        --------------------------------------------------------------
+        -- 1. UI-knoppen (Pak pot / Speel / Bekijk pot / Deselect)
+        --    Eerst afhandelen → bij hit meteen RETURN
+        --------------------------------------------------------------
+        if buttons then
+            local b = buttons.pickup
+            if b and utils.inside(x, y, b.x, b.y, b.w, b.h) then
+                if game.currentPlayer == 1 then
+                    utils.transfer_all_cards(player.players[1].hand, game.pot)
+                    utils.deselect_all(player.players[1].hand)
+                    print("Speler pakt pot op (" .. #player.players[1].hand .. " kaarten)")
+                    game.next_turn()
+                else
+                    print("Niet jouw beurt.")
+                end
+                return
+            end
+
+            local bp = buttons.play
+            if bp and utils.inside(x, y, bp.x, bp.y, bp.w, bp.h) then
+                if game.currentPlayer == 1 then
+                    local ok = require("rules").play_selected_cards(game, 1)
+                    if ok then
+                        local speler = player.players[1]
+                        utils.refill_hand(speler.hand, drawPile, 3)
+                        ronde = ronde + 1
+                        for _, k in ipairs(speler.hand) do k.selected = false end
+                    else
+                        ongeldigeZetTimer = 1.0   -- rood randje
+                    end
+                else
+                    print("Niet jouw beurt.")
+                end
+                return
+            end
+
+            local bv = buttons.pot
+            if bv and utils.inside(x, y, bv.x, bv.y, bv.w, bv.h) then
+                toonPotOverlay = not toonPotOverlay
+                return
+            end
+
+            -- (optioneel) Deselect-knop
+            local bd = buttons.deselect
+            if bd and utils.inside(x, y, bd.x, bd.y, bd.w, bd.h) then
+                utils.deselect_all(player.players[1].hand)
+                return
+            end
+        end
+
+        --------------------------------------------------------------
+        -- 2.  Géén knop geraakt → kaarten proberen selecteren
+        --------------------------------------------------------------
+        local hand      = player.players[1].hand
+        local positions = ui.get_card_positions(hand)
+
+        -- loop van rechts-naar-links zodat bovenliggende kaart wint
+        for i = #positions, 1, -1 do
+            local p = positions[i]
+            if utils.inside(x, y, p.x, p.y, p.w, p.h) then
+                player.toggle_select(hand, i, game.state)
                 return
             end
         end
     end
-
-    -- Knoppen onderaan controleren (Pak kaart & Pot bekijken)
-    if button == 1 and buttons then
-        -- Pak kaart knop
-        local b = buttons.pickup
-        if x >= b.x and x <= b.x + b.w and y >= b.y and y <= b.y + b.h then
-            if game.currentPlayer == 1 then
-                -- Alle kaarten uit de pot naar de speler overzetten
-                utils.transfer_all_cards(player.players[1].hand, game.pot)
-                print("Speler pakt pot op (" .. #player.players[1].hand .. " kaarten)")
-                game.next_turn()
-            else
-                print("Niet jouw beurt.")
-            end
-            return
-        end
-
-
-            -- === Speel-knop ===
-    if button == 1 and buttons and buttons.play then
-        local b = buttons.play
-        if x >= b.x and x <= b.x + b.w
-        and y >= b.y and y <= b.y + b.h then
-
-            if game.currentPlayer == 1 then
-                -- 1) Probeer alle geselecteerde kaarten te spelen
-                local ok = require("rules").play_selected_cards(game, 1)
-
-                if ok then
-                    -- 2) Vul je hand weer aan tot 3 kaarten
-                    local speler = player.players[1]
-                    utils.refill_hand(speler.hand, drawPile, 3)
-
-                    -- 3) Ronde tellen / volgende beurt
-                    ronde = ronde + 1
-
-                    -- 4) Reset selectie in de (aangevulde) hand
-                    for _, k in ipairs(speler.hand) do
-                        k.selected = false
-                    end
-
-                else
-                    -- Ongeldige zet: toon rood randje
-                    ongeldigeZetTimer = 1.0
-                end
-
-            else
-                print("Niet jouw beurt.")
-            end
-
-            return
-        end
-    end
-
-
-        -- Pot bekijken knop
-        local b2 = buttons.pot
-        if x >= b2.x and x <= b2.x + b2.w and y >= b2.y and y <= b2.y + b2.h then
-            toonPotOverlay = not toonPotOverlay
-            return
-        end
-    end
 end
+
 
 function love.wheelmoved(x, y)
     if game.currentPlayer == 1 then
-        local scrollSnelheid = 60  -- pixels per scroll
-        player.scrollOffset = math.max(0, player.scrollOffset - y * scrollSnelheid)
+        -- zelfde maatvoering als ui.draw_player_area
+        local CARD_H_SRC, CARD_W_SRC = 500, 300
+        local CARD_H  = 160
+        local SCALE   = CARD_H / CARD_H_SRC
+        local CARD_W  = CARD_W_SRC * SCALE
+        local PADDING = 15
+        local cardSpace = CARD_W + PADDING
+
+        local p = player.players[1]           -- ← één bron
+        p.scrollOffset = math.max(0, (p.scrollOffset or 0) - y * cardSpace)
     end
 end
+
 
 function love.keypressed(key)
     -- Alleen als we in de speel-scène zijn en de speler aan zet is

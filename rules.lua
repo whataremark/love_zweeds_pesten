@@ -33,7 +33,8 @@ function rules.is_speelbaar(kaart, pot, onderZevenGedwongen)
 end
 
 --codex-- Resolve card effects and update turn state
-function rules.handle_card_effects(game, playerIndex, kaart)
+function rules.handle_card_effects(game, playerIndex, kaart, advanceTurn)
+    if advanceTurn == nil then advanceTurn = true end  -- default
     --codex-- Add the card to the pile then resolve its effect
     local hadExtraTurn = game.extraTurn
     game.play_card(playerIndex, kaart)
@@ -71,11 +72,15 @@ function rules.handle_card_effects(game, playerIndex, kaart)
         print("[RULES] ZEVEN regel INACTIEF")
         game.nextMustBeUnder7 = false
     end
-
-    if hadExtraTurn then
-        game.extraTurn = false --codex: consume stored extra turn
+    -- Was er al een extra beurt actief? Dan is die nu opgebruikt,
+    -- tenzij deze kaart wéér een 8 of 10 was.
+    if game.extraTurn and kaart.waarde ~= "8" and kaart.waarde ~= "10" then
+        game.extraTurn = false
+    end 
+  -- Verplaats beurt alleen als dat mag én we niet midden in een batch zitten
+     if advanceTurn and not game.extraTurn then
+        game.next_turn()
     end
-    game.next_turn()
     game.check_winner()
 end
 
@@ -151,8 +156,9 @@ function rules.play_selected_cards(game, playerIndex)
     end
 
     -- 4) Speel alle geselecteerde kaarten (één voor één, met effecten)
-    for _, k in ipairs(selected) do
-        rules.handle_card_effects(game, playerIndex, k)
+    for i, k in ipairs(selected) do
+        local isLast = (i == #selected)           -- alleen true bij de laatste kaart
+        rules.handle_card_effects(game, playerIndex, k, isLast)
     end
 
     -- 5) Reset selectie-flags
