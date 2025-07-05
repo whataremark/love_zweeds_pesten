@@ -1,5 +1,4 @@
 -- Main entry file controlling scenes and user input
-
 local drawPile  = require("drawpile")
 local player = require("player")
 local ui    = require("ui")
@@ -7,6 +6,7 @@ local rules = require("rules")
 local game  = require("game")
 local ai    = require("ai")
 local utils = require("utils")
+local config = require("config")
 
 local bgCanvas
 
@@ -86,7 +86,49 @@ function love.mousepressed(x, y, button)
             return
         end
     end
+----------------------------------------------------------------
+--  OPEN-fase  –  speler mag op zijn faceUp-kaarten klikken
+----------------------------------------------------------------
+if scene == "playing"
+   and game.state == "playingOpen"
+   and game.currentPlayer == 1
+   and button == 1 then
 
+    local boxY   = love.graphics.getHeight()                      -- of bewaar boxY
+                    - (160 + 40) - 10                              -- CARD_H + 40 + margin
+    local yRow   = ui.row_faceUp_Y(boxY)
+
+    -- ligt de klik in de verticale band van de open-rij?
+    if y >= yRow and y <= yRow + 160 then                          -- 160 = CARD_H
+        local c = table.remove(player.players[1].faceUp, 1)        -- pak 1e kaart
+        rules.handle_card_effects(game, 1, c, true)
+        return
+    end
+end
+
+----------------------------------------------------------------
+--  BLIND-fase  –  klik op een faceDown-kaart (rug)
+----------------------------------------------------------------
+if scene == "playing"
+   and game.state == "playingBlind"
+   and game.currentPlayer == 1
+   and button == 1 then
+
+    local boxY   = love.graphics.getHeight()
+                    - (160 + 40) - 10
+    local yRow   = ui.row_faceDown_Y(boxY)
+
+    if y >= yRow and y <= yRow + 160 then
+        local c = table.remove(player.players[1].faceDown, 1)
+        table.insert(game.pot, c)                                   -- direct op pot
+
+        if not rules.is_speelbaar(c, game.pot, game.nextMustBeUnder7) then
+            utils.transfer_all_cards(player.players[1].hand, game.pot)
+        end
+        game.next_turn()
+        return
+    end
+end
     ------------------------------------------------------------------
     --  PLAYING-SCENE
     ------------------------------------------------------------------
@@ -115,7 +157,7 @@ function love.mousepressed(x, y, button)
                     local ok = require("rules").play_selected_cards(game, 1)
                     if ok then
                         local speler = player.players[1]
-                        utils.refill_hand(speler.hand, drawPile, 3)
+                        utils.refill_hand(speler.hand, drawPile, config.HAND_SIZE)
                         ronde = ronde + 1
                         for _, k in ipairs(speler.hand) do k.selected = false end
                     else

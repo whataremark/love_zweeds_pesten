@@ -1,6 +1,8 @@
 --informatie over spelers en kaartselectie
 local player = {}
 local rules = require("rules")
+local config = require("config")
+
 
 --voor het scrollen van de hand
 player.scrollOffset = 0  -- pixels
@@ -19,19 +21,23 @@ player.players = {
 }
 
 function player.init(deck)
-    -- Speler 1
-    player.players[1].hand = {}
-    player.players[1].faceUp = {}
-    player.players[1].faceDown = {}
+    -- velden aanmaken
+    for i = 1, 2 do
+        player.players[i].hand     = {}
+        player.players[i].faceUp   = {}
+        player.players[i].faceDown = {}
+    end
 
-    -- Speler 2
-    player.players[2].hand = {}
-    player.players[2].faceUp = {}
-    player.players[2].faceDown = {}
-
-    -- Kaarten uitdelen aan speler 1 (bijv. 5 handkaarten)
-    for i = 1, 5 do
+    -- hand-kaarten
+    for i = 1, config.HAND_SIZE do
         table.insert(player.players[1].hand, deck.draw())
+        table.insert(player.players[2].hand, deck.draw())
+    end
+
+    -- blinde kaarten
+    for i = 1, config.BLIND_SIZE do
+        table.insert(player.players[1].faceDown, deck.draw())
+        table.insert(player.players[2].faceDown, deck.draw())
     end
 end
 

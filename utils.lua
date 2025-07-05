@@ -56,7 +56,7 @@ end
 
 --codex-- Ensure a hand always has at least `X` cards by drawing from the deck module.
 function utils.refill_hand(hand, deck, count)
-    count = count or 5
+    count = count or 3
     while #hand < count and deck.count() > 0 do
         table.insert(hand, deck.draw())
         print("[UTILS] Hand aangevuld met kaart: " .. hand[#hand].waarde)

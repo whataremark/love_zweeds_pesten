@@ -3,6 +3,7 @@ local game = {}
 local utils    = require("utils")
 local drawPile = require("drawpile")
 local player = require("player")
+local config = require("config")
 
 -- default mode is against the AI
 game.mode = "ai"
@@ -18,31 +19,54 @@ game.waitingForAI = false
 game.nextMustBeUnder7 = false
 game.extraTurn = false
 game.winner = nil
+local config = require("config")
+
 
 --codex-- Initialize a new round with a chosen play mode
+--------------------------------------------------------------------
+-- game.start(mode) – start een nieuwe ronde
+--------------------------------------------------------------------
 function game.start(mode)
-    drawPile.init(game.deckCount)
-    player.init(drawPile)
-    print("[GAME] Nieuwe ronde gestart met " .. game.deckCount .. " decks")
+    --------------------------------------------------------------
+    -- 0.  Config & trekstapel opbouwen
+    --------------------------------------------------------------
+    local config = require("config")         -- centrale constants
+    drawPile.init(game.deckCount)            -- build / shuffle stapel
+
+    --------------------------------------------------------------
+    -- 1.  Spelers resetten + kaarten delen
+    --------------------------------------------------------------
+    player.init(drawPile)                    -- vult hand & faceDown
+    -- player.init moet nu  HAND_SIZE  hand-kaarten
+    -- en  BLIND_SIZE  faceDown-kaarten uitdelen aan beide spelers
+
+    --------------------------------------------------------------
+    -- 2.  Spelstatus resetten
+    --------------------------------------------------------------
     game.mode          = mode or "ai"
     game.currentPlayer = 1
     game.waitingForAI  = false
     game.extraTurn     = false
     game.winner        = nil
+    game.ronde         = 0
 
-    -- Zet de pot en check meteen de 7-regel
+    -- we beginnen in de setup-fase (mens kiest open kaarten)
+    game.state         = "setupSelectOpen"
+
+    --------------------------------------------------------------
+    -- 3.  Eerste kaart op de pot leggen
+    --------------------------------------------------------------
     game.pot = { drawPile.draw() }
+
+    -- 7-regel direct activeren?
     game.nextMustBeUnder7 = (game.pot[1].waarde == "7")
     if game.nextMustBeUnder7 then
-        print("[GAME] Eerste kaart is een 7, 7-regel actief")
+        print("[GAME] Eerste kaart is een 7 → 7-regel actief")
     end
 
-    game.ronde = 0
-
-    -- Vul de AI-hand
-    for i = 1, 5 do
-        table.insert(player.players[2].hand, drawPile.draw())
-    end
+    print(string.format(
+        "[GAME] Nieuwe ronde gestart: %d decks, hand=%d, blind=%d",
+        game.deckCount, config.HAND_SIZE, config.BLIND_SIZE))
 end
 
 

@@ -14,6 +14,24 @@ local cardBack = love.graphics.newImage("/png/back.png")
 local groteTitelFont = love.graphics.newFont(40)
 local kleineTitelFont = love.graphics.newFont(20)
 
+
+
+--------------------------------------------------------------------
+-- Hulpfuncties om de Y-posities van de rijen terug te geven
+--------------------------------------------------------------------
+local CARD_H_SRC, CARD_W_SRC = 500, 300      -- bron-afmetingen
+local CARD_H      = 160
+local SCALE_BASE  = CARD_H / CARD_H_SRC
+
+-- Hand-box-Y berekent draw_player_area al → we geven `boxY` mee
+local function row_faceUp_Y(boxY)    return boxY - CARD_H - 10        end
+local function row_faceDown_Y(boxY)  return boxY - CARD_H*2 - 20      end
+
+-- Exporteer voor mousepressed
+ui.row_faceUp_Y    = row_faceUp_Y
+ui.row_faceDown_Y  = row_faceDown_Y
+
+
 ----------------------MENU---------------------------------------
 function ui.draw_menu(mouseX, mouseY)
     local w,h = love.graphics.getWidth(), love.graphics.getHeight()
@@ -291,30 +309,44 @@ function ui.draw_player_area(playerData, index, totalPlayers)
     love.graphics.setColor(0, 0, 0)
     love.graphics.print("Speler " .. index, 20, boxY - 25)
 
-    ------------------------------------------------------------------
-    -- Face-down kaarten (optioneel)
-    ------------------------------------------------------------------
-    if playerData.faceDown and #playerData.faceDown > 0 then
-        local nFD       = math.min(#playerData.faceDown, 3)
-        local fdScale   = 0.4
-        local fdSpace   = 90 * fdScale
-        local totalW    = fdSpace * (nFD - 1) + cardBack:getWidth() * fdScale
-        local xFDStart  = (w - totalW) / 2
-        local yFD       = boxY + 20
+------------------------------------------------------------------
+-- FACE-UP rij  (zichtbare open kaarten)
+------------------------------------------------------------------
+local faceUp = playerData.faceUp
+if #faceUp > 0 then
+    local yRow     = row_faceUp_Y(boxY)
+    local spacing  = CARD_W + PADDING
+    local totalW   = #faceUp * CARD_W + (#faceUp - 1) * PADDING
+    local xStart   = (w - totalW) / 2
+    local imgScale = SCALE_BASE           -- zelfde grootte als hand
 
-        for i = 1, nFD do
-            love.graphics.setColor(1, 1, 1)
-            love.graphics.draw(cardBack,
-                               xFDStart + (i - 1) * fdSpace, yFD,
-                               0, fdScale, fdScale)
-        end
+    for i, kaart in ipairs(faceUp) do
+        local img = kaart.afbeelding      -- ook bij AI open = zichtbaar
+        love.graphics.draw(img,
+            xStart + (i-1)*spacing, yRow,
+            0, imgScale, imgScale)
     end
 end
 
-function ui.draw_all_players(players)
-    for i, speler in ipairs(players) do
-        ui.draw_player_area(speler, i, #players)
+------------------------------------------------------------------
+-- FACE-DOWN rij  (blinde rug-kaarten)
+------------------------------------------------------------------
+local faceDown = playerData.faceDown
+if #faceDown > 0 then
+    local yRow     = row_faceDown_Y(boxY)
+    local spacing  = CARD_W + PADDING
+    local totalW   = #faceDown * CARD_W + (#faceDown - 1) * PADDING
+    local xStart   = (w - totalW) / 2
+    local imgScale = SCALE_BASE           -- zelfde hoogte als hand
+
+    for i = 1, #faceDown do
+        love.graphics.draw(cardBack,
+            xStart + (i-1)*spacing, yRow,
+            0, imgScale, imgScale)
     end
+end
+
+
 end
 
 
@@ -406,6 +438,11 @@ function ui.get_card_positions(hand)
     return pos
 end
 
+function ui.draw_all_players(players)
+    for i, speler in ipairs(players) do
+        ui.draw_player_area(speler, i, #players)
+    end
+end
 
 
 
@@ -420,6 +457,5 @@ function ui.draw_end_screen(winner, players)
     local rest = #players[other].hand
     love.graphics.printf("Tegenstander heeft "..rest.." kaarten over",0,h/2,w,'center')
 end
-
 
 return ui
