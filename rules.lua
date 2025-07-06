@@ -44,6 +44,7 @@ function rules.handle_card_effects(game, playerIndex, kaart, advanceTurn)
         utils.transfer_all_cards({}, game.pot) -- simply clear pot
         game.lastCardWas10 = true
         game.extraTurn = true
+        game.nextMustBeUnder7 = false
         if playerIndex == 2 then
             game.waitingForAI = true
             game.aiTimer = 0.5

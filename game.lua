@@ -98,13 +98,16 @@ function game.next_turn()
 end     
 
 function game.check_winner()
-    for i,speler in ipairs(player.players) do
-        if #speler.hand == 0 then
-            game.winner = i
-            return i
+    local playerMod = require("player")
+
+    for i, p in ipairs(playerMod.players) do
+        if #p.hand == 0 and #p.faceUp == 0 and #p.faceDown == 0 then
+            game.winner = i          -- sla winnaar op
+            scene       = "einde"    -- of "end", wat je al gebruikt
+            print("[GAME] Speler "..i.." wint!")
+            return
         end
     end
-    return nil
 end
 
 

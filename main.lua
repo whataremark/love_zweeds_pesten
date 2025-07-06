@@ -86,7 +86,27 @@ function love.mousepressed(x, y, button)
             return
         end
     end
-----------------------------------------------------------------
+-- SETUP: speler kiest 3 open kaarten
+if scene == "playing"
+   and game.state == "setupSelectOpen"
+   and button == 1 then
+    local hand      = player.players[1].hand
+    local positions = ui.get_card_positions(hand)
+
+    for i = #positions, 1, -1 do
+        local p = positions[i]
+        if utils.inside(x,y,p.x,p.y,p.w,p.h) then
+            local kaart = table.remove(hand,i)
+            table.insert(player.players[1].faceUp, kaart)
+            if #player.players[1].faceUp == config.SETUP_OPEN then
+                game.state = "setupAISelect"   -- mens klaar → AI aan zet
+            end
+            return
+        end
+    end
+end
+
+    ----------------------------------------------------------------
 --  OPEN-fase  –  speler mag op zijn faceUp-kaarten klikken
 ----------------------------------------------------------------
 if scene == "playing"
@@ -152,12 +172,14 @@ end
             end
 
             local bp = buttons.play
-            if bp and utils.inside(x, y, bp.x, bp.y, bp.w, bp.h) then
+            if bp and utils.inside(x,y,bp.x,bp.y,bp.w,bp.h)
+            and game.state == "playingHand" then   -- alleen in hand-fase
                 if game.currentPlayer == 1 then
                     local ok = require("rules").play_selected_cards(game, 1)
                     if ok then
                         local speler = player.players[1]
-                        utils.refill_hand(speler.hand, drawPile, config.HAND_SIZE)
+                        -- hier ipv config.HANDSIZE naar 3 veranderd zodat ie pas aanvult als je 3 hebt
+                        utils.refill_hand(speler.hand, drawPile, config.CARDS_INHAND)
                         ronde = ronde + 1
                         for _, k in ipairs(speler.hand) do k.selected = false end
                     else

@@ -93,7 +93,7 @@ function ai.play(game, pot)
     end
     rules.handle_card_effects(game, 2, choice)
     local speler2 = require("player").players[2]
-    utils.refill_hand(speler2.hand, drawPile, config.HAND_SIZE) --refil met handsize
+    utils.refill_hand(speler2.hand, drawPile, config.CARDS_INHAND)
 
 end
 

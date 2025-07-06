@@ -8,7 +8,7 @@ local kaartHoogte = config.cardHeight
 local schaal = config.scale
 local kaartBreedte = config.cardWidth
 local padding = config.cardPadding
-local cardBack = love.graphics.newImage("/png/back.png")
+local cardBack = love.graphics.newImage("png/back.png")
 
 --fonts for titles
 local groteTitelFont = love.graphics.newFont(40)
@@ -22,18 +22,77 @@ local kleineTitelFont = love.graphics.newFont(20)
 local CARD_H_SRC, CARD_W_SRC = 500, 300      -- bron-afmetingen
 local CARD_H      = 160
 local SCALE_BASE  = CARD_H / CARD_H_SRC
+--------------------------------------------------------------------
+-- Kaart-constanten & helpers
+--------------------------------------------------------------------
+local TARGET_H = 140            -- alle kaarten komen 140 px hoog op scherm
+local PADDING  = 15             -- ruimte tussen kaarten
 
--- Hand-box-Y berekent draw_player_area al → we geven `boxY` mee
-local function row_faceUp_Y(boxY)    return boxY - CARD_H - 10        end
-local function row_faceDown_Y(boxY)  return boxY - CARD_H*2 - 20      end
+-- schaal elke afbeelding naar TARGET_H
+local function scale_to_target(img)
+    return TARGET_H / img:getHeight()
+end
 
--- Exporteer voor mousepressed
+--------------------------------------------------------------------
+-- Y-posities voor open- en blind-rijen
+-- • speler 1 (onderaan): rijen boven de hand
+-- • speler 2 (AI, boven): rijen onder de hand
+--------------------------------------------------------------------
+-- Stel doelhoogte (TARGET_H) staat al bovenin op 140 px
+local EXTRA_GAP = 70          -- extra afstand voor AI-rij
+
+local function row_faceDown_Y(boxY, index)
+    if index == 1 then                    -- Mens (onder): rij boven hand
+        return boxY - TARGET_H - 10       -- 10 px marge
+    else                                  -- AI (boven): rij onder hand
+        return boxY + TARGET_H + EXTRA_GAP
+    end
+end
+
+-- open kaart moet exact op de rug liggen → zelfde Y
+local function row_faceUp_Y(boxY, index)
+    return row_faceDown_Y(boxY, index)
+end
+
+-- Exporteer voor gebruik in mousepressed e.d.
 ui.row_faceUp_Y    = row_faceUp_Y
 ui.row_faceDown_Y  = row_faceDown_Y
 
 
 ----------------------MENU---------------------------------------
-function ui.draw_menu(mouseX, mouseY)
+function ui.draw_menu(mouseX, mouseY)--------------------------------------------------------------------
+-- Kaart-constanten & helpers
+--------------------------------------------------------------------
+local TARGET_H = 140            -- alle kaarten komen 140 px hoog op scherm
+local PADDING  = 15             -- ruimte tussen kaarten
+
+-- schaal elke afbeelding naar TARGET_H
+local function scale_to_target(img)
+    return TARGET_H / img:getHeight()
+end
+
+--------------------------------------------------------------------
+-- Y-posities voor open- en blind-rijen
+-- • speler 1 (onderaan): rijen boven de hand
+-- • speler 2 (AI, boven): rijen onder de hand
+--------------------------------------------------------------------
+local function row_faceDown_Y(boxY, index)
+    if index == 1 then               -- mens
+        return boxY - TARGET_H - 10  -- 10 px marge boven de hand
+    else                              -- AI
+        return boxY + TARGET_H + 10  -- 10 px onder zijn hand
+    end
+end
+
+-- open kaart moet exact op de rug liggen → zelfde Y
+local function row_faceUp_Y(boxY, index)
+    return row_faceDown_Y(boxY, index)
+end
+
+-- Exporteer voor gebruik in mousepressed e.d.
+ui.row_faceUp_Y    = row_faceUp_Y
+ui.row_faceDown_Y  = row_faceDown_Y
+
     local w,h = love.graphics.getWidth(), love.graphics.getHeight()
     love.graphics.setFont(groteTitelFont)
     love.graphics.setColor(1,1,1)
@@ -172,32 +231,6 @@ end
 end
 
 
--- teken de 3 dichte kaarten onder de handkaarten
-function ui.draw_facedown_cards(player, index, totalPlayers)
-    local w, h = love.graphics.getWidth(), love.graphics.getHeight()
-
-    -- Verticale spacing per speler
-    local spacingY = 220
-    local baseY = 100 + (index - 1) * spacingY
-
-    -- Kaartgrootte en schaal
-    local kaartHoogte = 140
-    local kaartBreedte = cardBack:getWidth()
-    local schaal = 0.4  -- kleiner dan handkaarten
-    local spacing = 90 * schaal
-
-    -- Positie: onder handkaarten
-    local aantal = math.min(#player.faceDown, 3)
-    local totalWidth = spacing * (aantal - 1) + kaartBreedte * schaal
-    local startX = (w - totalWidth) / 2
-    local y = baseY + 100  -- onder de hand
-
-    for i = 1, aantal do
-        love.graphics.setColor(1, 1, 1)
-        love.graphics.draw(cardBack, startX + (i - 1) * spacing, y, 0, schaal, schaal)
-    end
-end
-
 ------------------------------TEKEN KAARTEN  -----------------------------------
 
 function ui.draw_player_area(playerData, index, totalPlayers)
@@ -206,7 +239,7 @@ function ui.draw_player_area(playerData, index, totalPlayers)
     ------------------------------------------------------------------
     local w, h  = love.graphics.getWidth(), love.graphics.getHeight()
     local hand  = playerData.hand or {}
-    if #hand == 0 then return end
+--  if #hand == 0 then return end
 
     -- kaartafmetingen (bron 500×300 px, doel 160 px hoog)
     local CARD_H_SRC, CARD_W_SRC = 500, 300
@@ -297,6 +330,7 @@ function ui.draw_player_area(playerData, index, totalPlayers)
 
         for i = 1, totalCards do
             local x = xStart + (i - 1) * (backW_scaled + FIXED_PAD)
+            love.graphics.setColor(1,1,1) --reset kleur naar wit??
             love.graphics.draw(cardBack, x, yCards, 0, scaleOpp, scaleOpp)
         end
     end   -- sluit het if-index-blok
@@ -309,42 +343,49 @@ function ui.draw_player_area(playerData, index, totalPlayers)
     love.graphics.setColor(0, 0, 0)
     love.graphics.print("Speler " .. index, 20, boxY - 25)
 
-------------------------------------------------------------------
--- FACE-UP rij  (zichtbare open kaarten)
-------------------------------------------------------------------
-local faceUp = playerData.faceUp
-if #faceUp > 0 then
-    local yRow     = row_faceUp_Y(boxY)
-    local spacing  = CARD_W + PADDING
-    local totalW   = #faceUp * CARD_W + (#faceUp - 1) * PADDING
-    local xStart   = (w - totalW) / 2
-    local imgScale = SCALE_BASE           -- zelfde grootte als hand
-
-    for i, kaart in ipairs(faceUp) do
-        local img = kaart.afbeelding      -- ook bij AI open = zichtbaar
-        love.graphics.draw(img,
-            xStart + (i-1)*spacing, yRow,
-            0, imgScale, imgScale)
-    end
-end
 
 ------------------------------------------------------------------
 -- FACE-DOWN rij  (blinde rug-kaarten)
 ------------------------------------------------------------------
 local faceDown = playerData.faceDown
 if #faceDown > 0 then
-    local yRow     = row_faceDown_Y(boxY)
-    local spacing  = CARD_W + PADDING
+    local yRow = row_faceDown_Y(boxY, index)
+    local scaleDown = scale_to_target(cardBack)
+    local spacing   = cardBack:getWidth() * scaleDown + PADDING
     local totalW   = #faceDown * CARD_W + (#faceDown - 1) * PADDING
     local xStart   = (w - totalW) / 2
     local imgScale = SCALE_BASE           -- zelfde hoogte als hand
+    
+
 
     for i = 1, #faceDown do
-        love.graphics.draw(cardBack,
-            xStart + (i-1)*spacing, yRow,
-            0, imgScale, imgScale)
+        love.graphics.setColor(1,1,1) --reset kleur naar wit??
+        love.graphics.draw(cardBack, xStart+(i-1)*spacing, yRow,
+                   0, scaleDown, scaleDown)
     end
 end
+
+------------------------------------------------------------------
+-- FACE-UP rij  (zichtbare open kaarten)
+------------------------------------------------------------------
+    local faceUp = playerData.faceUp
+    if #faceUp > 0 then
+        local imgScale = scale_to_target(faceUp[1].afbeelding)
+        local scaleUp = scale_to_target(faceUp[1].afbeelding)
+        local spacing = faceUp[1].afbeelding:getWidth() * scaleUp + PADDING
+        local totalW   = #faceUp * spacing - PADDING   -- laatste geen extra gap
+        local xStart   = (w - totalW) / 2
+        local yRow = row_faceUp_Y(boxY, index)
+
+        
+
+
+        for i, kaart in ipairs(faceUp) do
+            love.graphics.setColor(1,1,1)
+            love.graphics.draw(kaart.afbeelding, xStart+(i-1)*spacing, yRow,
+                   0, scaleUp, scaleUp)
+        end
+    end          -- ← laat deze staan
 
 
 end
