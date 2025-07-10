@@ -86,84 +86,112 @@ function love.mousepressed(x, y, button)
             return
         end
     end
--- SETUP: speler kiest 3 open kaarten
-if scene == "playing"
-   and game.state == "setupSelectOpen"
-   and button == 1 then
-    local hand      = player.players[1].hand
-    local positions = ui.get_card_positions(hand)
+    -- SETUP: speler kiest 3 open kaarten
+    if scene == "playing"
+    and game.state == "setupSelectOpen"
+    and button == 1 then
+        local hand      = player.players[1].hand
+        local positions = ui.get_card_positions(hand)
 
-    for i = #positions, 1, -1 do
-        local p = positions[i]
-        if utils.inside(x,y,p.x,p.y,p.w,p.h) then
-            local kaart = table.remove(hand,i)
-            table.insert(player.players[1].faceUp, kaart)
-            if #player.players[1].faceUp == config.SETUP_OPEN then
-                game.state = "setupAISelect"   -- mens klaar → AI aan zet
+        for i = #positions, 1, -1 do
+            local p = positions[i]
+            if utils.inside(x,y,p.x,p.y,p.w,p.h) then
+                local kaart = table.remove(hand,i)
+                table.insert(player.players[1].faceUp, kaart)
+                if #player.players[1].faceUp == config.SETUP_OPEN then
+                    game.state = "setupAISelect"   -- mens klaar → AI aan zet
+                end
+                return
+            end
+        end
+    end
+
+    ----------------------------------------------------------------
+    --  OPEN-fase – kaart in faceUp selecteren
+    ----------------------------------------------------------------
+    if scene == "playing"
+        and game.state == "playingOpen"
+        and game.currentPlayer == 1
+        and button == 1 then
+
+        local faceUp = player.players[1].faceUp
+        if #faceUp == 0 then  -- niets te selecteren, val door naar knoppen
+            -- GEEN return hier!
+        else
+            ------------------------------------------------------ y-band
+            local TARGET_H, PADDING = 140, 15
+            local boxH  = TARGET_H + 40
+            local boxY  = love.graphics.getHeight() - boxH - 10
+            local yRow  = ui.row_faceUp_Y(boxY, 1)
+
+            if y >= yRow and y <= yRow + TARGET_H then     -- klik ín de rij
+                -------------------------------------------------- x-positie
+                local first   = faceUp[1].afbeelding
+                local scale   = TARGET_H / first:getHeight()
+                local cardW   = first:getWidth() * scale
+                local spacing = cardW + PADDING
+                local totalW  = #faceUp * spacing - PADDING
+                local xStart  = (love.graphics.getWidth() - totalW) / 2
+                local col     = math.floor((x - xStart) / spacing) + 1
+
+                if faceUp[col] then            -- kaart gevonden → toggelen
+                    player.toggle_select(faceUp, col, "open")
+                end
+                return                        -- **alleen** na échte kaart-hit
+            end
+            -- valt de klik buiten de y-band? → gewoon doorlopen naar knoppen
+        end
+    end
+
+    ----------------------------------------------------------------
+    --  BLIND-fase  –  klik op een faceDown-kaart (rug)
+    ----------------------------------------------------------------
+    if scene == "playing"
+    and game.state == "playingBlind"
+    and game.currentPlayer == 1
+    and button == 1 then
+
+        local boxY   = love.graphics.getHeight()
+                        - (160 + 40) - 10
+        local yRow = ui.row_faceDown_Y(boxY, 1)
+
+        if y >= yRow and y <= yRow + 160 then
+            local c = table.remove(player.players[1].faceDown, 1)
+            
+            -- checken of kaart gespeeld mag worden..
+            if rules.is_speelbaar(c, game.pot, game.nextMustBeUnder7) then
+                -- kaart mag: voer effecten uit en blijf in dezelfde beurt-logica
+                rules.handle_card_effects(game, 1, c)
+            else
+                -- kaart mag NIET: hele pot + de kaart terug naar je hand
+                utils.transfer_all_cards(player.players[1].hand, game.pot)
+                utils.deselect_all(player.players[1].hand) -- deselecteer alles
+                table.insert(player.players[1].hand, c)
+                game.next_turn()                              -- beurt voorbij
             end
             return
         end
     end
-end
-
-    ----------------------------------------------------------------
---  OPEN-fase  –  speler mag op zijn faceUp-kaarten klikken
-----------------------------------------------------------------
-if scene == "playing"
-   and game.state == "playingOpen"
-   and game.currentPlayer == 1
-   and button == 1 then
-
-    local boxY   = love.graphics.getHeight()                      -- of bewaar boxY
-                    - (160 + 40) - 10                              -- CARD_H + 40 + margin
-    local yRow   = ui.row_faceUp_Y(boxY)
-
-    -- ligt de klik in de verticale band van de open-rij?
-    if y >= yRow and y <= yRow + 160 then                          -- 160 = CARD_H
-        local c = table.remove(player.players[1].faceUp, 1)        -- pak 1e kaart
-        rules.handle_card_effects(game, 1, c, true)
-        return
-    end
-end
-
-----------------------------------------------------------------
---  BLIND-fase  –  klik op een faceDown-kaart (rug)
-----------------------------------------------------------------
-if scene == "playing"
-   and game.state == "playingBlind"
-   and game.currentPlayer == 1
-   and button == 1 then
-
-    local boxY   = love.graphics.getHeight()
-                    - (160 + 40) - 10
-    local yRow   = ui.row_faceDown_Y(boxY)
-
-    if y >= yRow and y <= yRow + 160 then
-        local c = table.remove(player.players[1].faceDown, 1)
-        table.insert(game.pot, c)                                   -- direct op pot
-
-        if not rules.is_speelbaar(c, game.pot, game.nextMustBeUnder7) then
-            utils.transfer_all_cards(player.players[1].hand, game.pot)
-        end
-        game.next_turn()
-        return
-    end
-end
     ------------------------------------------------------------------
     --  PLAYING-SCENE
     ------------------------------------------------------------------
+        ------------------------------------------------------------------
+    --  PLAYING-SCENE (knoppen + kaart-selectie)
+    ------------------------------------------------------------------
     if scene == "playing" and button == 1 then
-        --------------------------------------------------------------
-        -- 1. UI-knoppen (Pak pot / Speel / Bekijk pot / Deselect)
-        --    Eerst afhandelen → bij hit meteen RETURN
-        --------------------------------------------------------------
+        ----------------------------------------------------------------
+        -- 1.  UI-knoppen (Pak pot / Speel / Bekijk pot / Deselect)
+        --     ⇒ bij hit altijd meteen RETURN
+        ----------------------------------------------------------------
         if buttons then
+            ------------- Pak-pot --------------------------------------
             local b = buttons.pickup
             if b and utils.inside(x, y, b.x, b.y, b.w, b.h) then
                 if game.currentPlayer == 1 then
                     utils.transfer_all_cards(player.players[1].hand, game.pot)
                     utils.deselect_all(player.players[1].hand)
-                    print("Speler pakt pot op (" .. #player.players[1].hand .. " kaarten)")
+                    utils.update_phase_for_player(game, 1)
+                    print("Speler pakt pot op ("..#player.players[1].hand.." kaarten)")
                     game.next_turn()
                 else
                     print("Niet jouw beurt.")
@@ -171,33 +199,51 @@ end
                 return
             end
 
+            ------------- Speel-knop (één bp-variabele!) ---------------
             local bp = buttons.play
-            if bp and utils.inside(x,y,bp.x,bp.y,bp.w,bp.h)
-            and game.state == "playingHand" then   -- alleen in hand-fase
-                if game.currentPlayer == 1 then
-                    local ok = require("rules").play_selected_cards(game, 1)
-                    if ok then
-                        local speler = player.players[1]
-                        -- hier ipv config.HANDSIZE naar 3 veranderd zodat ie pas aanvult als je 3 hebt
-                        utils.refill_hand(speler.hand, drawPile, config.CARDS_INHAND)
-                        ronde = ronde + 1
-                        for _, k in ipairs(speler.hand) do k.selected = false end
-                    else
-                        ongeldigeZetTimer = 1.0   -- rood randje
-                    end
-                else
-                    print("Niet jouw beurt.")
+
+            -- === SPEEL tijdens OPEN-fase ============================
+            if bp and utils.inside(x, y, bp.x, bp.y, bp.w, bp.h)
+               and game.state == "playingOpen" then
+
+                -- rules.play_selected_open regelt pot, effecten,
+                -- én game.next_turn() als er geen extra beurt volgt.
+                local ok = rules.play_selected_open(game, 1)
+                if not ok then
+                    ongeldigeZetTimer = 1.0
                 end
                 return
             end
 
+            -- === SPEEL tijdens HAND-fase ============================
+            if bp and utils.inside(x, y, bp.x, bp.y, bp.w, bp.h)
+               and game.state == "playingHand" then
+
+                if game.currentPlayer ~= 1 then
+                    print("Niet jouw beurt.")
+                    return
+                end
+
+                local ok = rules.play_selected_cards(game, 1)
+                if ok then
+                    local speler = player.players[1]
+                    utils.refill_hand(speler.hand, drawPile, config.CARDS_INHAND)
+                    utils.update_phase_for_player(game, 1)   -- hand → open/blind?
+                    -- beurt- & extraTurn-afhandeling zit in rules.handle_card_effects
+                else
+                    ongeldigeZetTimer = 1.0
+                end
+                return
+            end
+
+            ------------- Pot bekijken --------------------------------
             local bv = buttons.pot
             if bv and utils.inside(x, y, bv.x, bv.y, bv.w, bv.h) then
                 toonPotOverlay = not toonPotOverlay
                 return
             end
 
-            -- (optioneel) Deselect-knop
+            ------------- Deselect-knop -------------------------------
             local bd = buttons.deselect
             if bd and utils.inside(x, y, bd.x, bd.y, bd.w, bd.h) then
                 utils.deselect_all(player.players[1].hand)
@@ -205,9 +251,9 @@ end
             end
         end
 
-        --------------------------------------------------------------
-        -- 2.  Géén knop geraakt → kaarten proberen selecteren
-        --------------------------------------------------------------
+        ----------------------------------------------------------------
+        -- 2.  Geen knop geraakt → kaarten in hand proberen selecteren
+        ----------------------------------------------------------------
         local hand      = player.players[1].hand
         local positions = ui.get_card_positions(hand)
 
@@ -221,6 +267,7 @@ end
         end
     end
 end
+
 
 
 function love.wheelmoved(x, y)

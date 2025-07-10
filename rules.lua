@@ -170,6 +170,46 @@ function rules.play_selected_cards(game, playerIndex)
     return true
 end
 
+--------------------------------------------------------------------
+-- Speel alle Geselecteerde kaarten uit faceUp-stapel speler i
+--------------------------------------------------------------------
+function rules.play_selected_open(game, playerIndex)
+    local speler   = require("player").players[playerIndex]
+    local selected = {}
+
+    -- 1) verzamel geselecteerden, haal ze uit faceUp
+    for i = #speler.faceUp, 1, -1 do
+        if speler.faceUp[i].selected then
+            table.insert(selected, 1, table.remove(speler.faceUp, i))
+        end
+    end
+    if #selected == 0 then
+        print("Geen open kaart geselecteerd")
+        return false
+    end
+
+    -- 2) zelfde validatie als bij hand-kaarten
+    local eersteVal = utils.numeric_value(selected[1].waarde)
+    for _, k in ipairs(selected) do
+        if utils.numeric_value(k.waarde) ~= eersteVal
+           or not rules.is_speelbaar(k, game.pot, game.nextMustBeUnder7) then
+            print("Open-selectie ongeldig → pot pakken")
+            -- kaart + pot terug naar hand
+            utils.transfer_all_cards(speler.hand, game.pot)
+            for _, c in ipairs(selected) do table.insert(speler.hand, c) end
+            return false
+        end
+    end
+
+    -- 3) Speel de kaarten
+    for _, k in ipairs(selected) do
+        rules.handle_card_effects(game, playerIndex, k)
+    end
+    -- 4) reset selectievlaggen in resterende faceUp
+    for _, k in ipairs(speler.faceUp) do k.selected = false end
+    return true
+end
+
 
 return rules
 

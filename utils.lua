@@ -67,4 +67,23 @@ function utils.deselect_all(t)
     for _, k in ipairs(t) do k.selected = false end
 end
 
+
+--------------------------------------------------------------------
+--  Hulpfunctie: bepaal nieuwe fase voor een speler
+--------------------------------------------------------------------
+function utils.update_phase_for_player(game, idx)
+    local p = require("player").players[idx]
+
+    if #p.hand > 0 then
+        game.state = "playingHand"
+    elseif #p.faceUp > 0 then
+        game.state = "playingOpen"
+    elseif #p.faceDown > 0 then
+        game.state = "playingBlind"
+    else
+        game.state = "finished"   -- speler heeft echt alles weg
+    end
+end
+
+
 return utils

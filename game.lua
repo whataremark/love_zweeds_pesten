@@ -21,6 +21,19 @@ game.extraTurn = false
 game.winner = nil
 local config = require("config")
 
+--------------------------------------------------------------------
+-- Hulp: bepaal in welke fase speler i zit
+--------------------------------------------------------------------
+local function phase_for_player(i)
+    local p = require("player").players[i]
+    if     #p.hand     > 0 then return "playingHand"
+    elseif #p.faceUp   > 0 then return "playingOpen"
+    elseif #p.faceDown > 0 then return "playingBlind"
+    else                         return "out"
+    end
+end
+
+
 
 --codex-- Initialize a new round with a chosen play mode
 --------------------------------------------------------------------
@@ -87,15 +100,17 @@ end
 
 function game.next_turn()
     game.currentPlayer = (game.currentPlayer % #player.players) + 1
+    game.state        = phase_for_player(game.currentPlayer)
 
     if game.mode == "ai" and game.currentPlayer == 2 then
         game.waitingForAI = true
         game.aiTimer      = 0.5
     else
         game.waitingForAI = false
-        game.aiTimer      = 0        -- safety: timer stilzetten
+        game.aiTimer      = 0
     end
-end     
+    game.check_winner()
+end   
 
 function game.check_winner()
     local playerMod = require("player")

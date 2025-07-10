@@ -63,14 +63,6 @@ ui.row_faceDown_Y  = row_faceDown_Y
 function ui.draw_menu(mouseX, mouseY)--------------------------------------------------------------------
 -- Kaart-constanten & helpers
 --------------------------------------------------------------------
-local TARGET_H = 140            -- alle kaarten komen 140 px hoog op scherm
-local PADDING  = 15             -- ruimte tussen kaarten
-
--- schaal elke afbeelding naar TARGET_H
-local function scale_to_target(img)
-    return TARGET_H / img:getHeight()
-end
-
 --------------------------------------------------------------------
 -- Y-posities voor open- en blind-rijen
 -- • speler 1 (onderaan): rijen boven de hand
@@ -368,26 +360,36 @@ end
 ------------------------------------------------------------------
 -- FACE-UP rij  (zichtbare open kaarten)
 ------------------------------------------------------------------
-    local faceUp = playerData.faceUp
-    if #faceUp > 0 then
-        local imgScale = scale_to_target(faceUp[1].afbeelding)
-        local scaleUp = scale_to_target(faceUp[1].afbeelding)
-        local spacing = faceUp[1].afbeelding:getWidth() * scaleUp + PADDING
-        local totalW   = #faceUp * spacing - PADDING   -- laatste geen extra gap
-        local xStart   = (w - totalW) / 2
-        local yRow = row_faceUp_Y(boxY, index)
+local faceUp = playerData.faceUp
+if #faceUp > 0 then
+    local scaleUp = scale_to_target(faceUp[1].afbeelding)
+    local spacing = faceUp[1].afbeelding:getWidth()*scaleUp + PADDING
+    local totalW  = #faceUp * spacing - PADDING
+    local xStart  = (w - totalW) / 2
+    local yRow    = row_faceUp_Y(boxY, index)
 
-        
+    for i, kaart in ipairs(faceUp) do
+        local drawX = xStart + (i-1)*spacing
 
+        -- kaart (altijd)
+        love.graphics.setColor(1,1,1)
+        love.graphics.draw(kaart.afbeelding, drawX, yRow, 0, scaleUp, scaleUp)
 
-        for i, kaart in ipairs(faceUp) do
-            love.graphics.setColor(1,1,1)
-            love.graphics.draw(kaart.afbeelding, xStart+(i-1)*spacing, yRow,
-                   0, scaleUp, scaleUp)
+        -- gele selectie-rand (alleen als gekozen)
+        if kaart.selected then
+            love.graphics.setColor(1,1,0)
+            love.graphics.setLineWidth(3 / scaleUp)
+            love.graphics.rectangle(
+                "line",
+                drawX, yRow,
+                kaart.afbeelding:getWidth()*scaleUp,
+                kaart.afbeelding:getHeight()*scaleUp
+            )
+            love.graphics.setLineWidth(1)
+            love.graphics.setColor(1,1,1)     -- kleur herstellen
         end
-    end          -- ← laat deze staan
-
-
+    end
+end
 end
 
 

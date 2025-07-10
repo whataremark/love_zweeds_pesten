@@ -5,6 +5,7 @@ local drawPile = require("drawpile")
 local player = require("player")
 local ai = {}
 local config = require("config")
+local game = require("game")    
 
 
 
@@ -19,21 +20,23 @@ local function get_heuristics(waarde)
     return map[waarde] or 0
 end
 
--- beste kaarten voor op blinde kaarten leggen
+--------------------------------------------------------------------
+-- Kies de n beste kaarten (o.b.v. heuristics) uit de lijst 'cards'
+--------------------------------------------------------------------
 local function pick_best(cards, n)
-    -- sorteer DESC op heuristische waarde; ties → willekeurig
+    if type(cards) ~= "table" then return {} end   -- veiligheid
+
     table.sort(cards, function(a, b)
         local wa = get_heuristics(a.waarde) or 0
         local wb = get_heuristics(b.waarde) or 0
-        if wa == wb then               -- gelijke score → willekeurig
-            return math.random() < 0.5
-        end
-        return wa > wb                 -- hoogste eerst
+        if wa == wb then return math.random() < 0.5 end
+        return wa > wb
     end)
 
-    local chosen = {}
-    for i = 1, n do                    -- top-n eruit halen
-        table.insert(chosen, table.remove(cards, 1))
+    local chosen = {}                              -- ← expliciet initialiseren
+    for i = 1, math.min(n, #cards) do
+        local card = table.remove(cards, 1)        -- neem beste uit de kop
+        if card then table.insert(chosen, card) end
     end
     return chosen
 end
@@ -75,46 +78,114 @@ end
 -- Execute the AI's turn
 -- ...existing code...
 
---codex-- Execute the AI's turn by choosing or picking up cards
+--------------------------------------------------------------------
+--  AI speelt een volledige beurt
+--------------------------------------------------------------------
 function ai.play(game, pot)
-    local choice = choose_card(game, pot)
-    if not choice then
-        if game.extraTurn then
-            -- No card during an extra turn means pass
-            game.extraTurn = false
-            game.next_turn()
+    local p = player.players[2]
+
+    --------------------------------------------------------------
+    -- 1. FACE-UP fase
+    --------------------------------------------------------------
+    if game.state == "playingOpen" then
+        local kaart = p.faceUp[1]                     -- altijd links pakken
+        if kaart and rules.is_speelbaar(kaart, game.pot, game.nextMustBeUnder7) then
+            table.remove(p.faceUp, 1)
+            rules.handle_card_effects(game, 2, kaart)
+            -- geen game.next_turn(): card-effect (of extraTurn) handelt dat af
         else
-            -- Pick up the pot when no card can be played
-            utils.transfer_all_cards(player.players[2].hand, pot)
-            -- Do NOT refill here!
+            -- ongeldig → pot pakken + kaart terug in hand
+            table.remove(p.faceUp, 1)
+            utils.transfer_all_cards(p.hand, game.pot)
+            table.insert(p.hand, kaart)
+            utils.deselect_all(p.hand)   -- deselecteer alles
             game.next_turn()
         end
         return
     end
+
+    --------------------------------------------------------------
+    -- 2. FACE-DOWN fase
+    --------------------------------------------------------------
+    if game.state == "playingBlind" then
+        local kaart = table.remove(p.faceDown, 1)     -- bovenste rug
+        ---table.insert(game.pot, kaart)
+
+        if rules.is_speelbaar(kaart, game.pot, game.nextMustBeUnder7) then
+            rules.handle_card_effects(game, 2, kaart)
+            -- effecten (of extraTurn) regelen beurtwissel
+        else
+            -- ongeldig → hele pot + kaart in hand
+            utils.transfer_all_cards(p.hand, game.pot)
+            table.insert(p.hand, kaart)
+            utils.deselect_all(p.hand)   -- deselecteer alles
+            game.next_turn()
+        end
+        return
+    end
+
+    --------------------------------------------------------------
+    -- 3. HAND-fase  (standaard)
+    --------------------------------------------------------------
+    local choice = choose_card(game, pot)
+    if not choice then
+        if game.extraTurn then            -- passeer extra beurt
+            game.extraTurn = false
+            game.next_turn()
+        else                              -- pak pot
+            utils.transfer_all_cards(p.hand, pot)
+            game.next_turn()
+        end
+        return
+    end
+
+    -- speel gekozen kaart
     rules.handle_card_effects(game, 2, choice)
-    local speler2 = require("player").players[2]
-    utils.refill_hand(speler2.hand, drawPile, config.CARDS_INHAND)
-
+    utils.refill_hand(p.hand, drawPile, config.CARDS_INHAND)
+    -- rules.handle_card_effects regelt zelf extraTurn / next_turn
 end
-
 
 --codex-- Timer helper + setup-fase voor de AI
 function ai.update(dt, game, pot)
+    ----------------------------------------------------------------
+    -- A)  Per beurt fase bepalen voor de AI DIT IS NIEUW MISS WEG
+    ----------------------------------------------------------------
+    if game.mode == "ai" and game.currentPlayer == 2 then
+        local p = player.players[2]
+        if #p.hand > 0 then
+            game.state = "playingHand"
+        elseif #p.faceUp > 0 then
+            game.state = "playingOpen"
+        elseif #p.faceDown > 0 then
+            game.state = "playingBlind"
+        end
+    end
+        
+    
     ----------------------------------------------------------------
     -- 0.  Eénmalige setup: AI kiest zijn 3 open kaarten
     ----------------------------------------------------------------
     if game.state == "setupAISelect" then
         local aiHand  = player.players[2].hand
-        local chosen  = pick_best(aiHand, config.SETUP_OPEN)   -- 3 beste
+        local chosen  = pick_best(aiHand, config.SETUP_OPEN)   -- pak beste(n)
 
+        -- als pick_best minder dan 3 teruggeeft, vul aan met willekeurige kaarten
+        while #chosen < config.SETUP_OPEN and #aiHand > 0 do
+            table.insert(chosen, table.remove(aiHand, 1))
+        end
+
+        -- zet in faceUp
         for _, k in ipairs(chosen) do
             table.insert(player.players[2].faceUp, k)
         end
-        print(string.format("[AI] kiest open kaarten: %s, %s, %s",
-              chosen[1].waarde, chosen[2].waarde, chosen[3].waarde))
 
-        game.state = "playingHand"       -- setup klaar → echt spel
-        return                           -- dit frame geen verdere AI-actie
+        -- veilige debug-print
+        local vals = {}
+        for i, k in ipairs(chosen) do vals[i] = k.waarde end
+        print("[AI] kiest open kaarten: "..table.concat(vals, ", "))
+
+        game.state = "playingHand"   -- setup klaar
+        return
     end
 
     ----------------------------------------------------------------
