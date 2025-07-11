@@ -5,10 +5,10 @@ local utils = {}
 -- Convert card value names to a numeric ranking.
 function utils.numeric_value(value)
     local map = {
-        ["2"] = 2, ["3"] = 3, ["4"] = 4, ["5"] = 5,
-        ["6"] = 6, ["7"] = 7, ["8"] = 8, ["9"] = 9,
-        ["10"] = 10, jack = 11, queen = 12,
-        king = 13, ace = 14
+        ["4"]=4, ["5"]=5, ["6"]=6, ["7"]=7,
+        ["8"]=8, ["9"]=9, ["10"]=10,
+        jack = 11, queen = 12, king = 13, ace = 14,
+        joker = 15         
     }
     return tonumber(value) or map[value] or -1
 end

@@ -14,19 +14,36 @@ function drawPile.init(count)
             local naam = bestand:gsub("%.png$", "")
             local waarde, kleur = naam:match("^(.-)_of_(.-)$")
 
+            ------------------------------------------------------------
+            -- 1. Gewone kaarten “X_of_<suit>.png”
+            ------------------------------------------------------------
             if waarde and kleur then
                 local afbeelding = love.graphics.newImage(kaartmap .. "/" .. bestand)
 
                 table.insert(basis, {
-                    kleur = kleur,
-                    waarde = waarde,
+                    kleur      = kleur,
+                    waarde     = waarde,
                     afbeelding = afbeelding,
-                    naam = naam
+                    naam       = naam
+                })
+
+            ------------------------------------------------------------
+            -- 2. Jokers: black_joker.png / red_joker.png
+            --    (geen "_of_", dus vang ze in een extra elseif)
+            ------------------------------------------------------------
+            elseif naam == "black_joker" or naam == "red_joker" then
+                local afbeelding = love.graphics.newImage(kaartmap .. "/" .. bestand)
+
+                table.insert(basis, {
+                    kleur      = (naam == "black_joker") and "black" or "red",
+                    waarde     = "joker",        -- speciale waarde-string
+                    afbeelding = afbeelding,
+                    naam       = naam
                 })
             end
         end
     end
-
+    
     for _ = 1, count do
         for _, card in ipairs(basis) do
             table.insert(drawPile.cards, card)

@@ -205,6 +205,8 @@ function rules.play_selected_open(game, playerIndex)
     for _, k in ipairs(selected) do
         rules.handle_card_effects(game, playerIndex, k)
     end
+    -- checken of faceup nu leeg is.
+    utils.update_phase_for_player(game, playerIndex)
     -- 4) reset selectievlaggen in resterende faceUp
     for _, k in ipairs(speler.faceUp) do k.selected = false end
     return true
