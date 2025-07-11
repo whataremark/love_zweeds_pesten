@@ -42,13 +42,6 @@ function player.init(deck)
 end
 
 -- tel hoeveel kaarten momenteel geselecteerd zijn
-function player.count_selected(hand)
-    local c = 0
-    for _,k in ipairs(hand) do
-        if k.selected then c = c + 1 end
-    end
-    return c
-end
 
 function player.toggle_select(hand, index, phase)
     local kaart = hand[index]

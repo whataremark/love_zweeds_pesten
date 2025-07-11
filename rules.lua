@@ -197,6 +197,8 @@ function rules.play_selected_open(game, playerIndex)
             -- kaart + pot terug naar hand
             utils.transfer_all_cards(speler.hand, game.pot)
             for _, c in ipairs(selected) do table.insert(speler.hand, c) end
+            utils.deselect_all(speler.hand)
+            game.next_turn()
             return false
         end
     end
@@ -205,8 +207,10 @@ function rules.play_selected_open(game, playerIndex)
     for _, k in ipairs(selected) do
         rules.handle_card_effects(game, playerIndex, k)
     end
-    -- checken of faceup nu leeg is.
-    utils.update_phase_for_player(game, playerIndex)
+    -- checken of faceup nu leeg is wanneer dezelfde speler aan zet blijft
+    if game.currentPlayer == playerIndex then
+        utils.update_phase_for_player(game, playerIndex)
+    end
     -- 4) reset selectievlaggen in resterende faceUp
     for _, k in ipairs(speler.faceUp) do k.selected = false end
     return true
