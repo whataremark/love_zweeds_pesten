@@ -72,6 +72,7 @@ Deze gids is bedoeld om OpenAI Codex en andere AI-agents te helpen bij het begri
 - ai speelt 2 faceup kaarten tegelijk..
 - Speler blijft hangen in faceup siutaie als ie laatste faceup kaart heeft gepakt, dus kaarten in de hand heeft en facedown
 kaarten nog moet spelen, hij moet eerst hand spelen maar blijft hangen in faceup fase.
+- faceup blijft ook hangen al speler niuet kan, kaarten pakt, dan moet ie nog een keer leggen, eeen faceup kaart terwijl eigenllijk de beurt door zou moetne gaan.
 
 ## THINGS TO ADD
 -
