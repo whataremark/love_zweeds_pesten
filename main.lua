@@ -63,7 +63,11 @@ function love.draw()
     love.graphics.print("Speler aan zet: " .. game.currentPlayer, 20, 60)
     love.graphics.print("AI-timer: " .. string.format("%.2f", game.aiTimer), 20, 80)
 
-    buttons = ui.draw_action_buttons()
+    if game.state ~= "setupSelectOpen" and game.state ~= "setupAISelect" then
+        buttons = ui.draw_action_buttons()
+    else
+        buttons = nil
+    end
 end
 
 --codex-- Handle mouse clicks for menus, buttons en kaart-acties
@@ -179,6 +183,9 @@ function love.mousepressed(x, y, button)
     --  PLAYING-SCENE (knoppen + kaart-selectie)
     ------------------------------------------------------------------
     if scene == "playing" and button == 1 then
+        if game.state == "setupSelectOpen" or game.state == "setupAISelect" then
+            return
+        end
         ----------------------------------------------------------------
         -- 1.  UI-knoppen (Pak pot / Speel / Bekijk pot / Deselect)
         --     ⇒ bij hit altijd meteen RETURN

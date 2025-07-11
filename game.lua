@@ -25,12 +25,7 @@ local config = require("config")
 -- Hulp: bepaal in welke fase speler i zit
 --------------------------------------------------------------------
 local function phase_for_player(i)
-    local p = require("player").players[i]
-    if     #p.hand     > 0 then return "playingHand"
-    elseif #p.faceUp   > 0 then return "playingOpen"
-    elseif #p.faceDown > 0 then return "playingBlind"
-    else                         return "out"
-    end
+    return require("utils").phase_for_player(i)
 end
 
 

@@ -67,6 +67,17 @@ function utils.deselect_all(t)
     for _, k in ipairs(t) do k.selected = false end
 end
 
+-- Count how many cards are currently selected in a list
+function utils.count_selected(cards)
+    local c = 0
+    for _, k in ipairs(cards) do
+        if k.selected then
+            c = c + 1
+        end
+    end
+    return c
+end
+
 
 --------------------------------------------------------------------
 --  Hulpfunctie: bepaal nieuwe fase voor een speler
@@ -82,6 +93,16 @@ function utils.update_phase_for_player(game, idx)
         game.state = "playingBlind"
     else
         game.state = "finished"   -- speler heeft echt alles weg
+    end
+end
+
+-- Return the phase string for a given player without modifying the game
+function utils.phase_for_player(idx)
+    local p = require("player").players[idx]
+    if     #p.hand     > 0 then return "playingHand"
+    elseif #p.faceUp   > 0 then return "playingOpen"
+    elseif #p.faceDown > 0 then return "playingBlind"
+    else                         return "out"
     end
 end
 
