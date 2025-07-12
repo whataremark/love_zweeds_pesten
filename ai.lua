@@ -8,14 +8,17 @@ local config = require("config")
 local game = require("game")    
 
 
-
 --codex-- Ranking used by the AI to choose between playable cards
 local function get_heuristics(waarde)
-    local map = {
-        ["2"] = 11, ["3"] = 14, ["4"] = 1, ["5"] = 2,
-        ["6"] = 3, ["7"] = 4, ["8"] = 5, ["9"] = 6,
-        ["10"] = 13, ["jack"] = 8, ["queen"] = 9,
-        ["king"] = 9, ["ace"] = 10
+    local map ={
+        ["4"] = 1,["5"] = 2,["6"] = 3,
+        ["7"] = 4, ["8"] = 5,  ["9"] = 6,
+        ["jack"] = 8,["queen"] = 9,["king"] = 9,
+        ["ace"]  = 10,
+        ["joker"] = 11,   
+        ["2"]     = 12,  
+        ["3"]     = 14,  
+        ["10"]    = 15  
     }
     return map[waarde] or 0
 end
@@ -27,16 +30,18 @@ local function pick_best(cards, n)
     if type(cards) ~= "table" then return {} end   -- veiligheid
 
     table.sort(cards, function(a, b)
-        local wa = get_heuristics(a.waarde) or 0
-        local wb = get_heuristics(b.waarde) or 0
-        if wa == wb then return math.random() < 0.5 end
+        local wa = get_heuristics(a.waarde or "")  -- nil-safe
+        local wb = get_heuristics(b.waarde or "")
+        if wa == wb then
+            -- deterministische tie-breaker om nil-returns te vermijden
+            return (a.waarde or "") < (b.waarde or "")
+        end
         return wa > wb
     end)
 
-    local chosen = {}                              -- ← expliciet initialiseren
+    local chosen = {}
     for i = 1, math.min(n, #cards) do
-        local card = table.remove(cards, 1)        -- neem beste uit de kop
-        if card then table.insert(chosen, card) end
+        table.insert(chosen, table.remove(cards, 1))
     end
     return chosen
 end
@@ -99,6 +104,8 @@ function ai.play(game, pot)
             utils.transfer_all_cards(p.hand, game.pot)
             table.insert(p.hand, kaart)
             utils.deselect_all(p.hand)   -- deselecteer alles
+            game.nextMustBeUnder7 = false -- reset 7-regel
+            game.extraTurn = false
             game.next_turn()
         end
         return
@@ -108,45 +115,77 @@ function ai.play(game, pot)
     -- 2. FACE-DOWN fase
     --------------------------------------------------------------
     if game.state == "playingBlind" then
-        local kaart = table.remove(p.faceDown, 1)     -- bovenste rug
-        ---table.insert(game.pot, kaart)
+        local kaart = table.remove(p.faceDown, 1)
 
         if rules.is_speelbaar(kaart, game.pot, game.nextMustBeUnder7) then
-            rules.handle_card_effects(game, 2, kaart)
-            -- effecten (of extraTurn) regelen beurtwissel
+            -- Geldige kaart → toon reveal eerst
+            game.reveal.card   = kaart
+            game.reveal.timer  = 0.8
+            game.reveal.player = 2
+            return
         else
-            -- ongeldig → hele pot + kaart in hand
-            utils.transfer_all_cards(p.hand, game.pot)
+            -- Ongeldige kaart → pot + kaart naar hand
             table.insert(p.hand, kaart)
-            utils.deselect_all(p.hand)   -- deselecteer alles
-            game.next_turn()
-        end
-        return
-    end
-
-    --------------------------------------------------------------
-    -- 3. HAND-fase  (standaard)
-    --------------------------------------------------------------
-    local choice = choose_card(game, pot)
-    if not choice then
-        if game.extraTurn then            -- passeer extra beurt
+            utils.transfer_all_cards(p.hand, game.pot)
+            utils.deselect_all(p.hand)
             game.extraTurn = false
             game.next_turn()
-        else                              -- pak pot
-            utils.transfer_all_cards(p.hand, pot)
-            game.next_turn()
+            return
         end
-        return
     end
+--------------------------------------------------------------
+-- 3. HAND-fase  (standaard)
+--------------------------------------------------------------
+local choice = choose_card(game, pot)
 
-    -- speel gekozen kaart
-    rules.handle_card_effects(game, 2, choice)
-    utils.refill_hand(p.hand, drawPile, config.CARDS_INHAND)
-    -- rules.handle_card_effects regelt zelf extraTurn / next_turn
+-- Kan er niets? → pot pakken of extra beurt overslaan
+if not choice then
+    if game.extraTurn then
+        game.extraTurn = false
+        game.next_turn()
+    else
+        utils.transfer_all_cards(p.hand, pot)
+        utils.deselect_all(p.hand)
+        game.extraTurn = false
+        game.nextMustBeUnder7 = false
+        game.next_turn()
+    end
+     game.waitingForAI = false  
+    return
 end
+
+----------------------------------------------------------------
+-- 3A. Verzamel ALLE handkaarten met dezelfde waarde
+----------------------------------------------------------------
+local speelKaarten = {}
+for i = #p.hand, 1, -1 do
+    if p.hand[i].waarde == choice.waarde then
+        -- haal ze uit de hand, zo voorkom je dubbels
+        table.insert(speelKaarten, table.remove(p.hand, i))
+    end
+end
+-- sorteren niet nodig; volgorde is onbelangrijk
+
+----------------------------------------------------------------
+-- 3B. Speel ze één-voor-één
+----------------------------------------------------------------
+for idx, kaart in ipairs(speelKaarten) do
+    local isLast = (idx == #speelKaarten)   -- laatste bepaalt beurt-einde
+    rules.handle_card_effects(game, 2, kaart, isLast)
+end
+
+-- 3C. Hand weer bijvullen
+utils.refill_hand(p.hand, drawPile, config.CARDS_INHAND)
+-- rules.handle_card_effects regelt zelf extraTurn / next_turn
+end
+
 
 --codex-- Timer helper + setup-fase voor de AI
 function ai.update(dt, game, pot)
+    -- Als we midden in een reveal-animatie zitten, AI doet niks
+    if game.reveal and game.reveal.timer > 0 then
+        return
+    end
     ----------------------------------------------------------------
     -- A)  Per beurt fase bepalen voor de AI DIT IS NIEUW MISS WEG
     ----------------------------------------------------------------
@@ -202,7 +241,5 @@ function ai.update(dt, game, pot)
         end
     end
 end
-
-
 
 return ai

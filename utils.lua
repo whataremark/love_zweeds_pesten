@@ -1,7 +1,5 @@
 -- Collection of small reusable helper functions
-
 local utils = {}
-
 -- Convert card value names to a numeric ranking.
 function utils.numeric_value(value)
     local map = {
@@ -106,5 +104,14 @@ function utils.phase_for_player(idx)
     end
 end
 
+function utils.update_reveal_logic(dt, game)
+    if game.reveal.timer > 0 then
+        game.reveal.timer = game.reveal.timer - dt
+        if game.reveal.timer <= 0 then
+            game.reveal.card = nil
+            game.reveal.player = nil
+        end
+    end
+end
 
 return utils

@@ -390,43 +390,56 @@ if #faceUp > 0 then
         end
     end
 end
+    -- ===============================================
+    -- Stap 3: Tijdelijke blinde kaart tonen (reveal)
+    -- ===============================================
+    if game.reveal and game.reveal.card and game.reveal.player == index then
+        local img = game.reveal.card.afbeelding
+        local scale = scale_to_target(img)
+        local w, h = love.graphics.getWidth(), love.graphics.getHeight()
+        local x = (w - img:getWidth() * scale) / 2
+        local y = h / 2 - img:getHeight() * scale / 2
+
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.draw(img, x, y, 0, scale, scale)
+    end
 end
 
 
--- Pickup + Pot bekijkknoppen gecombineerd en gecentreerd
---codex-- Draw buttons to pick up the pile or view it
 function ui.draw_action_buttons()
-    local w, h = love.graphics.getWidth(), love.graphics.getHeight()
-    local btnW, btnH = 150, 40
-    local spacing = 20
-    local totalW = btnW * 3 + spacing * 2
+    local w, h      = love.graphics.getWidth(), love.graphics.getHeight()
+    local btnW,btnH = 150, 40
+    local spacing   = 20
+
+    -- Pas-knop alleen tijdens extra beurt van speler 1
+    local allowPass = (game.extraTurn and game.currentPlayer == 1)
+
+    local order = { "pickup", "play" }
+    if allowPass then table.insert(order, "pass") end
+    table.insert(order, "pot")
+
+    local totalW = #order * btnW + (#order - 1) * spacing
     local startX = (w - totalW) / 2
-    local y = h - btnH - 20
+    local y      = h - btnH - 20
 
-    -- === Pak kaart knop ===
-    love.graphics.setColor(0.2, 0.6, 0.2)
-    love.graphics.rectangle("fill", startX, y, btnW, btnH, 8)
-    love.graphics.setColor(1, 1, 1)
-    love.graphics.printf("Pak pot", startX, y + 10, btnW, "center")
+    local rects, i = {}, 0
+    local function draw(label, key, r,g,b)
+        local x = startX + i * (btnW + spacing)
+        love.graphics.setColor(r,g,b)
+        love.graphics.rectangle("fill", x, y, btnW, btnH, 8)
+        love.graphics.setColor(1,1,1)
+        love.graphics.printf(label, x, y+10, btnW, "center")
+        rects[key] = { x=x, y=y, w=btnW, h=btnH }
+        i = i + 1
+    end
 
-    -- === Speel kaart knop ===
-    love.graphics.setColor(0.2, 0.4, 0.8)
-    love.graphics.rectangle("fill", startX + btnW + spacing, y, btnW, btnH, 8)
+    draw("Pak pot",    "pickup", 0.2,0.6,0.2)
+    draw("Speel",      "play",   0.2,0.4,0.8)
+    if allowPass then  draw("Pas", "pass", 0.6,0.4,0.2) end
+    draw("Bekijk Pot", "pot",    0.2,0.2,0.2)
+
     love.graphics.setColor(1,1,1)
-    love.graphics.printf("Speel", startX + btnW + spacing, y + 10, btnW, "center")
-
-    -- === Pot bekijken knop ===
-    love.graphics.setColor(0.2, 0.2, 0.2)
-    love.graphics.rectangle("fill", startX + (btnW + spacing) * 2, y, btnW, btnH, 8)
-    love.graphics.setColor(1, 1, 1)
-    love.graphics.printf("Bekijk Pot", startX + (btnW + spacing) * 2, y + 10, btnW, "center")
-
-    -- Return knopposities voor klikdetectie
-    return {
-        pickup = { x = startX, y = y, w = btnW, h = btnH },
-        play   = { x = startX + btnW + spacing, y = y, w = btnW, h = btnH },
-        pot    = { x = startX + (btnW + spacing) * 2, y = y, w = btnW, h = btnH }
-    }
+    return rects
 end
 
 

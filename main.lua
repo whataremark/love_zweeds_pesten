@@ -28,10 +28,49 @@ end
 --codex-- Game loop update handling AI and timers
 function love.update(dt)
     if scene == "playing" then
+        --------------------------------------------------------
+        -- A) Ongeldige zet timer af laten lopen
+        --------------------------------------------------------
         if ongeldigeZetTimer > 0 then
             ongeldigeZetTimer = ongeldigeZetTimer - dt
         end
+
+        --------------------------------------------------------
+        -- B) Reveal-timer voor blinde kaarten afhandelen
+        --------------------------------------------------------
+        if game.reveal.timer > 0 then
+            game.reveal.timer = game.reveal.timer - dt
+            if game.reveal.timer <= 0 then
+                local p  = game.reveal.player
+                local k  = game.reveal.card
+                local ok = rules.is_speelbaar(k, game.pot, game.nextMustBeUnder7)
+
+                if ok then
+                    rules.handle_card_effects(game, p, k)
+                else
+                    local pl = player.players[p]
+                    utils.transfer_all_cards(pl.hand, game.pot)
+                    table.insert(pl.hand, k)
+                    if p == 1 then utils.deselect_all(pl.hand) end
+                    game.next_turn()
+                end
+
+                game.reveal.timer   = 0
+                game.reveal.player  = nil
+                game.reveal.card    = nil
+            end
+            return
+        end
+
+        --------------------------------------------------------
+        -- C) AI update alleen als er geen reveal actief is
+        --------------------------------------------------------
+        utils.update_reveal_logic(dt,game)
         ai.update(dt, game, game.pot)
+
+        --------------------------------------------------------
+        -- D) Winner check
+        --------------------------------------------------------
         if game.winner then
             scene = "gameover"
         end
@@ -72,6 +111,7 @@ end
 
 --codex-- Handle mouse clicks for menus, buttons en kaart-acties
 function love.mousepressed(x, y, button)
+    if game.reveal.timer > 0 then return end
     ------------------------------------------------------------------
     --  MENU-SCENE
     ------------------------------------------------------------------
@@ -155,24 +195,16 @@ function love.mousepressed(x, y, button)
     and game.currentPlayer == 1
     and button == 1 then
 
-        local boxY   = love.graphics.getHeight()
-                        - (160 + 40) - 10
+        local boxY = love.graphics.getHeight() - (160 + 40) - 10
         local yRow = ui.row_faceDown_Y(boxY, 1)
 
         if y >= yRow and y <= yRow + 160 then
-            local c = table.remove(player.players[1].faceDown, 1)
-            
-            -- checken of kaart gespeeld mag worden..
-            if rules.is_speelbaar(c, game.pot, game.nextMustBeUnder7) then
-                -- kaart mag: voer effecten uit en blijf in dezelfde beurt-logica
-                rules.handle_card_effects(game, 1, c)
-            else
-                -- kaart mag NIET: hele pot + de kaart terug naar je hand
-                utils.transfer_all_cards(player.players[1].hand, game.pot)
-                utils.deselect_all(player.players[1].hand) -- deselecteer alles
-                table.insert(player.players[1].hand, c)
-                game.next_turn()                              -- beurt voorbij
-            end
+            local kaart = table.remove(player.players[1].faceDown, 1)
+
+            -- Start reveal-animatie met kleine delay (bijv. 1 seconde)
+            game.reveal.timer  = 1.0
+            game.reveal.card   = kaart
+            game.reveal.player = 1
             return
         end
     end
@@ -189,70 +221,81 @@ function love.mousepressed(x, y, button)
         ----------------------------------------------------------------
         -- 1.  UI-knoppen (Pak pot / Speel / Bekijk pot / Deselect)
         --     ⇒ bij hit altijd meteen RETURN
-        ----------------------------------------------------------------
+
         if buttons then
-            ------------- Pak-pot --------------------------------------
+            ----------------------------------------------------------------
+            --  PICK-UP (Pak pot)
+            ----------------------------------------------------------------
             local b = buttons.pickup
-            if b and utils.inside(x, y, b.x, b.y, b.w, b.h) then
+            if b and utils.inside(x,y,b.x,b.y,b.w,b.h) then
                 if game.currentPlayer == 1 then
                     utils.transfer_all_cards(player.players[1].hand, game.pot)
                     utils.deselect_all(player.players[1].hand)
-                    utils.update_phase_for_player(game, 1)
-                    print("Speler pakt pot op ("..#player.players[1].hand.." kaarten)")
+                    game.nextMustBeUnder7 = false
                     game.next_turn()
-                else
-                    print("Niet jouw beurt.")
                 end
                 return
             end
 
-            ------------- Speel-knop (één bp-variabele!) ---------------
+            ----------------------------------------------------------------
+            --  PLAY  (Speel)  – hand-fase
+            ----------------------------------------------------------------
             local bp = buttons.play
+            if bp and utils.inside(x,y,bp.x,bp.y,bp.w,bp.h)
+            and game.state == "playingHand" then
 
-            -- === SPEEL tijdens OPEN-fase ============================
-            if bp and utils.inside(x, y, bp.x, bp.y, bp.w, bp.h)
-               and game.state == "playingOpen" then
-
-                -- rules.play_selected_open regelt pot, effecten,
-                -- én game.next_turn() als er geen extra beurt volgt.
-                local ok = rules.play_selected_open(game, 1)
-                if not ok then
-                    ongeldigeZetTimer = 1.0
-                end
-                return
-            end
-
-            -- === SPEEL tijdens HAND-fase ============================
-            if bp and utils.inside(x, y, bp.x, bp.y, bp.w, bp.h)
-               and game.state == "playingHand" then
-
-                if game.currentPlayer ~= 1 then
-                    print("Niet jouw beurt.")
-                    return
-                end
+                if game.currentPlayer ~= 1 then return end
 
                 local ok = rules.play_selected_cards(game, 1)
                 if ok then
-                    local speler = player.players[1]
-                    utils.refill_hand(speler.hand, drawPile, config.CARDS_INHAND)
-                    utils.update_phase_for_player(game, 1)   -- hand → open/blind?
-                    -- beurt- & extraTurn-afhandeling zit in rules.handle_card_effects
+                    local p = player.players[1]
+                    utils.refill_hand(p.hand, drawPile, config.CARDS_INHAND)
+                    utils.update_phase_for_player(game, 1)  -- fase kan wisselen
+                    -- beurt-/extraTurn-logica zit ín rules.handle_card_effects
                 else
                     ongeldigeZetTimer = 1.0
                 end
                 return
             end
 
-            ------------- Pot bekijken --------------------------------
+            ----------------------------------------------------------------
+            --  PLAY  (Speel)  – open-fase
+            ----------------------------------------------------------------
+            if bp and utils.inside(x,y,bp.x,bp.y,bp.w,bp.h)
+            and game.state == "playingOpen" then
+
+                local ok = rules.play_selected_open(game, 1)
+                if not ok then ongeldigeZetTimer = 1.0 end
+                -- rules.play_selected_open regelt zelf beurt/extraTurn/pot-logica
+                return
+            end
+
+            ----------------------------------------------------------------
+            --  PASS  – alleen zichtbaar als game.extraTurn actief is
+            ----------------------------------------------------------------
+            local bpass = buttons.pass
+            if bpass and utils.inside(x,y,bpass.x,bpass.y,bpass.w,bpass.h) then
+                if game.currentPlayer == 1 and game.extraTurn then
+                    game.extraTurn = false     -- extra beurt opgeven
+                    game.next_turn()
+                end
+                return
+            end
+
+            ----------------------------------------------------------------
+            --  BEKIJK POT
+            ----------------------------------------------------------------
             local bv = buttons.pot
-            if bv and utils.inside(x, y, bv.x, bv.y, bv.w, bv.h) then
+            if bv and utils.inside(x,y,bv.x,bv.y,bv.w,bv.h) then
                 toonPotOverlay = not toonPotOverlay
                 return
             end
 
-            ------------- Deselect-knop -------------------------------
+            ----------------------------------------------------------------
+            --  DESELECT
+            ----------------------------------------------------------------
             local bd = buttons.deselect
-            if bd and utils.inside(x, y, bd.x, bd.y, bd.w, bd.h) then
+            if bd and utils.inside(x,y,bd.x,bd.y,bd.w,bd.h) then
                 utils.deselect_all(player.players[1].hand)
                 return
             end

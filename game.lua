@@ -19,7 +19,12 @@ game.waitingForAI = false
 game.nextMustBeUnder7 = false
 game.extraTurn = false
 game.winner = nil
-local config = require("config")
+
+game.reveal = {
+    timer = 0,
+    player = nil,
+    card = nil
+}
 
 --------------------------------------------------------------------
 -- Hulp: bepaal in welke fase speler i zit

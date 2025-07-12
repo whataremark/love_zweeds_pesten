@@ -67,15 +67,8 @@ Deze gids is bedoeld om OpenAI Codex en andere AI-agents te helpen bij het begri
 ## known bugs:
 
 - NIEUW:
-- je kan pak pot knop doen in de openinggs fase
-- ai pakt kaart maar speelt daarna gelijk nog een keer...
-- ai speelt 2 faceup kaarten tegelijk..
-- Speler blijft hangen in faceup siutaie als ie laatste faceup kaart heeft gepakt, dus kaarten in de hand heeft en facedown
-kaarten nog moet spelen, hij moet eerst hand spelen maar blijft hangen in faceup fase.
-- faceup blijft ook hangen al speler niuet kan, kaarten pakt, dan moet ie nog een keer leggen, eeen faceup kaart terwijl eigenllijk de beurt door zou moetne gaan.
+- ai pakt kaart maar speelt daarna gelijk nog een keer... 
+- Als speler faceup heeft gespeeld mag ie nog een keer..
 
 ## THINGS TO ADD
--
--  Organize the lua files better so its more coherent en meer overzichtelijk, 
-- pass knop
-- begin (4 of 5)
+- begin situatie

@@ -44,11 +44,17 @@ function drawPile.init(count)
         end
     end
     
-    for _ = 1, count do
-        for _, card in ipairs(basis) do
-            table.insert(drawPile.cards, card)
-        end
+for _ = 1, count do
+    for _, card in ipairs(basis) do
+        -- kopieer velden → elke positie krijgt een unieke tabel
+        table.insert(drawPile.cards, {
+            kleur      = card.kleur,
+            waarde     = card.waarde,
+            afbeelding = card.afbeelding,
+            naam       = card.naam
+        })
     end
+end
 
     -- Schudden
     math.randomseed(os.time())
@@ -61,14 +67,8 @@ end
 function drawPile.draw()
     local c = table.remove(drawPile.cards)
     if not c then return nil end
-    -- maak een kopie zodat geselecteerde staat per kaart uniek is
-    return {
-        kleur = c.kleur,
-        waarde = c.waarde,
-        afbeelding = c.afbeelding,
-        naam = c.naam,
-        selected = false
-    }
+    c.selected = false       -- reset vlag per trek
+    return c
 end
 
 function drawPile.count()
