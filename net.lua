@@ -212,10 +212,15 @@ function net.send(msg)
     end
 end
 
-  if not net.conn or not net.game then return end
-  -- stuur alléén een serieel snapshot, geen functies
-  net.send({ cmd = "STATE", game = export_state() })
+
+-- wordt aangeroepen zodra er een geldig game-object is gekoppeld
+function net.send_state()
+    if not net.conn or not net.game then return end
+    -- stuur een plat snapshot, geen functies
+    net.send({ cmd = "STATE", game = export_state() })
 end
+
+
 local function handle_host(msg)
     if msg.cmd == "HELLO" then
         table.insert(hosts, "Client")   -- later naam mee-sturen
@@ -311,5 +316,7 @@ end
 function net.poll_new_client_name()
     return table.remove(net.newClients, 1)
 end
+
+
 
 return net
