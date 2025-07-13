@@ -15,10 +15,12 @@ function b.load()
 end
 
 function b.update(dt)
+    print("[scan] start")
     b.scanTimer = b.scanTimer - dt
     if b.scanTimer <= 0 then
         b.scanTimer = 2
         b.hosts     = net.scan_lan()
+
         if #b.hosts == 0 then b.selected = 1 end
     end
 end

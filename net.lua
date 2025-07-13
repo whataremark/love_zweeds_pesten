@@ -27,20 +27,19 @@ local MAGIC       = "CARDGAME_LOBBY"
 local beaconSocket
 local lastBeacon  = 0
 
-if msg.cmd == "STATE" then
-    import_state(msg.game)
-    net.started = true 
-end
+
 
 -- roept elke  ~2s  net.update_lan(dt)  aan als je host bent
 function net.update_lan(dt, lobbyName)
     if not net.isHost() then return end
-    beaconSocket = beaconSocket or udp()
+    beaconSocket = beaconSocket or socket.udp()
     lastBeacon   = lastBeacon + dt
     if lastBeacon > 2 then
         lastBeacon = 0
         beaconSocket:setoption("broadcast", true)
-        beaconSocket:sendto(MAGIC .. "|" .. lobbyName, "255.255.255.255", BCAST_PORT)
+        local payload = MAGIC .. "|" .. lobbyName
+        local ok,err = beaconSocket:sendto(payload, "255.255.255.255", BCAST_PORT)
+        print("[beacon]", ok and #payload or err)     -- ← debug-regel
     end
 end
 
@@ -229,6 +228,7 @@ end
 local function handle_client(msg)
     if msg.cmd=="STATE" then
         import_state(msg.game)
+        net.started = true        -- ← voeg deze regel toe
     end
 end
 
