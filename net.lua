@@ -251,17 +251,17 @@ end
 
 
 function net.send(msg)
-    local line = json.encode(msg).."\n"
-    if net.isHost() and net.conn then
+    local line = json.encode(msg) .. "\n"     -- ✱ altijd met newline
+
+    -- Host stuurt naar de verbonden client
+    if net.isHost()   and net.conn   then
         net.conn:send(line)
+
+    -- Client stuurt naar de host
     elseif net.isClient() and net.client then
         net.client:send(line)
     end
-    if net.conn then
-        net.conn:send(json.encode(tbl).."\n")   -- ↩ newline garandeert “*l”
-    end
 end
-
 
 -- wordt aangeroepen zodra er een geldig game-object is gekoppeld
 function net.send_state()
