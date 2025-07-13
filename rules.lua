@@ -77,7 +77,6 @@ end
         print("[RULES] ZEVEN regel ACTIEF")
     elseif kaart.waarde ~= "3" then
         -- 3 is 'doorzichtig' en heft de 7-regel niet op
-        print("[RULES] ZEVEN regel INACTIEF")
         game.nextMustBeUnder7 = false
     end
     -- Was er al een extra beurt actief? Dan is die nu opgebruikt,
@@ -105,6 +104,9 @@ function rules.can_select_for_play(selectedCards, newCard)
     return eersteWaarde == nieuweWaarde
 end
 
+--------------------------------------------------------------------
+-- Speel alle geselecteerde hand-kaarten (incl. Brunzyn-logica)
+--------------------------------------------------------------------
 function rules.play_selected_cards(game, playerIndex)
     local speler   = require("player").players[playerIndex]
     local selected = {}
@@ -117,51 +119,47 @@ function rules.play_selected_cards(game, playerIndex)
             table.insert(selected, 1, table.remove(speler.hand, i))
         end
     end
-    if #selected == 0 then
-        print("[RULES] Geen kaarten geselecteerd")
-        return false
-    end
+    if #selected == 0 then return false end
 
     ----------------------------------------------------------------
-    -- 2.  Basis-validatie (allemaal gelijke waarde & speelbaar)
+    -- 2.  Basis-validatie: allemaal gelijke waarde + speelbaar
     ----------------------------------------------------------------
     local firstVal = utils.numeric_value(selected[1].waarde)
-
     for _, k in ipairs(selected) do
         if utils.numeric_value(k.waarde) ~= firstVal
            or not rules.is_speelbaar(k, game.pot, game.nextMustBeUnder7) then
-            print("[RULES] Ongeldige selectie")
-            -- kaarten terug in hand
+            -- ongeldig → kaarten terug
             for _, c in ipairs(selected) do table.insert(speler.hand, c) end
             return false
         end
     end
 
     ----------------------------------------------------------------
-    -- 3.  Kaarten daadwerkelijk spelen (één-voor-één met effecten)
+    -- 3.  Kaarten daadwerkelijk spelen
+    --     (we laten  ❰handle_card_effects❱  het werk doen,
+    --      dus we stoppen ze níét handmatig in de pot)
     ----------------------------------------------------------------
-    for i, k in ipairs(selected) do
-        local isLast = (i == #selected)           -- turn-wissel pas na laatste
-        rules.handle_card_effects(game, playerIndex, k, isLast)
+    for _, k in ipairs(selected) do
+        -- advanceTurn = false → geen automatische beurtwissel
+        rules.handle_card_effects(game, playerIndex, k, false)
     end
 
-    -- deselect vlaggen in de resterende hand opruimen
+    -- deselect flags opruimen
     for _, k in ipairs(speler.hand) do k.selected = false end
 
     ----------------------------------------------------------------
-    -- 4.  BRUNZYN-check: 4 of meer opeenvolgende gelijke bovenop pot
-    --     • 3-en tellen niet mee en breken de reeks
+    -- 4.  Brunzyn-check: 4 opeenvolgende identieke waardes
+    --     3-en tellen niet mee en onderbreken de reeks.
     ----------------------------------------------------------------
     local function consecutive_run(pot)
-        if #pot == 0 then return 0 end
-        local topCard   = pot[#pot]
-        if topCard.waarde == "3" then return 0 end     -- 3 bovenop = onmogelijk
-        local topVal    = utils.numeric_value(topCard.waarde)
-        local run       = 0
+        local run, topVal = 0, nil
         for i = #pot, 1, -1 do
             local c = pot[i]
-            if c.waarde == "3" then break end          -- 3 breekt de reeks
-            if utils.numeric_value(c.waarde) == topVal then
+            if c.waarde == "3" then break              -- 3 breekt de reeks
+            elseif not topVal then                     -- eerste niet-3
+                topVal = utils.numeric_value(c.waarde)
+                run    = 1
+            elseif utils.numeric_value(c.waarde) == topVal then
                 run = run + 1
             else
                 break
@@ -171,9 +169,26 @@ function rules.play_selected_cards(game, playerIndex)
     end
 
     if consecutive_run(game.pot) >= 4 then
-        utils.transfer_all_cards({}, game.pot)   -- pot leeg
-        game.extraTurn = true                    -- extra beurt
+        utils.transfer_all_cards({}, game.pot)         -- pot legen
+        game.extraTurn = true                          -- gratis beurt
         print("[RULES] BRUNZYN! Pot geleegd en extra beurt")
+    end
+
+    ----------------------------------------------------------------
+    -- 5.  Beurtafhandeling
+    ----------------------------------------------------------------
+    if game.extraTurn then
+        -- speler blijft aan zet; reset vlag na gebruik
+        game.extraTurn = false
+        utils.update_phase_for_player(game, playerIndex)
+
+        -- AI moet opnieuw denken als hij de extra beurt kreeg
+        if game.mode == "ai" and playerIndex == 2 then
+            game.waitingForAI = true
+            game.aiTimer      = 0.5
+        end
+    else
+        game.next_turn()
     end
 
     game.check_winner()
@@ -195,7 +210,7 @@ function rules.play_selected_open(game, playerIndex)
         end
     end
     if #selected == 0 then
-        print("Geen open kaart geselecteerd")
+        print("[ERROR] Geen open kaart geselecteerd")
         return false
     end
 
@@ -204,7 +219,7 @@ function rules.play_selected_open(game, playerIndex)
     for _, k in ipairs(selected) do
         if utils.numeric_value(k.waarde) ~= eersteVal
            or not rules.is_speelbaar(k, game.pot, game.nextMustBeUnder7) then
-            print("Open-selectie ongeldig → pot pakken")
+            print("[RULES] open-selectie ongeldig → pot pakken")
             -- kaart + pot terug naar hand
             utils.transfer_all_cards(speler.hand, game.pot)
             for _, c in ipairs(selected) do table.insert(speler.hand, c) end

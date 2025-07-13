@@ -66,9 +66,6 @@ Deze gids is bedoeld om OpenAI Codex en andere AI-agents te helpen bij het begri
 
 ## known bugs:
 
-- NIEUW:
-- ai pakt kaart maar speelt daarna gelijk nog een keer... 
-- Als speler faceup heeft gespeeld mag ie nog een keer..
-
+-
 ## THINGS TO ADD
 - begin situatie

@@ -80,8 +80,6 @@ local function choose_card(game, pot)
     return legal[1]
 end
 
--- Execute the AI's turn
--- ...existing code...
 
 --------------------------------------------------------------------
 --  AI speelt een volledige beurt
