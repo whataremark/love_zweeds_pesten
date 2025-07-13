@@ -8,6 +8,8 @@ local game --empty for circular dependency
 
 local net = {}
 
+local import_state
+
 net.mode   = nil -- 'host' or 'client'
 net.server = nil
 net.conn   = nil
