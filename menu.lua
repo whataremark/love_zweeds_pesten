@@ -17,6 +17,14 @@ local options = {
     {key="j", label="Join game",       next=function()
         state.enter(require("browser"))
     end},
+    --AUTOMATISCH JOIN PC UTRECHT
+    {key   = "d",
+    label = "Debug-join 192.168.178.166",
+    next  = function()
+        require("net").connect("192.168.178.166")
+        state.enter(require("client_lobby"), { ip = "192.168.178.166" })
+    end
+},
 }
 function menu.load()
     menu.selected = 1
