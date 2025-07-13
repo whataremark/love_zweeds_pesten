@@ -4,6 +4,7 @@ local utils    = require("utils")
 local drawPile = require("drawpile")
 local player = require("player")
 local config = require("config")
+local net    = require("net")
 
 -- default mode is against the AI
 game.mode = "ai"
@@ -56,7 +57,11 @@ function game.start(mode)
     --------------------------------------------------------------
     -- 2.  Spelstatus resetten
     --------------------------------------------------------------
-    game.mode          = mode or "ai"
+    if mode == "multiplayer-host" or mode == "multiplayer-client" then
+        game.mode = "multiplayer"
+    else
+        game.mode = mode or "ai"
+    end
     game.currentPlayer = 1
     game.waitingForAI  = false
     game.extraTurn     = false
@@ -80,6 +85,13 @@ function game.start(mode)
     print(string.format(
         "[GAME] Nieuwe ronde gestart: %d decks, hand=%d, blind=%d",
         game.deckCount, config.HAND_SIZE, config.BLIND_SIZE))
+
+    if mode == "multiplayer-host" then
+        net.set_game(game)
+        net.send_state()
+    elseif mode == "multiplayer-client" then
+        net.set_game(game)
+    end
 end
 
 
