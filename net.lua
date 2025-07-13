@@ -369,26 +369,19 @@ function net.update(dt)
     ------------------------------------------------------------------
     if net.isClient() and net.client then
         local line, err = net.client:receive("*l")     -- wacht op newline
-        while line or err do
-            if line then
-                -- debug: laat ruwe regel zien
-                print("[CLIENT] RAW:", line:sub(1,60))
+            while line do                                -- ← alleen échte regels
+                        -- (debug) toon begin van de regel
+                        print("[CLIENT] RAW:", line:sub(1,60))
 
-                if line:match("^[%s]*[{%[]") then      -- lijkt JSON?
-                    local ok, msg = pcall(json.decode, line)
-                    if ok and type(msg)=="table" then
-                        handle_client(msg)             -- zet net.started
-                    else
-                        print("[CLIENT] ⚠ json-decode mislukt")
-                    end
+                        if line:match("^[%s]*[{%[]") then        -- lijkt JSON?
+                            local ok, msg = pcall(json.decode, line)
+                            if ok and type(msg)=="table" then
+                                handle_client(msg)               -- zet net.started
+                            end
+                        end
+                        line, err = net.client:receive("*l")     -- volgende regel (kan nil zijn)
+                    end                                          -- bij nil stopt lus → geen freeze
                 end
-            elseif err ~= "timeout" then
-                print("[CLIENT] recv-error:", err)
-                break
-            end
-            line, err = net.client:receive("*l")
-        end
-    end
 end
 
 function net.play_from_client(cards)
