@@ -125,6 +125,11 @@ end
 
 function net.set_game(g)
     net.game = g
+    -- ❷  Toegepast bij eerste binnenkomst van de echte game-state
+    if net.pendingState then
+        import_state(net.pendingState)
+        net.pendingState = nil
+    end
 end
 
 
@@ -295,9 +300,14 @@ local function handle_host(msg)
 end
 
 local function handle_client(msg)
-    if msg.cmd=="STATE" then
-        import_state(msg.game)
-        net.started = true        -- ← voeg deze regel toe
+    if msg.cmd == "STATE" then
+        -- ❶  Spaar snapshot op als game nog niet bestaat
+        if not net.game then
+            net.pendingState = msg.game      -- tijdelijk bewaren
+            net.started      = true          -- client_lobby mag doorgaan
+        else
+            import_state(msg.game)           -- normale update
+        end
     end
 end
 
