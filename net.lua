@@ -212,17 +212,16 @@ function net.send(msg)
     end
 end
 
-function net.send_state()
-    if not net.conn or not net.game then return end
-        net.send({cmd="STATE", game = net.game})
+  if not net.conn or not net.game then return end
+  -- stuur alléén een serieel snapshot, geen functies
+  net.send({ cmd = "STATE", game = export_state() })
 end
-
 local function handle_host(msg)
     if msg.cmd == "HELLO" then
         table.insert(hosts, "Client")   -- later naam mee-sturen
         print("[net] client connected")
     return
-    
+    end
     if msg.cmd=="PLAY" then
         local p = player.players[msg.id]
         if p then
@@ -298,9 +297,6 @@ function net.update()
     end
 end
 
- if net.game and net.conn then      -- kleine g  ▲
-            net.send_state()
-        end
 
 function net.play_from_client(cards)
     net.send({cmd="PLAY", id=1, cards=cards})
