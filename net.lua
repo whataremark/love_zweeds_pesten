@@ -17,29 +17,52 @@ net.netGame = nil
 
 net.started = false
 
----------------------------------------------------------------
--- LAN-Discovery  (optioneel, maar handig)
----------------------------------------------------------------
-local udp         = require("socket").udp
-local BCAST_PORT  = 22123
-local MAGIC       = "CARDGAME_LOBBY"
-
-local beaconSocket
-local lastBeacon  = 0
-
-
 
 -- roept elke  ~2s  net.update_lan(dt)  aan als je host bent
+---------------------------------------------------------------------------
+-- net.update_lan(dt, lobbyName)
+--  ⏱️  Wordt door de host-lobby elke ~2 s aangeroepen om op het LAN
+--     een UDP-broadcast te sturen zodat Join-clients de server kunnen zien.
+---------------------------------------------------------------------------
+local BCAST_PORT  = 22123
+local MAGIC       = "CARDGAME_LOBBY"
+local socket       = require("socket")
+
+local beaconSocket = nil        -- hergebruik dezelfde socket telkens
+local lastBeacon   = 0
+
 function net.update_lan(dt, lobbyName)
-    if not net.isHost() then return end
-    beaconSocket = beaconSocket or socket.udp()
-    lastBeacon   = lastBeacon + dt
-    if lastBeacon > 2 then
-        lastBeacon = 0
-        beaconSocket:setoption("broadcast", true)
-        local payload = MAGIC .. "|" .. lobbyName
-        local ok,err = beaconSocket:sendto(payload, "255.255.255.255", BCAST_PORT)
-        print("[beacon]", ok and #payload or err)     -- ← debug-regel
+    if not net.isHost() then return end         -- alleen host zendt uit
+
+    -------------------------------------------------------------------
+    -- 1.  Socket aanmaken (één keer) en correct binden
+    -------------------------------------------------------------------
+    if not beaconSocket then
+        beaconSocket = socket.udp()
+        beaconSocket:setoption("broadcast", true)      -- uitzend-flag
+        beaconSocket:setsockname("0.0.0.0", 0)         -- bind aan willekeurige poort
+    end
+
+    -------------------------------------------------------------------
+    -- 2.  Om de ±2 seconden een pakket uitsturen
+    -------------------------------------------------------------------
+    lastBeacon = lastBeacon + dt
+    if lastBeacon < 2 then return end
+    lastBeacon = 0
+
+    local payload = MAGIC .. "|" .. (lobbyName or "Lobby")
+
+    -------------------------------------------------------------------
+    -- 3.  Stuur naar universeel én subnet-broadcast (bv. 192.168.178.255)
+    -------------------------------------------------------------------
+    local targets = {
+        "255.255.255.255",
+        "192.168.178.255",   -- ← vervang dit adres door jouw eigen subnet
+    }
+
+    for _,bc in ipairs(targets) do
+        local ok, err = beaconSocket:sendto(payload, bc, BCAST_PORT)
+        print("[beacon]", bc, ok and #payload or err)
     end
 end
 
