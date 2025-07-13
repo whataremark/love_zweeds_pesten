@@ -1,4 +1,3 @@
-local socket = require("socket")
 local json   = require("json")
 local drawPile = require("drawpile")
 local rules  = require("rules")
@@ -27,6 +26,7 @@ net.started = false
 local BCAST_PORT  = 22123
 local MAGIC       = "CARDGAME_LOBBY"
 local socket       = require("socket")
+local udp = socket.udp         -- ❶ nodig voor scan_lan()
 
 local beaconSocket = nil        -- hergebruik dezelfde socket telkens
 local lastBeacon   = 0
