@@ -158,17 +158,36 @@ local function inflate_card(c)
     return {kleur=c.kleur, waarde=c.waarde, naam=c.naam, afbeelding=getImage(c.naam)}
 end
 
-local function export_state()
-    local g = net.game             -- ❶ pak het gekoppelde spel-object
-    if not g then return {} end    -- ❷ nog geen spel? leeg snapshot
+----------------------------------------------------------------------
+--  Serialiseer alleen primitives (string/number/boolean/nil)
+--  + recursief tabellen die zélf alleen primitives bevatten.
+----------------------------------------------------------------------
+local function copy_clean(src, depth)
+    depth = (depth or 0) + 1
+    if depth > 4 then return nil end             -- voorkom diepe recursie
 
-    local snap = {}
-    for k, v in pairs(g) do        -- ❸ kopieer alleen serialiseerbare velden
-        if type(v) ~= "function" then
-            snap[k] = v
+    local t = type(src)
+    if t == "string" or t == "number" or t == "boolean" or t == "nil" then
+        return src
+    elseif t == "table" then
+        local out = {}
+        for k, v in pairs(src) do
+            if type(k) == "string" or type(k) == "number" then
+                local clean = copy_clean(v, depth)
+                if clean ~= nil then
+                    out[k] = clean
+                end
+            end
         end
+        return out
+    else
+        return nil   -- filter 'function', 'userdata', 'thread'
     end
-    return snap
+end
+
+local function export_state()
+    if not net.game then return {} end
+    return copy_clean(net.game)
 end
 
 local function import_state(state)
