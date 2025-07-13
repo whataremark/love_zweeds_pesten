@@ -15,6 +15,7 @@ net.conn   = nil
 net.client = nil
 net.netGame = nil
 
+net.started = false
 
 ---------------------------------------------------------------
 -- LAN-Discovery  (optioneel, maar handig)
@@ -25,6 +26,11 @@ local MAGIC       = "CARDGAME_LOBBY"
 
 local beaconSocket
 local lastBeacon  = 0
+
+if msg.cmd == "STATE" then
+    import_state(msg.game)
+    net.started = true 
+end
 
 -- roept elke  ~2s  net.update_lan(dt)  aan als je host bent
 function net.update_lan(dt, lobbyName)

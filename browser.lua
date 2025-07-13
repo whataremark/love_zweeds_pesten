@@ -28,27 +28,36 @@ function b.textinput(t)
         b.manualIP = b.manualIP .. t
     end
 end
+
 function b.keypressed(key)
+    ----------------------------------------------------------------------
+    -- 1.  Typ-modus: handmatig IP invoeren
+    ----------------------------------------------------------------------
     if b.typing then
         if key == "return" then
-            net.connect(b.manualIP)
-            state.enter(require("game"), {mode="multiplayer-client"})
+            local ip = b.manualIP
+            net.connect(ip)                                 -- ↩ verbind
+            state.enter(require("client_lobby"), { ip = ip })-- ↩ ga lobby in
         elseif key == "backspace" then
-            b.manualIP = b.manualIP:sub(1,-2)
+            b.manualIP = b.manualIP:sub(1, -2)
         end
         return
     end
 
-    if key=="up"   then b.selected = (b.selected-2)%#b.hosts +1 end
-    if key=="down" then b.selected =  b.selected   %#b.hosts +1 end
+    ----------------------------------------------------------------------
+    -- 2.  Navigeren in gevonden hosts-lijst
+    ----------------------------------------------------------------------
+    if key == "up"   then b.selected = (b.selected - 2) % #b.hosts + 1 end
+    if key == "down" then b.selected =  b.selected      % #b.hosts + 1 end
 
-    if key=="return" and #b.hosts>0 then
-        net.connect(b.hosts[b.selected].ip)
-        state.enter(require("game"), {mode="multiplayer-client"})
-    elseif key=="i" then
-        b.typing = true
-    elseif key=="escape" then
-        state.enter(require("menu"))
+    if key == "return" and #b.hosts > 0 then
+        local ip = b.hosts[b.selected].ip
+        net.connect(ip)                                   -- ↩ verbind
+        state.enter(require("client_lobby"), { ip = ip }) -- ↩ ga lobby in
+    elseif key == "i" then
+        b.typing = true                                   -- start typen
+    elseif key == "escape" then
+        state.enter(require("menu"))                      -- terug
     end
 end
 
