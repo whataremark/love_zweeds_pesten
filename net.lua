@@ -125,6 +125,38 @@ function net.start()
     end
 end
 
+----------------------------------------------------------------------
+-- 2.  Herstel snapshot aan client-kant
+----------------------------------------------------------------------
+local function import_state(snap)
+    -- spelers
+    local players = {}
+    for i,sp in ipairs(snap.players or {}) do
+        local t = { hand = {}, faceUp = {}, faceDown = {} }
+        for _,k in ipairs(sp.hand)     do table.insert(t.hand,     inflate_card(k)) end
+        for _,k in ipairs(sp.faceUp)   do table.insert(t.faceUp,   inflate_card(k)) end
+        for _,k in ipairs(sp.faceDown) do table.insert(t.faceDown, inflate_card(k)) end
+        players[i] = t
+    end
+    player.players = players
+
+    -- pot
+    net.game.pot = {}
+    for _,k in ipairs(snap.pot or {}) do
+        table.insert(net.game.pot, inflate_card(k))
+    end
+
+    -- overige velden
+    net.game.currentPlayer    = snap.currentPlayer
+    net.game.ronde            = snap.ronde
+    net.game.nextMustBeUnder7 = snap.nextMustBeUnder7
+    net.game.extraTurn        = snap.extraTurn
+    net.game.winner           = snap.winner
+    net.game.state            = snap.state
+    net.game.deckCount        = snap.deckCount
+end
+
+
 function net.set_game(g)
     net.game = g
     -- ❷  Toegepast bij eerste binnenkomst van de echte game-state
@@ -216,36 +248,7 @@ local function export_state()
     return snap
 end
 
-----------------------------------------------------------------------
--- 2.  Herstel snapshot aan client-kant
-----------------------------------------------------------------------
-local function import_state(snap)
-    -- spelers
-    local players = {}
-    for i,sp in ipairs(snap.players or {}) do
-        local t = { hand = {}, faceUp = {}, faceDown = {} }
-        for _,k in ipairs(sp.hand)     do table.insert(t.hand,     inflate_card(k)) end
-        for _,k in ipairs(sp.faceUp)   do table.insert(t.faceUp,   inflate_card(k)) end
-        for _,k in ipairs(sp.faceDown) do table.insert(t.faceDown, inflate_card(k)) end
-        players[i] = t
-    end
-    player.players = players
 
-    -- pot
-    net.game.pot = {}
-    for _,k in ipairs(snap.pot or {}) do
-        table.insert(net.game.pot, inflate_card(k))
-    end
-
-    -- overige velden
-    net.game.currentPlayer    = snap.currentPlayer
-    net.game.ronde            = snap.ronde
-    net.game.nextMustBeUnder7 = snap.nextMustBeUnder7
-    net.game.extraTurn        = snap.extraTurn
-    net.game.winner           = snap.winner
-    net.game.state            = snap.state
-    net.game.deckCount        = snap.deckCount
-end
 
 function net.send(msg)
     local line = json.encode(msg).."\n"
