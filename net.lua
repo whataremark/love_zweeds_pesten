@@ -159,26 +159,16 @@ local function inflate_card(c)
 end
 
 local function export_state()
-    local state = {
-        pot={},
-        players={},
-        currentPlayer=game.currentPlayer,
-        ronde=game.ronde,
-        nextMustBeUnder7=game.nextMustBeUnder7,
-        extraTurn=game.extraTurn,
-        winner=game.winner,
-        state=game.state,
-        deckCount=game.deckCount
-    }
-    for _,k in ipairs(game.pot) do table.insert(state.pot, slim_card(k)) end
-    for i,p in ipairs(player.players) do
-        local t={hand={},faceUp={},faceDown={}}
-        for _,k in ipairs(p.hand) do table.insert(t.hand, slim_card(k)) end
-        for _,k in ipairs(p.faceUp) do table.insert(t.faceUp, slim_card(k)) end
-        for _,k in ipairs(p.faceDown) do table.insert(t.faceDown, slim_card(k)) end
-        state.players[i]=t
+    local g = net.game             -- ❶ pak het gekoppelde spel-object
+    if not g then return {} end    -- ❷ nog geen spel? leeg snapshot
+
+    local snap = {}
+    for k, v in pairs(g) do        -- ❸ kopieer alleen serialiseerbare velden
+        if type(v) ~= "function" then
+            snap[k] = v
+        end
     end
-    return state
+    return snap
 end
 
 local function import_state(state)
