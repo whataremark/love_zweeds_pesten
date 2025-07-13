@@ -321,69 +321,75 @@ local function handle_client(msg)
     end
 end
 
-function net.update()
+----------------------------------------------------------------------
+--  Netwerk-update – host- en client-pad strikt gescheiden
+----------------------------------------------------------------------
+function net.update(dt)
+    ------------------------------------------------------------------
+    --  HOST-zijde
+    ------------------------------------------------------------------
     if net.isHost() then
+        --------------------------------------------------------------
+        -- 1.  Accept nieuwe client (max 1)
+        --------------------------------------------------------------
         if net.server and not net.conn then
             local c = net.server:accept()
             if c then
                 c:settimeout(0)
                 net.conn = c
-            
-                --tijdens accept
-            local dc = (net.game and net.game.deckCount) or 1
-            net.send({cmd="HELLO", seed=os.time(), deckCount = dc})
 
-            -- voeg vlak eronder toe:
-            table.insert(net.newClients, "Client")          -- of een echte naam
-            end
-            ------------------------------------------------------------------
-            -- 4.  Blijf de spel­status pushen zolang er een game is
-            ------------------------------------------------------------------
-            if net.game and net.conn then
-                net.send_state()
+                local dc = (net.game and net.game.deckCount) or 1
+                net.send({ cmd="HELLO", seed=os.time(), deckCount = dc })
+                table.insert(net.newClients, "Client")
             end
         end
-        
+
+        --------------------------------------------------------------
+        -- 2.  Inkomende berichten van de client
+        --------------------------------------------------------------
         if net.conn then
-            local line = net.conn:receive()
+            local line = net.conn:receive("*l")
             while line do
                 local msg = json.decode(line)
                 handle_host(msg)
-                line = net.conn:receive()
+                line = net.conn:receive("*l")
             end
         end
 
-        ----------------------------------------------------------------------
-        --  CLIENT – lees veilig alle binnen­komende regels
-        ----------------------------------------------------------------------
-        if net.isClient() and net.client then
-            local line, err = net.client:receive("*l")   -- expliciet “tot newline”
-            while line or err do
-                if line then
-                    ----------------------------------------------------------
-                    -- 1.  Laat zien wat er werkelijk binnen komt
-                    ----------------------------------------------------------
-                    print("[CLIENT] RAW:", line:sub(1,60))
+        --------------------------------------------------------------
+        -- 3.  Push elke frame de spel-status (zolang game bestaat)
+        --------------------------------------------------------------
+        if net.game and net.conn then
+            net.send_state()                           -- newline zit al in net.send
+        end
+    end
 
-                    -- alleen JSON‐regels verwerken
-                    if line:match("^[%s]*[{%[]") then
-                        local ok, msg = pcall(json.decode, line)
-                        if ok and type(msg)=="table" then
-                            handle_client(msg)          -- zet net.started zodra STATE
-                        else
-                            print("[CLIENT] ⚠ json decode mislukt")
-                        end
+    ------------------------------------------------------------------
+    --  CLIENT-zijde  (stond eerst per ongeluk in host-blok)
+    ------------------------------------------------------------------
+    if net.isClient() and net.client then
+        local line, err = net.client:receive("*l")     -- wacht op newline
+        while line or err do
+            if line then
+                -- debug: laat ruwe regel zien
+                print("[CLIENT] RAW:", line:sub(1,60))
+
+                if line:match("^[%s]*[{%[]") then      -- lijkt JSON?
+                    local ok, msg = pcall(json.decode, line)
+                    if ok and type(msg)=="table" then
+                        handle_client(msg)             -- zet net.started
+                    else
+                        print("[CLIENT] ⚠ json-decode mislukt")
                     end
-                elseif err ~= "timeout" then
-                    print("[CLIENT] recv-error:", err)  -- gesloten verbinding e.d.
-                    break
                 end
-                line, err = net.client:receive("*l")
+            elseif err ~= "timeout" then
+                print("[CLIENT] recv-error:", err)
+                break
             end
+            line, err = net.client:receive("*l")
         end
     end
 end
-
 
 function net.play_from_client(cards)
     net.send({cmd="PLAY", id=1, cards=cards})
