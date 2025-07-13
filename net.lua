@@ -5,7 +5,7 @@ local rules  = require("rules")
 local player = require("player")
 local utils  = require("utils")
 local config = require("config")
-local game   = require("game")
+local game --empty for circular dependency
 
 local net = {}
 
@@ -51,7 +51,31 @@ end
 
 function net.set_game(g)
     net.netGame = g
+    game = g
 end
+
+
+function net.host()
+    -- probeer te binden; lukt het niet dan nil + error
+    local srv, err = socket.bind("*", 22122)
+    if not srv then return nil, err end
+    srv:settimeout(0)
+    net.mode   = "host"
+    net.server = srv
+    return "multiplayer-host"
+end
+
+function net.connect(ip)
+    ip = ip or "localhost"
+    local c = socket.tcp()
+    c:settimeout(0)
+    local ok, err = c:connect(ip, 22122)
+    if not ok and err ~= "timeout" then return nil, err end
+    net.mode   = "client"
+    net.client = c
+    return "multiplayer-client"
+end
+
 
 local function slim_card(c)
     return {kleur=c.kleur, waarde=c.waarde, naam=c.naam}
