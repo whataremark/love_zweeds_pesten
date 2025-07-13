@@ -360,7 +360,7 @@ function net.update()
             line = net.client:receive()
         end
         end
-
+    end
 end
 
 
