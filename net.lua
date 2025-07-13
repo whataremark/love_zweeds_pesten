@@ -265,6 +265,7 @@ function net.send_state()
     if not net.conn or not net.game then return end
     -- stuur een plat snapshot, geen functies
     net.send({ cmd = "STATE", game = export_state() })
+    print("[net] STATE sent, pot=", #net.game.pot)
 end
 
 
@@ -331,6 +332,12 @@ function net.update()
             -- voeg vlak eronder toe:
             table.insert(net.newClients, "Client")          -- of een echte naam
             end
+            ------------------------------------------------------------------
+            -- 4.  Blijf de spel­status pushen zolang er een game is
+            ------------------------------------------------------------------
+            if net.game and net.conn then
+                net.send_state()
+            end
         end
         
         if net.conn then
@@ -346,20 +353,20 @@ function net.update()
         -- CLIENT: inkomende berichten verwerken
         ------------------------------------------------------------
         if net.isClient() and net.client then
-        local line = net.client:receive()
-        while line do
-            -- 1) filter lege of niet-JSON regels
-            if line:match("^[%s]*[{%[]") then
-            local ok, msg = pcall(json.decode, line)
-            if ok and type(msg) == "table" then
-                handle_client(msg)
-            else
-                print("[net]  ⚠  kon JSON niet decoden:", line:sub(1,40))
+            local line = net.client:receive()
+            while line do
+                -- 1) filter lege of niet-JSON regels
+                if line:match("^[%s]*[{%[]") then
+                    local ok, msg = pcall(json.decode, line)
+                    if ok and type(msg) == "table" then
+                        handle_client(msg)
+                    else
+                        print("[net]  ⚠  kon JSON niet decoden:", line:sub(1,40))
+                    end
+                end
+                line = net.client:receive()
             end
             end
-            line = net.client:receive()
-        end
-        end
     end
 end
 
