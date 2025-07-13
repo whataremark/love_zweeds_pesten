@@ -307,6 +307,7 @@ end
 
 local function handle_client(msg)
     if msg.cmd == "STATE" then
+        print("[CLIENT] STATE received")   
         -- ❶  Spaar snapshot op als game nog niet bestaat
         if not net.game then
             net.pendingState = msg.game      -- tijdelijk bewaren
