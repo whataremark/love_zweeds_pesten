@@ -349,24 +349,25 @@ function net.update()
             end
         end
 
-        ------------------------------------------------------------
-        -- CLIENT: inkomende berichten verwerken
-        ------------------------------------------------------------
+        ----------------------------------------------------------------------
+        --  CLIENT – lees alle binnenkomende regels veilig
+        ----------------------------------------------------------------------
         if net.isClient() and net.client then
             local line = net.client:receive()
             while line do
-                -- 1) filter lege of niet-JSON regels
+                -- Pak alleen regels die eruit zien als JSON
                 if line:match("^[%s]*[{%[]") then
                     local ok, msg = pcall(json.decode, line)
                     if ok and type(msg) == "table" then
-                        handle_client(msg)
+                        handle_client(msg)        -- zet net.started zodra STATE komt
                     else
-                        print("[net]  ⚠  kon JSON niet decoden:", line:sub(1,40))
+                        print("[net]  ⚠  kon JSON niet decoden, skip")
                     end
                 end
+                -- Lees evt. meerdere regels die al in de buffer zitten
                 line = net.client:receive()
             end
-            end
+        end
     end
 end
 
