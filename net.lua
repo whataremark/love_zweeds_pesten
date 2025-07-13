@@ -257,6 +257,9 @@ function net.send(msg)
     elseif net.isClient() and net.client then
         net.client:send(line)
     end
+    if net.conn then
+        net.conn:send(json.encode(tbl).."\n")   -- ↩ newline garandeert “*l”
+    end
 end
 
 
@@ -351,22 +354,31 @@ function net.update()
         end
 
         ----------------------------------------------------------------------
-        --  CLIENT – lees alle binnenkomende regels veilig
+        --  CLIENT – lees veilig alle binnen­komende regels
         ----------------------------------------------------------------------
         if net.isClient() and net.client then
-            local line = net.client:receive()
-            while line do
-                -- Pak alleen regels die eruit zien als JSON
-                if line:match("^[%s]*[{%[]") then
-                    local ok, msg = pcall(json.decode, line)
-                    if ok and type(msg) == "table" then
-                        handle_client(msg)        -- zet net.started zodra STATE komt
-                    else
-                        print("[net]  ⚠  kon JSON niet decoden, skip")
+            local line, err = net.client:receive("*l")   -- expliciet “tot newline”
+            while line or err do
+                if line then
+                    ----------------------------------------------------------
+                    -- 1.  Laat zien wat er werkelijk binnen komt
+                    ----------------------------------------------------------
+                    print("[CLIENT] RAW:", line:sub(1,60))
+
+                    -- alleen JSON‐regels verwerken
+                    if line:match("^[%s]*[{%[]") then
+                        local ok, msg = pcall(json.decode, line)
+                        if ok and type(msg)=="table" then
+                            handle_client(msg)          -- zet net.started zodra STATE
+                        else
+                            print("[CLIENT] ⚠ json decode mislukt")
+                        end
                     end
+                elseif err ~= "timeout" then
+                    print("[CLIENT] recv-error:", err)  -- gesloten verbinding e.d.
+                    break
                 end
-                -- Lees evt. meerdere regels die al in de buffer zitten
-                line = net.client:receive()
+                line, err = net.client:receive("*l")
             end
         end
     end
