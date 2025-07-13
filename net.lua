@@ -13,7 +13,6 @@ net.server = nil
 net.conn   = nil
 net.client = nil
 net.netGame = nil
-
 net.started = false
 
 
@@ -263,7 +262,9 @@ function net.update()
                 c:settimeout(0)
                 net.conn=c
                 net.send({cmd="HELLO", seed=os.time(), deckCount=game.deckCount})
-                net.send_state()
+                
+                if net.Game then             -- ★ alleen als spel al bestaat
+                    net.send_state()
             end
         end
         if net.conn then
@@ -273,6 +274,9 @@ function net.update()
                 handle_host(msg)
                 line = net.conn:receive()
             end
+        end
+        if net.Game and net.conn then
+            net.send_state()
         end
     elseif net.isClient() then
         if net.client then
