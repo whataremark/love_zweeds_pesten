@@ -15,6 +15,50 @@ net.conn   = nil
 net.client = nil
 net.netGame = nil
 
+
+---------------------------------------------------------------
+-- LAN-Discovery  (optioneel, maar handig)
+---------------------------------------------------------------
+local udp         = require("socket").udp
+local BCAST_PORT  = 22123
+local MAGIC       = "CARDGAME_LOBBY"
+
+local beaconSocket
+local lastBeacon  = 0
+
+-- roept elke  ~2s  net.update_lan(dt)  aan als je host bent
+function net.update_lan(dt, lobbyName)
+    if not net.isHost() then return end
+    beaconSocket = beaconSocket or udp()
+    lastBeacon   = lastBeacon + dt
+    if lastBeacon > 2 then
+        lastBeacon = 0
+        beaconSocket:setoption("broadcast", true)
+        beaconSocket:sendto(MAGIC .. "|" .. lobbyName, "255.255.255.255", BCAST_PORT)
+    end
+end
+
+-- geeft lijst { {ip="...", name="..."}, … }
+function net.scan_lan()
+    local s      = udp()
+    s:settimeout(0)
+    s:setsockname("*", BCAST_PORT)
+    local hosts  = {}
+    for _ = 1,50 do      -- max 50 pakketten lezen
+        local data, ip = s:receivefrom()
+        if not data then break end
+        if data:sub(1, #MAGIC) == MAGIC then
+            local name = data:match("|(.+)$") or "Server"
+            hosts[ip]  = name
+        end
+    end
+    s:close()
+    local list = {}
+    for ip, name in pairs(hosts) do table.insert(list, {ip=ip, name=name}) end
+    table.sort(list, function(a,b) return a.ip < b.ip end)
+    return list
+end
+
 local imageCache = {}
 local function getImage(name)
     if not imageCache[name] then

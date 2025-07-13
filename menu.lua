@@ -8,11 +8,16 @@ local smallFont = love.graphics.newFont(20)
 
 ------------------------------ menu-opties
 local options = {
-    { key = "a", label = "Play vs AI",      mode = "ai"                 },
-    { key = "h", label = "Host game",       mode = "multiplayer-host"   },
-    { key = "j", label = "Join game",       mode = "multiplayer-client" },
+    {key="a", label="Play vs AI",      next=function()
+        state.enter(require("game"), {mode="ai"})
+    end},
+    {key="h", label="Host game",       next=function()
+        state.enter(require("host_lobby"), {name="My Lobby"})
+    end},
+    {key="j", label="Join game",       next=function()
+        state.enter(require("browser"))
+    end},
 }
-
 function menu.load()
     menu.selected = 1
 end
@@ -33,17 +38,18 @@ function menu.draw()
 end
 
 function menu.keypressed(key)
-    if key == "up"   then menu.selected = (menu.selected - 2) % #options + 1; return end
-    if key == "down" then menu.selected =  menu.selected      % #options + 1; return end
+    if key == "up"   then
+        menu.selected = (menu.selected - 2) % #options + 1
+        return
+    end
+    if key == "down" then
+        menu.selected =  menu.selected      % #options + 1
+        return
+    end
 
-    local chosen = options[menu.selected]
-    if key == "return" or key == "kpenter" or key == "space" or key == chosen.key then
-        if chosen.mode == "multiplayer-host" then
-            require("net").host()
-        elseif chosen.mode == "multiplayer-client" then
-            require("net").connect("127.0.0.1")
-        end
-        state.enter(require("game"), { mode = chosen.mode })
+    local opt = options[menu.selected]
+    if key == "return" or key == "kpenter" or key == "space" or key == opt.key then
+        opt.next()                          -- ← alleen dát doet het werk
     end
 end
 
