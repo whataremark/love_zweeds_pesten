@@ -260,13 +260,23 @@ function net.update()
             local c = net.server:accept()
             if c then
                 c:settimeout(0)
-                net.conn=c
-                net.send({cmd="HELLO", seed=os.time(), deckCount=game.deckCount})
-                
-                if net.Game then             -- ★ alleen als spel al bestaat
+                net.conn = c
+
+                ----------------------------------------------------------------
+                -- A.  HELLO-verzoek  – gebruik veilige deckCount
+                ----------------------------------------------------------------
+                local dc = (net.game and net.game.deckCount) or 1
+                net.send({ cmd = "HELLO", seed = os.time(), deckCount = dc })
+
+                ----------------------------------------------------------------
+                -- B.  Eerste STATE   – alleen als spel al bestaat
+                ----------------------------------------------------------------
+                if net.game then          -- kleine g  ▲
                     net.send_state()
+                end
             end
         end
+        
         if net.conn then
             local line = net.conn:receive()
             while line do
@@ -275,9 +285,7 @@ function net.update()
                 line = net.conn:receive()
             end
         end
-        if net.Game and net.conn then
-            net.send_state()
-        end
+
     elseif net.isClient() then
         if net.client then
             local line = net.client:receive()
@@ -290,6 +298,10 @@ function net.update()
     end
 end
 
+ if net.game and net.conn then      -- kleine g  ▲
+            net.send_state()
+        end
+
 function net.play_from_client(cards)
     net.send({cmd="PLAY", id=1, cards=cards})
 end
@@ -299,5 +311,5 @@ end
 function net.pass_from_client()
     net.send({cmd="PASS", id=1})
 end
-
+end
 return net
