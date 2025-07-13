@@ -158,58 +158,86 @@ local function inflate_card(c)
     return {kleur=c.kleur, waarde=c.waarde, naam=c.naam, afbeelding=getImage(c.naam)}
 end
 
-----------------------------------------------------------------------
---  Serialiseer alleen primitives (string/number/boolean/nil)
---  + recursief tabellen die zélf alleen primitives bevatten.
-----------------------------------------------------------------------
-local function copy_clean(src, depth)
-    depth = (depth or 0) + 1
-    if depth > 4 then return nil end             -- voorkom diepe recursie
 
-    local t = type(src)
-    if t == "string" or t == "number" or t == "boolean" or t == "nil" then
-        return src
-    elseif t == "table" then
-        local out = {}
-        for k, v in pairs(src) do
-            if type(k) == "string" or type(k) == "number" then
-                local clean = copy_clean(v, depth)
-                if clean ~= nil then
-                    out[k] = clean
-                end
-            end
-        end
-        return out
-    else
-        return nil   -- filter 'function', 'userdata', 'thread'
-    end
+
+----------------------------------------------------------------------
+-- Kaart in / uit   (slim = alleen primitive velden)
+----------------------------------------------------------------------
+local function slim_card(c)
+    return { kleur = c.kleur, waarde = c.waarde, naam = c.naam }
+end
+local function inflate_card(c)
+    return {
+        kleur = c.kleur, waarde = c.waarde, naam = c.naam,
+        afbeelding = getImage(c.naam)
+    }
 end
 
+
+----------------------------------------------------------------------
+-- 1.  Maak een plat snapshot voor JSON
+----------------------------------------------------------------------
 local function export_state()
     if not net.game then return {} end
-    return copy_clean(net.game)
+
+    local snap = {
+        pot              = {},
+        players          = {},
+        currentPlayer    = net.game.currentPlayer,
+        ronde            = net.game.ronde,
+        nextMustBeUnder7 = net.game.nextMustBeUnder7,
+        extraTurn        = net.game.extraTurn,
+        winner           = net.game.winner,
+        state            = net.game.state,
+        deckCount        = net.game.deckCount,
+    }
+
+    -- pot
+    for _,k in ipairs(net.game.pot) do
+        table.insert(snap.pot, slim_card(k))
+    end
+
+    -- spelers
+    for i,sp in ipairs(player.players) do
+        local t = { hand = {}, faceUp = {}, faceDown = {} }
+        for _,k in ipairs(sp.hand)     do table.insert(t.hand,     slim_card(k)) end
+        for _,k in ipairs(sp.faceUp)   do table.insert(t.faceUp,   slim_card(k)) end
+        for _,k in ipairs(sp.faceDown) do table.insert(t.faceDown, slim_card(k)) end
+        snap.players[i] = t
+    end
+
+    return snap
 end
 
-local function import_state(state)
-    local players={}
-    for i,sp in ipairs(state.players) do
-        local t={hand={},faceUp={},faceDown={}}
-        for _,k in ipairs(sp.hand) do table.insert(t.hand, inflate_card(k)) end
-        for _,k in ipairs(sp.faceUp) do table.insert(t.faceUp, inflate_card(k)) end
+----------------------------------------------------------------------
+-- 2.  Herstel snapshot aan client-kant
+----------------------------------------------------------------------
+local function import_state(snap)
+    -- spelers
+    local players = {}
+    for i,sp in ipairs(snap.players or {}) do
+        local t = { hand = {}, faceUp = {}, faceDown = {} }
+        for _,k in ipairs(sp.hand)     do table.insert(t.hand,     inflate_card(k)) end
+        for _,k in ipairs(sp.faceUp)   do table.insert(t.faceUp,   inflate_card(k)) end
         for _,k in ipairs(sp.faceDown) do table.insert(t.faceDown, inflate_card(k)) end
-        players[i]=t
+        players[i] = t
     end
     player.players = players
-    game.pot              = {}
-    for _,k in ipairs(state.pot) do table.insert(game.pot, inflate_card(k)) end
-    game.currentPlayer    = state.currentPlayer
-    game.ronde            = state.ronde
-    game.nextMustBeUnder7 = state.nextMustBeUnder7
-    game.extraTurn        = state.extraTurn
-    game.winner           = state.winner
-    game.state            = state.state
-    game.deckCount        = state.deckCount
-    net.netGame           = state
+
+    -- pot
+    net.game.pot = {}
+    for _,k in ipairs(snap.pot or {}) do
+        table.insert(net.game.pot, inflate_card(k))
+    end
+
+    -- overige velden
+    net.game.currentPlayer    = snap.currentPlayer
+    net.game.ronde            = snap.ronde
+    net.game.nextMustBeUnder7 = snap.nextMustBeUnder7
+    net.game.extraTurn        = snap.extraTurn
+    net.game.winner           = snap.winner
+    net.game.state            = snap.state
+    net.game.deckCount        = snap.deckCount
 end
 
 function net.send(msg)
