@@ -342,16 +342,25 @@ function net.update()
             end
         end
 
-    elseif net.isClient() then
-        if net.client then
-            local line = net.client:receive()
-            while line do
-                local msg = json.decode(line)
+        ------------------------------------------------------------
+        -- CLIENT: inkomende berichten verwerken
+        ------------------------------------------------------------
+        if net.isClient() and net.client then
+        local line = net.client:receive()
+        while line do
+            -- 1) filter lege of niet-JSON regels
+            if line:match("^[%s]*[{%[]") then
+            local ok, msg = pcall(json.decode, line)
+            if ok and type(msg) == "table" then
                 handle_client(msg)
-                line = net.client:receive()
+            else
+                print("[net]  ⚠  kon JSON niet decoden:", line:sub(1,40))
             end
+            end
+            line = net.client:receive()
         end
-    end
+        end
+
 end
 
 
