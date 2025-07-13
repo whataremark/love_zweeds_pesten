@@ -91,13 +91,6 @@ function net.scan_lan()
     return list
 end
 
-local imageCache = {}
-local function getImage(name)
-    if not imageCache[name] then
-        imageCache[name] = love.graphics.newImage("png/"..name..".png")
-    end
-    return imageCache[name]
-end
 
 -- NET-BEGIN helper
 function net.isMultiplayer()
@@ -123,6 +116,30 @@ function net.start()
         net.client = c
         return "multiplayer-client"
     end
+end
+
+----------------------------------------------------------------------
+-- Kaart helpers (primitives only)
+----------------------------------------------------------------------
+local imageCache = {}
+local function getImage(name)
+    if not imageCache[name] then
+        imageCache[name] = love.graphics.newImage("png/"..name..".png")
+    end
+    return imageCache[name]
+end
+
+local function slim_card(c)      -- voor export_state
+    return { kleur = c.kleur, waarde = c.waarde, naam = c.naam }
+end
+
+local function inflate_card(c)   -- voor import_state
+    return {
+        kleur = c.kleur,
+        waarde = c.waarde,
+        naam = c.naam,
+        afbeelding = getImage(c.naam),
+    }
 end
 
 ----------------------------------------------------------------------
@@ -189,28 +206,11 @@ function net.connect(ip)
 end
 
 
-local function slim_card(c)
-    return {kleur=c.kleur, waarde=c.waarde, naam=c.naam}
-end
 
 local function inflate_card(c)
     return {kleur=c.kleur, waarde=c.waarde, naam=c.naam, afbeelding=getImage(c.naam)}
 end
 
-
-
-----------------------------------------------------------------------
--- Kaart in / uit   (slim = alleen primitive velden)
-----------------------------------------------------------------------
-local function slim_card(c)
-    return { kleur = c.kleur, waarde = c.waarde, naam = c.naam }
-end
-local function inflate_card(c)
-    return {
-        kleur = c.kleur, waarde = c.waarde, naam = c.naam,
-        afbeelding = getImage(c.naam)
-    }
-end
 
 
 ----------------------------------------------------------------------
