@@ -7,6 +7,7 @@ local game  = require("game")
 local ai    = require("ai")
 local utils = require("utils")
 local config = require("config")
+local net    = require("net")
 
 local bgCanvas
 
@@ -28,6 +29,10 @@ end
 --codex-- Game loop update handling AI and timers
 function love.update(dt)
     if scene == "playing" then
+        if net.isMultiplayer() then
+            net.update()
+            if net.isHost() then net.send_state() end
+        end
         --------------------------------------------------------
         -- A) Ongeldige zet timer af laten lopen
         --------------------------------------------------------
@@ -125,7 +130,8 @@ function love.mousepressed(x, y, button)
             ronde = 0;            ongeldigeZetTimer = 0
             return
         elseif utils.inside(x, y, ui.hX, ui.hY, ui.hW, ui.hH) then
-            game.start("human");  scene = "playing"
+            local m = net.start()
+            game.start(m);  scene = "playing"
             ronde = 0;            ongeldigeZetTimer = 0
             return
         end
@@ -228,7 +234,9 @@ function love.mousepressed(x, y, button)
             ----------------------------------------------------------------
             local b = buttons.pickup
             if b and utils.inside(x,y,b.x,b.y,b.w,b.h) then
-                if game.currentPlayer == 1 then
+                if net.isClient() then
+                    net.pickup_from_client()
+                elseif game.currentPlayer == 1 then
                     utils.transfer_all_cards(player.players[1].hand, game.pot)
                     utils.deselect_all(player.players[1].hand)
                     game.nextMustBeUnder7 = false
@@ -246,14 +254,22 @@ function love.mousepressed(x, y, button)
 
                 if game.currentPlayer ~= 1 then return end
 
-                local ok = rules.play_selected_cards(game, 1)
-                if ok then
-                    local p = player.players[1]
-                    utils.refill_hand(p.hand, drawPile, config.CARDS_INHAND)
-                    utils.update_phase_for_player(game, 1)  -- fase kan wisselen
-                    -- beurt-/extraTurn-logica zit ín rules.handle_card_effects
+                if net.isClient() then
+                    local cards={}
+                    for _,k in ipairs(player.players[1].hand) do
+                        if k.selected then table.insert(cards, {kleur=k.kleur,waarde=k.waarde}) end
+                    end
+                    net.play_from_client(cards)
+                    utils.deselect_all(player.players[1].hand)
                 else
-                    ongeldigeZetTimer = 1.0
+                    local ok = rules.play_selected_cards(game, 1)
+                    if ok then
+                        local p = player.players[1]
+                        utils.refill_hand(p.hand, drawPile, config.CARDS_INHAND)
+                        utils.update_phase_for_player(game, 1)
+                    else
+                        ongeldigeZetTimer = 1.0
+                    end
                 end
                 return
             end
@@ -275,8 +291,10 @@ function love.mousepressed(x, y, button)
             ----------------------------------------------------------------
             local bpass = buttons.pass
             if bpass and utils.inside(x,y,bpass.x,bpass.y,bpass.w,bpass.h) then
-                if game.currentPlayer == 1 and game.extraTurn then
-                    game.extraTurn = false     -- extra beurt opgeven
+                if net.isClient() then
+                    net.pass_from_client()
+                elseif game.currentPlayer == 1 and game.extraTurn then
+                    game.extraTurn = false
                     game.next_turn()
                 end
                 return
