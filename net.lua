@@ -15,6 +15,9 @@ net.client = nil
 net.netGame = nil
 net.started = false
 
+net.game        = nil     -- wordt later gekoppeld via net.set_game
+net.newClients  = {}      -- wachtrij met binnengekomen namen/IP's
+
 
 -- roept elke  ~2s  net.update_lan(dt)  aan als je host bent
 ---------------------------------------------------------------------------
@@ -121,8 +124,7 @@ function net.start()
 end
 
 function net.set_game(g)
-    net.netGame = g
-    game = g
+    net.game = g
 end
 
 
@@ -211,12 +213,16 @@ function net.send(msg)
 end
 
 function net.send_state()
-    if net.isHost() and net.conn then
-        net.send({cmd="STATE", game=export_state()})
-    end
+    if not net.conn or not net.game then return end
+        net.send({cmd="STATE", game = net.game})
 end
 
 local function handle_host(msg)
+    if msg.cmd == "HELLO" then
+        table.insert(hosts, "Client")   -- later naam mee-sturen
+        print("[net] client connected")
+    return
+    
     if msg.cmd=="PLAY" then
         local p = player.players[msg.id]
         if p then
@@ -261,19 +267,13 @@ function net.update()
             if c then
                 c:settimeout(0)
                 net.conn = c
+            
+                --tijdens accept
+            local dc = (net.game and net.game.deckCount) or 1
+            net.send({cmd="HELLO", seed=os.time(), deckCount = dc})
 
-                ----------------------------------------------------------------
-                -- A.  HELLO-verzoek  – gebruik veilige deckCount
-                ----------------------------------------------------------------
-                local dc = (net.game and net.game.deckCount) or 1
-                net.send({ cmd = "HELLO", seed = os.time(), deckCount = dc })
-
-                ----------------------------------------------------------------
-                -- B.  Eerste STATE   – alleen als spel al bestaat
-                ----------------------------------------------------------------
-                if net.game then          -- kleine g  ▲
-                    net.send_state()
-                end
+            -- voeg vlak eronder toe:
+            table.insert(net.newClients, "Client")          -- of een echte naam
             end
         end
         
@@ -311,5 +311,9 @@ end
 function net.pass_from_client()
     net.send({cmd="PASS", id=1})
 end
+
+function net.poll_new_client_name()
+    return table.remove(net.newClients, 1)
 end
+
 return net
