@@ -15,7 +15,6 @@ function b.load()
 end
 
 function b.update(dt)
-    print("[scan] start")
     b.scanTimer = b.scanTimer - dt
     if b.scanTimer <= 0 then
         b.scanTimer = 2
@@ -23,6 +22,7 @@ function b.update(dt)
 
         if #b.hosts == 0 then b.selected = 1 end
     end
+    print("[scan] found", #b.hosts)
 end
 
 function b.textinput(t)

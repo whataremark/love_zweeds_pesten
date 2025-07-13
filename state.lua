@@ -13,9 +13,9 @@ end
 
 -- Genereer dunne wrappers voor de belangrijkste Love-callbacks
 for _, cb in ipairs{
-    "update", "draw", "keypressed", "mousepressed",
-    "mousereleased", "wheelmoved",          -- ← al aanwezig
-    "textinput"                             -- ← nieuw, één woord erbij
+    "update", "draw", "keypressed",
+    "mousepressed", "mousereleased", "wheelmoved",
+    "textinput",
 } do
     state[cb] = function(...)
         if state.current and state.current[cb] then

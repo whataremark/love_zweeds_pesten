@@ -12,3 +12,6 @@ function love.keypressed(...)   state.keypressed(...)   end
 function love.mousepressed(...) state.mousepressed(...) end
 function love.wheelmoved(...)   state.wheelmoved(...)   end
 
+function love.textinput(text)
+    state.textinput(text)
+end
