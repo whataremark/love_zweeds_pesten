@@ -180,6 +180,7 @@ end
 
 --codex-- Timer helper + setup-fase voor de AI
 function ai.update(dt, game, pot)
+    if game.mode ~= "ai" then return end
     -- Als we midden in een reveal-animatie zitten, AI doet niks
     if game.reveal and game.reveal.timer > 0 then
         return

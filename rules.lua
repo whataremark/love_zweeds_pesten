@@ -41,6 +41,7 @@ function rules.handle_card_effects(game, playerIndex, kaart, advanceTurn)
 
     -- 10 clears the discard pile and grants another turn
     if kaart.waarde == "10" then
+        print("[RULE] 10 clears pot")
         utils.transfer_all_cards({}, game.pot) -- simply clear pot
         game.lastCardWas10 = true
         game.extraTurn = true
@@ -74,7 +75,7 @@ end
     -- 7 enforces that the next card must be lower or equal to 7
     if kaart.waarde == "7" then
         game.nextMustBeUnder7 = true
-        print("[RULES] ZEVEN regel ACTIEF")
+        print("[RULE] 7 – next ≤7")
     elseif kaart.waarde ~= "3" then
         -- 3 is 'doorzichtig' en heft de 7-regel niet op
         game.nextMustBeUnder7 = false

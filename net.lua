@@ -8,6 +8,8 @@ local game --empty for circular dependency
 
 local net = {}
 
+net.localId = 1
+
 local import_state
 
 net.mode   = nil -- 'host' or 'client'
@@ -107,6 +109,7 @@ function net.start()
         srv:settimeout(0)
         net.mode = "host"
         net.server = srv
+        net.localId = 1
         return "multiplayer-host"
     else
         local c = socket.tcp()
@@ -114,6 +117,7 @@ function net.start()
         c:connect("localhost", 22122)
         net.mode = "client"
         net.client = c
+        net.localId = 2
         return "multiplayer-client"
     end
 end
@@ -191,6 +195,7 @@ function net.host()
     srv:settimeout(0)
     net.mode   = "host"
     net.server = srv
+    net.localId = 1
     return "multiplayer-host"
 end
 
@@ -202,6 +207,7 @@ function net.connect(ip)
     if not ok and err ~= "timeout" then return nil, err end
     net.mode   = "client"
     net.client = c
+    net.localId = 2
     return "multiplayer-client"
 end
 
@@ -252,6 +258,9 @@ end
 
 function net.send(msg)
     local line = json.encode(msg) .. "\n"     -- ✱ altijd met newline
+    if msg.cmd then
+        print(string.format("[NET] SEND  cmd=%s len=%d", msg.cmd, #line))
+    end
 
     -- Host stuurt naar de verbonden client
     if net.isHost()   and net.conn   then
@@ -268,11 +277,13 @@ function net.send_state()
     if not net.conn or not net.game then return end
     -- stuur een plat snapshot, geen functies
     net.send({ cmd = "STATE", game = export_state() })
-    print("[net] STATE sent, pot=", #net.game.pot)
 end
 
 
 local function handle_host(msg)
+    if msg.cmd then
+        print(string.format("[NET] RECV  cmd=%s from id=%s", msg.cmd, msg.id or "?"))
+    end
     if msg.cmd == "HELLO" then
         table.insert(hosts, "Client")   -- later naam mee-sturen
         print("[net] client connected")
@@ -309,8 +320,10 @@ local function handle_host(msg)
 end
 
 local function handle_client(msg)
+    if msg.cmd then
+        print(string.format("[NET] RECV  cmd=%s from id=%s", msg.cmd, msg.id or "host"))
+    end
     if msg.cmd == "STATE" then
-        print("[CLIENT] STATE received")   
         -- ❶  Spaar snapshot op als game nog niet bestaat
         if not net.game then
             net.pendingState = msg.game      -- tijdelijk bewaren
@@ -385,13 +398,13 @@ function net.update(dt)
 end
 
 function net.play_from_client(cards)
-    net.send({cmd="PLAY", id=1, cards=cards})
+    net.send({cmd="PLAY", id=net.localId, cards=cards})
 end
 function net.pickup_from_client()
-    net.send({cmd="PICKUP", id=1})
+    net.send({cmd="PICKUP", id=net.localId})
 end
 function net.pass_from_client()
-    net.send({cmd="PASS", id=1})
+    net.send({cmd="PASS", id=net.localId})
 end
 
 function net.poll_new_client_name()
