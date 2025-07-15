@@ -312,7 +312,10 @@ local function handle_host(msg)
         print("[net] client connected")
     return
     end
-    
+
+    ------------------------------------------------------------------
+    -- 1.  Client legt één face‑up kaart (OPEN_ADD)
+    ------------------------------------------------------------------
    if msg.cmd == "OPEN_ADD" then
         local p   = player.players[msg.id]
         local new = inflate_card(msg.card)          -- kaart object bewaren
@@ -330,6 +333,21 @@ local function handle_host(msg)
         return
    end
 
+
+       ------------------------------------------------------------------
+    -- 2.  Client speelt z’n geselecteerde face‑up kaart (OPEN_PLAY)
+    ------------------------------------------------------------------
+    if msg.cmd == "OPEN_PLAY" then
+        local p = player.players[msg.id]
+        local card = table.remove(p.faceUp, msg.index)
+        if not card then return end                -- safety
+        rules.handle_card_effects(net.game, msg.id, card)
+        utils.update_phase_for_player(net.game, msg.id)
+        net.send_state()
+        return
+    end
+
+    
     --------------------------------------------------------------
     -- Client heeft z’n 3 open kaarten klaar
     --------------------------------------------------------------
@@ -465,6 +483,12 @@ function net.poll_new_client_name()
     return table.remove(net.newClients, 1)
 end
 
+-- één face‑up kaart spelen (client → host)
+function net.play_open_from_client(idx)
+    net.send({ cmd = "OPEN_PLAY",
+               id   = net.localId,   -- speler‑id van de client
+               index = idx })        -- positie in zijn faceUp‑tabel
+end
 
 
 return net

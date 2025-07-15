@@ -394,7 +394,7 @@ function ui.draw_action_buttons()
     local spacing   = 20
 
     -- Pas-knop alleen tijdens extra beurt van speler 1
-    local allowPass = (game.extraTurn and game.currentPlayer == 1)
+    local allowPass = (game.extraTurn and game.currentPlayer == net.localId)
 
     local order = { "pickup", "play" }
     if allowPass then table.insert(order, "pass") end

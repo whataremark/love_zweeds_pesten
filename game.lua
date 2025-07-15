@@ -271,7 +271,7 @@ function game.mousepressed(x, y, button)
             -- PICK‑UP
             local b = buttons.pickup
             if b and utils.inside(x, y, b.x, b.y, b.w, b.h) then
-                if net.isClient() then
+                if net.isClient() and game.currentPlayer == myId then
                     net.pickup_from_client()
                 elseif game.currentPlayer == myId then
                     utils.transfer_all_cards(player.players[myId].hand, game.pot)
@@ -359,7 +359,7 @@ function game.mousepressed(x, y, button)
 end
 
 function game.wheelmoved(x, y)
-    if game.currentPlayer == net.localId then
+    if player.players[net.localId] then
         local CARD_H_SRC, CARD_W_SRC = 500, 300
         local CARD_H      = 160
         local SCALE       = CARD_H / CARD_H_SRC
