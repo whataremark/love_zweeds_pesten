@@ -80,29 +80,28 @@ end
 --------------------------------------------------------------------
 --  Hulpfunctie: bepaal nieuwe fase voor een speler
 --------------------------------------------------------------------
-function utils.update_phase_for_player(game, idx)
-    local p = require("player").players[idx]
+local function phase_for_player_cached(id)
+    -- LAZY‑require voorkomt require‑loop
+    local playerMod = require("player")
 
-    if #p.hand > 0 then
-        game.state = "playingHand"
-    elseif #p.faceUp > 0 then
-        game.state = "playingOpen"
-    elseif #p.faceDown > 0 then
-        game.state = "playingBlind"
-    else
-        game.state = "finished"   -- speler heeft echt alles weg
-    end
-end
+    local p = playerMod.players[id]
+    if not p then return "unknown" end
 
--- Return the phase string for a given player without modifying the game
-function utils.phase_for_player(idx)
-    local p = require("player").players[idx]
-    if     #p.hand     > 0 then return "playingHand"
+    if #p.hand     > 0 then return "playingHand"
     elseif #p.faceUp   > 0 then return "playingOpen"
     elseif #p.faceDown > 0 then return "playingBlind"
-    else                         return "out"
+    else                      return "finished"
     end
 end
+
+function utils.phase_for_player(id)
+    return phase_for_player_cached(id)
+end
+
+function utils.update_phase_for_player(game, id)
+    game.state = phase_for_player_cached(id)
+end
+
 
 function utils.update_reveal_logic(dt, game)
     if game.reveal.timer > 0 then

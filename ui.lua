@@ -343,7 +343,7 @@ love.graphics.print("Speler " .. index ..
     ------------------------------------------------------------------
     -- FACE-DOWN rij  (blinde rug-kaarten)
     ------------------------------------------------------------------
-    local faceDown = playerData.faceDown
+    local faceDown = playerData.faceDown or {}
     if #faceDown > 0 then
         local yRow = row_faceDown_Y(boxY, index)
         local scaleDown = scale_to_target(cardBack)
@@ -364,7 +364,7 @@ love.graphics.print("Speler " .. index ..
     ------------------------------------------------------------------
     -- FACE-UP rij  (zichtbare open kaarten)
     ------------------------------------------------------------------
-    local faceUp = playerData.faceUp
+    local faceUp = playerData.faceUp or {}
     if #faceUp > 0 then
         local scaleUp = scale_to_target(faceUp[1].afbeelding)
         local spacing = faceUp[1].afbeelding:getWidth()*scaleUp + PADDING

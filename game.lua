@@ -348,73 +348,68 @@ end
 --------------------------------------------------------------------
 function game.start(mode)
     -------------------------------------------------------------- 0
-    -- Trekstapel maken en schudden
+    -- Trekstapel maken en schudden  ➜  **alleen de host doet dit**
     --------------------------------------------------------------
-    drawPile.init(game.deckCount)            -- aantal decks → config
+    if mode ~= "multiplayer-client" then
+        drawPile.init(game.deckCount)        -- host: deck & shuffle
+        player.init(drawPile)                -- host: kaarten delen
+        game.maxPlayers = #player.players
+    else
+        -- client wacht op eerste STATE, weet maxPlayers nog niet
+        game.maxPlayers = 2                  -- fallback, wordt overschreven
+    end
 
     -------------------------------------------------------------- 1
-    -- Spelers resetten + delen
+    -- Basis‑status resetten
     --------------------------------------------------------------
-    player.init(drawPile)                    -- vult hand & faceDown
-    game.maxPlayers = #player.players
+    game.mode = (mode == "multiplayer-host" or mode == "multiplayer-client")
+                and "multiplayer" or (mode or "ai")
 
-    -------------------------------------------------------------- 2
-    -- Basis-status resetten
-    --------------------------------------------------------------
-    if mode == "multiplayer-host" or mode == "multiplayer-client" then
-        game.mode = "multiplayer"
-    else
-        game.mode = mode or "ai"
-    end
     game.currentPlayer = 1
     game.waitingForAI  = false
     game.extraTurn     = false
     game.winner        = nil
     game.ronde         = 0
+    game.state         = "setupSelectOpen"   -- mens kiest open kaarten
 
-    -- start in setup-fase (mens kiest open kaarten)
-    game.state = "setupSelectOpen"
-
-    -------------------------------------------------------------- 3
-    -- Lege pot & startspeler bepalen
+    -------------------------------------------------------------- 2
+    -- Lege pot & start‑speler bepalen  ➜  host alleen
     --------------------------------------------------------------
     game.pot = {}
     game.nextMustBeUnder7 = false
 
-    local order = {"4","5","6","7","8","9","10","jack","queen","king","ace"}
-    local found
-    for _,v in ipairs(order) do
-        for pid=1,game.maxPlayers do
-            for _,c in ipairs(player.players[pid].hand) do
-                if c.waarde==v and rules.is_speelbaar(c, game.pot, false) then
-                    game.currentPlayer = pid
-                    found = v
-                    break
+    if mode ~= "multiplayer-client" then
+        local order = {"4","5","6","7","8","9","10",
+                       "jack","queen","king","ace"}
+        local found
+        for _,v in ipairs(order) do
+            for pid = 1, game.maxPlayers do
+                for _,c in ipairs(player.players[pid].hand) do
+                    if c.waarde==v and rules.is_speelbaar(c, game.pot,false) then
+                        game.currentPlayer = pid
+                        found = v
+                        break
+                    end
                 end
+                if found then break end
             end
             if found then break end
         end
-        if found then break end
-    end
-    if found then
-        print(string.format("[INIT] P%d starts with %s", game.currentPlayer, found))
-    else
-        print("[INIT] no 4/5/… found")
+        print(found and
+              string.format("[INIT] P%d starts with %s", game.currentPlayer, found)
+              or "[INIT] no 4/5/… found")
     end
 
-    print(string.format(
-        "[GAME] Nieuwe ronde: %d decks, hand=%d, blind=%d",
-        game.deckCount, config.HAND_SIZE, config.BLIND_SIZE))
-
-    -- Netwerk delen
+    -------------------------------------------------------------- 3
+    -- Netwerk‑koppeling
+    --------------------------------------------------------------
     if mode == "multiplayer-host" then
         net.set_game(game)
         net.send_state()
     elseif mode == "multiplayer-client" then
-        net.set_game(game)
+        net.set_game(game)     -- snapshot zal alles vullen
     end
 end
-
 
 --------------------------------------------------------------------
 -- game.play_card(playerIndex, kaart)  – kaart van hand naar pot
@@ -437,7 +432,7 @@ end
 --------------------------------------------------------------------
 function game.next_turn()
     game.currentPlayer = (game.currentPlayer % game.maxPlayers) + 1
-    game.state        = phase_for_player(game.currentPlayer)
+    utils.update_phase_for_player(game, game.currentPlayer)
 
     print(string.format("[TURN] now player id=%d", game.currentPlayer))
 

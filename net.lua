@@ -150,31 +150,18 @@ end
 -- 2.  Herstel snapshot aan client-kant
 ----------------------------------------------------------------------
 local function import_state(snap)
-    -- spelers
-    local players = {}
+    local new = {}
     for i,sp in ipairs(snap.players or {}) do
-        local t = { hand = {}, faceUp = {}, faceDown = {} }
-        for _,k in ipairs(sp.hand)     do table.insert(t.hand,     inflate_card(k)) end
-        for _,k in ipairs(sp.faceUp)   do table.insert(t.faceUp,   inflate_card(k)) end
-        for _,k in ipairs(sp.faceDown) do table.insert(t.faceDown, inflate_card(k)) end
-        players[i] = t
+        new[i] = inflate_player(sp)      -- hand/faceUp/faceDown gevuld
     end
-    player.players = players
+    player.players = new              -- ← zet op module, niet lokale var
 
-    -- pot
-    net.game.pot = {}
-    for _,k in ipairs(snap.pot or {}) do
-        table.insert(net.game.pot, inflate_card(k))
-    end
 
-    -- overige velden
-    net.game.currentPlayer    = snap.currentPlayer
-    net.game.ronde            = snap.ronde
-    net.game.nextMustBeUnder7 = snap.nextMustBeUnder7
-    net.game.extraTurn        = snap.extraTurn
-    net.game.winner           = snap.winner
-    net.game.state            = snap.state
-    net.game.deckCount        = snap.deckCount
+    game.currentPlayer    = snap.currentPlayer
+    game.nextMustBeUnder7 = snap.nextMustBeUnder7
+    game.state            = snap.state
+    game.ronde            = snap.ronde
+    game.maxPlayers       = #new
 end
 
 
@@ -258,9 +245,6 @@ end
 
 function net.send(msg)
     local line = json.encode(msg) .. "\n"     -- ✱ altijd met newline
-    if msg.cmd then
-        print(string.format("[NET] SEND  cmd=%s len=%d", msg.cmd, #line))
-    end
 
     -- Host stuurt naar de verbonden client
     if net.isHost()   and net.conn   then
@@ -281,9 +265,6 @@ end
 
 
 local function handle_host(msg)
-    if msg.cmd then
-        print(string.format("[NET] RECV  cmd=%s from id=%s", msg.cmd, msg.id or "?"))
-    end
     if msg.cmd == "HELLO" then
         table.insert(hosts, "Client")   -- later naam mee-sturen
         print("[net] client connected")
@@ -320,9 +301,6 @@ local function handle_host(msg)
 end
 
 local function handle_client(msg)
-    if msg.cmd then
-        print(string.format("[NET] RECV  cmd=%s from id=%s", msg.cmd, msg.id or "host"))
-    end
     if msg.cmd == "STATE" then
         -- ❶  Spaar snapshot op als game nog niet bestaat
         if not net.game then
@@ -384,7 +362,6 @@ function net.update(dt)
         local line, err = net.client:receive("*l")     -- wacht op newline
             while line do                                -- ← alleen échte regels
                         -- (debug) toon begin van de regel
-                        print("[CLIENT] RAW:", line:sub(1,60))
 
                         if line:match("^[%s]*[{%[]") then        -- lijkt JSON?
                             local ok, msg = pcall(json.decode, line)
