@@ -314,15 +314,17 @@ local function handle_host(msg)
     end
     
    if msg.cmd == "OPEN_ADD" then
-        local p = player.players[msg.id]
-        table.insert(p.faceUp, inflate_card(msg.card))
-        
-        -- verwijder dezelfde kaart uit de hand idk mischien fout dit
+        local p   = player.players[msg.id]
+        local new = inflate_card(msg.card)          -- kaart object bewaren
+        table.insert(p.faceUp, new)
+
+        -- dezelfde kaart uit de hand van de speler halen
         for i,k in ipairs(p.hand) do
-            if k.kleur==new.kleur and k.waarde==new.waarde then
-                table.remove(p.hand, i); break
+            if k.kleur == new.kleur and k.waarde == new.waarde then
+                table.remove(p.hand, i)
+                break
             end
-        end   
+        end
         
         net.send_state()          -- broadcast update
         return
