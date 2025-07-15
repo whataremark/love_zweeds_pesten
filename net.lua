@@ -137,12 +137,15 @@ local function slim_card(c)      -- voor export_state
     return { kleur = c.kleur, waarde = c.waarde, naam = c.naam }
 end
 
-local function inflate_card(c)   -- voor import_state
+local function inflate_card(c)
+    -- ↓ Fallback: als naam ontbreekt, bouw hem uit kleur + waarde
+    local nm = c.naam or (c.kleur .. "_" .. tostring(c.waarde))
+
     return {
-        kleur = c.kleur,
-        waarde = c.waarde,
-        naam = c.naam,
-        afbeelding = getImage(c.naam),
+        kleur      = c.kleur,
+        waarde     = c.waarde,
+        naam       = nm,
+        afbeelding = getImage(nm),
     }
 end
 

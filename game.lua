@@ -181,7 +181,9 @@ function game.mousepressed(x, y, button)
                     net.send({
                         cmd  = "OPEN_ADD",
                         id   = myId,
-                        card = { kleur = kaart.kleur, waarde = kaart.waarde }
+                        card = { kleur = kaart.kleur,
+                                waarde = kaart.waarde,
+                                naam   = kaart.naam }      --nieuw
                     })
                 end
 
