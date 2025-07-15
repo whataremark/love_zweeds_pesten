@@ -186,6 +186,12 @@ local function import_state(snap)
     g.state            = snap.state
     g.ronde            = snap.ronde
     g.maxPlayers       = #new
+
+    -- draw pile size → vul dummy‐ruggen zodat ui.draw_deck iets tekent
+   drawPile.cards = {}
+   for i = 1, (snap.drawCount or 0) do
+       drawPile.cards[i] = { naam = "back" }   -- inhoud niet relevant
+   end
  end
 
 function net.set_game(g)
@@ -239,6 +245,7 @@ local function export_state()
         winner           = net.game.winner,
         state            = net.game.state,
         deckCount        = net.game.deckCount,
+        drawCount        = #drawPile.cards,     -- ← NIEUW
     }
 
     -- pot
@@ -291,6 +298,14 @@ local function handle_host(msg)
    if msg.cmd == "OPEN_ADD" then
         local p = player.players[msg.id]
         table.insert(p.faceUp, inflate_card(msg.card))
+        
+        -- verwijder dezelfde kaart uit de hand idk mischien fout dit
+        for i,k in ipairs(p.hand) do
+            if k.kleur==new.kleur and k.waarde==new.waarde then
+                table.remove(p.hand, i); break
+            end
+        end   
+        
         net.send_state()          -- broadcast update
         return
    end
@@ -320,7 +335,7 @@ local function handle_host(msg)
             end
             rules.play_selected_cards(net.game, msg.id)
             utils.refill_hand(p.hand, drawPile, config.CARDS_INHAND)
-            utils.update_phase_for_player(game, msg.id)
+            utils.update_phase_for_player(net.game, msg.id)
         end
     elseif msg.cmd=="PICKUP" then
         local p=player.players[msg.id]
@@ -341,9 +356,13 @@ local function handle_client(msg)
     if msg.cmd == "STATE" then
         -- tijdens SETUP mogen snapshots mijn (lokale) faceUp/faceDown
         -- niet overschrijven; accepteer ze pas na finalize_setup
-        if net.game and net.game.state == "setupSelectOpen"
-                    and msg.game.state == "setupSelectOpen" then
-            return                    -- ⬅︎   NIEUW: negeer tot klaar
+        local setup = (net.game and net.game.state == "setupSelectOpen")
+                        and (msg.game.state == "setupSelectOpen")
+        local myTurn = (msg.game.currentPlayer == (net.localId or 1))
+
+        -- tijdens eigen beurt hand niet overschrijven → selectie blijft
+        if setup or myTurn then
+            msg.game.players[net.localId or 1].hand = nil   -- skip mijn hand
         end
 
         if not net.game then
