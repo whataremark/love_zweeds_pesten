@@ -182,6 +182,7 @@ end
 
 
 function net.set_game(g)
+    net.openDone = 0
     net.game = g
     -- ❷  Toegepast bij eerste binnenkomst van de echte game-state
     if net.pendingState then
@@ -279,6 +280,18 @@ local function handle_host(msg)
         print("[net] client connected")
     return
     end
+        --------------------------------------------------------------
+    -- Client heeft z’n 3 open kaarten klaar
+    --------------------------------------------------------------
+    if msg.cmd == "OPEN_DONE" then
+        net.openDone = (net.openDone or 0) + 1     -- 1 client → 1 melding
+        if net.openDone == 1 then                  -- host zelf al klaar
+            game.finalize_setup()                  -- bepaal startspeler
+            net.send_state()                       -- push nieuwe fase
+        end
+        return
+    end
+    --------------------------------------------------------------
     if msg.cmd=="PLAY" then
         local p = player.players[msg.id]
         if p then
@@ -311,16 +324,21 @@ end
 
 local function handle_client(msg)
     if msg.cmd == "STATE" then
-        -- ❶  Spaar snapshot op als game nog niet bestaat
+        -- tijdens SETUP mogen snapshots mijn (lokale) faceUp/faceDown
+        -- niet overschrijven; accepteer ze pas na finalize_setup
+        if net.game and net.game.state == "setupSelectOpen"
+                    and msg.game.state == "setupSelectOpen" then
+            return                    -- ⬅︎   NIEUW: negeer tot klaar
+        end
+
         if not net.game then
-            net.pendingState = msg.game      -- tijdelijk bewaren
-            net.started      = true          -- client_lobby mag doorgaan
+            net.pendingState = msg.game
+            net.started      = true
         else
-            import_state(msg.game)           -- normale update
+            import_state(msg.game)
         end
     end
 end
-
 ----------------------------------------------------------------------
 --  Netwerk-update – host- en client-pad strikt gescheiden
 ----------------------------------------------------------------------
@@ -382,6 +400,7 @@ function net.update(dt)
                     end                                          -- bij nil stopt lus → geen freeze
                 end
 end
+
 
 function net.play_from_client(cards)
     net.send({cmd="PLAY", id=net.localId, cards=cards})

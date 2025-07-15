@@ -159,6 +159,7 @@ end
 function game.mousepressed(x, y, button)
     if game.reveal.timer > 0 then return end
     local myId = net.localId or 1
+    --if #faceUp >= config.SETUP_OPEN then return end
 
     ------------------------------------------------------------------
     -- 1.  SETUP‑fase – kies 3 open kaarten
@@ -198,15 +199,15 @@ function game.mousepressed(x, y, button)
         end
     end
 
-  ------------------------------------------------------------------
+    ------------------------------------------------------------------
     -- 2.  OPEN‑fase – kaart uit faceUp selecteren
     ------------------------------------------------------------------
     if game.state == "playingOpen"
-       and game.currentPlayer == myId
-       and button == 1 then
+    and game.currentPlayer == myId
+    and button == 1 then
 
-        local faceUp = player.players[myId].faceUp
-        if #faceUp == 0 then goto AFTER_OPEN end
+        local fp = player.players[myId].faceUp    -- lokaal
+        if #fp == 0 then return end               -- niks te selecteren
 
         local w = love.graphics.getWidth()
         local TARGET_H, PADDING = 140, 15
@@ -214,21 +215,22 @@ function game.mousepressed(x, y, button)
         local boxY   = love.graphics.getHeight() - boxH - 10
         local yRow   = ui.row_faceUp_Y(boxY, myId)
 
-        if y >= yRow and y <= yRow + TARGET_H then
-            local first   = faceUp[1].afbeelding
-            local scale   = TARGET_H / first:getHeight()
-            local cardW   = first:getWidth() * scale
-            local spacing = cardW + PADDING
-            local totalW  = #faceUp * spacing - PADDING
-            local xStart  = (w - totalW) / 2
-            local col     = math.floor((x - xStart) / spacing) + 1
-            if faceUp[col] then
-                player.toggle_select(faceUp, col, "open")
-            end
-            return
+        if y < yRow or y > yRow + TARGET_H then return end
+
+        local first   = fp[1].afbeelding
+        local scale   = TARGET_H / first:getHeight()
+        local cardW   = first:getWidth() * scale
+        local spacing = cardW + PADDING
+        local totalW  = #fp * spacing - PADDING
+        local xStart  = (w - totalW) / 2
+        local col     = math.floor((x - xStart) / spacing) + 1
+
+        if fp[col] then
+            player.toggle_select(fp, col, "open")
         end
+        return
     end
-::AFTER_OPEN::
+
 
   ------------------------------------------------------------------
     -- 3.  BLIND‑fase – klik op een faceDown‑kaart
