@@ -10,8 +10,5 @@ Deze repository bevat een eenvoudige Love2D implementatie van het kaartspel "Zwe
 - `ai.lua` bevat eenvoudige tegenstanderlogica
 
 ## Laatste wijzigingen
-- Verholpen bug waardoor een gespeelde "3" de 7-regel onterecht ophief
-- Overbodige zipbestanden en `todo.md` verwijderd om de codebase op te ruimen
-- Drag&drop vervangen door kaartselectie met klikken
-- Eindscreen toegevoegd wanneer een speler geen kaarten meer heeft
+
 
