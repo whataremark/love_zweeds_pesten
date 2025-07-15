@@ -169,10 +169,28 @@ end
 -- 2.  Herstel snapshot aan client-kant
 local function import_state(snap)
     local new = {}
+        -- ❶  vooraf opslaan van oude selectie
+    local oldSel = {}
+    if player.players[net.localId or 1] then
+        for _,c in ipairs(player.players[net.localId or 1].hand) do
+            if c.selected then
+                oldSel[c.kleur .. c.waarde] = true
+            end
+        end
+    end
+    
     for i,sp in ipairs(snap.players or {}) do
         new[i] = inflate_player(sp)
     end
     player.players = new           -- handen / open / blind
+
+    -- ❸  selectie terugzetten voor lokale speler
+    local me = net.localId or 1
+    for _,c in ipairs(new[me].hand) do
+        if oldSel[c.kleur .. c.waarde] then
+            c.selected = true
+        end
+    end
 
     -- ⬇︎  pot overnemen  ⬇︎
     net.game.pot = {}
@@ -359,11 +377,6 @@ local function handle_client(msg)
         local setup = (net.game and net.game.state == "setupSelectOpen")
                         and (msg.game.state == "setupSelectOpen")
         local myTurn = (msg.game.currentPlayer == (net.localId or 1))
-
-        -- tijdens eigen beurt hand niet overschrijven → selectie blijft
-        if setup or myTurn then
-            msg.game.players[net.localId or 1].hand = nil   -- skip mijn hand
-        end
 
         if not net.game then
             net.pendingState = msg.game
