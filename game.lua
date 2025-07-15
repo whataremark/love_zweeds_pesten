@@ -30,6 +30,7 @@ game.mode              = "ai"
 game.pot               = {}
 game.deckCount         = 1
 game.currentPlayer     = 1
+game.maxPlayers        = 2
 game.aiTimer           = 0
 game.waitingForAI      = false
 game.nextMustBeUnder7  = false
@@ -98,7 +99,7 @@ function game.update(dt)
                 local pl = player.players[p]
                 utils.transfer_all_cards(pl.hand, game.pot)
                 table.insert(pl.hand, k)
-                if p == 1 then utils.deselect_all(pl.hand) end
+                if p == net.localId then utils.deselect_all(pl.hand) end
                 game.next_turn()
             end
 
@@ -111,7 +112,9 @@ function game.update(dt)
 
     -- C) AI
     utils.update_reveal_logic(dt, game)
-    ai.update(dt, game, game.pot)
+    if game.mode == "ai" then
+        ai.update(dt, game, game.pot)
+    end
 
     -- D) Winner-check
     if game.winner then
@@ -159,15 +162,16 @@ function game.mousepressed(x, y, button)
     -- SETUP-fase: speler kiest 3 open kaarten
     ------------------------------------------------------------------
     if game.state == "setupSelectOpen" and button == 1 then
-        local hand      = player.players[1].hand
+        local me        = net.localId
+        local hand      = player.players[me].hand
         local positions = ui.get_card_positions(hand)
 
         for i = #positions, 1, -1 do
             local p = positions[i]
             if utils.inside(x, y, p.x, p.y, p.w, p.h) then
                 local kaart = table.remove(hand, i)
-                table.insert(player.players[1].faceUp, kaart)
-                if #player.players[1].faceUp == config.SETUP_OPEN then
+                table.insert(player.players[me].faceUp, kaart)
+                if #player.players[me].faceUp == config.SETUP_OPEN then
                     game.state = "setupAISelect"
                 end
                 return
@@ -178,8 +182,8 @@ function game.mousepressed(x, y, button)
     ------------------------------------------------------------------
     -- OPEN-fase – kaart uit faceUp kiezen
     ------------------------------------------------------------------
-    if game.state == "playingOpen" and game.currentPlayer == 1 and button == 1 then
-        local faceUp    = player.players[1].faceUp
+    if game.state == "playingOpen" and game.currentPlayer == net.localId and button == 1 then
+        local faceUp    = player.players[net.localId].faceUp
         if #faceUp == 0 then goto AFTER_OPEN end
 
         local w = love.graphics.getWidth()
@@ -207,14 +211,14 @@ function game.mousepressed(x, y, button)
     ------------------------------------------------------------------
     -- BLIND-fase – klik op een faceDown-kaart
     ------------------------------------------------------------------
-    if game.state == "playingBlind" and game.currentPlayer == 1 and button == 1 then
+    if game.state == "playingBlind" and game.currentPlayer == net.localId and button == 1 then
         local boxY = love.graphics.getHeight() - (160 + 40) - 10
         local yRow = ui.row_faceDown_Y(boxY, 1)
         if y >= yRow and y <= yRow + 160 then
-            local kaart = table.remove(player.players[1].faceDown, 1)
+            local kaart = table.remove(player.players[net.localId].faceDown, 1)
             game.reveal.timer  = 1.0
             game.reveal.card   = kaart
-            game.reveal.player = 1
+            game.reveal.player = net.localId
             return
         end
     end
@@ -229,9 +233,9 @@ function game.mousepressed(x, y, button)
             if b and utils.inside(x, y, b.x, b.y, b.w, b.h) then
                 if net.isClient() then
                     net.pickup_from_client()
-                elseif game.currentPlayer == 1 then
-                    utils.transfer_all_cards(player.players[1].hand, game.pot)
-                    utils.deselect_all(player.players[1].hand)
+                elseif game.currentPlayer == net.localId then
+                    utils.transfer_all_cards(player.players[net.localId].hand, game.pot)
+                    utils.deselect_all(player.players[net.localId].hand)
                     game.nextMustBeUnder7 = false
                     game.next_turn()
                 end
@@ -243,22 +247,22 @@ function game.mousepressed(x, y, button)
             if bp and utils.inside(x, y, bp.x, bp.y, bp.w, bp.h)
                and game.state == "playingHand" then
 
-                if game.currentPlayer ~= 1 then return end
+                if game.currentPlayer ~= net.localId then return end
                 if net.isClient() then
                     local cards = {}
-                    for _,k in ipairs(player.players[1].hand) do
+                    for _,k in ipairs(player.players[net.localId].hand) do
                         if k.selected then
                             table.insert(cards, {kleur=k.kleur, waarde=k.waarde})
                         end
                     end
                     net.play_from_client(cards)
-                    utils.deselect_all(player.players[1].hand)
+                    utils.deselect_all(player.players[net.localId].hand)
                 else
-                    local ok = rules.play_selected_cards(game, 1)
+                    local ok = rules.play_selected_cards(game, net.localId)
                     if ok then
-                        local p = player.players[1]
+                        local p = player.players[net.localId]
                         utils.refill_hand(p.hand, drawPile, config.CARDS_INHAND)
-                        utils.update_phase_for_player(game, 1)
+                        utils.update_phase_for_player(game, net.localId)
                     else
                         ongeldigeZetTimer = 1.0
                     end
@@ -270,7 +274,7 @@ function game.mousepressed(x, y, button)
             if bp and utils.inside(x, y, bp.x, bp.y, bp.w, bp.h)
                and game.state == "playingOpen" then
 
-                local ok = rules.play_selected_open(game, 1)
+                local ok = rules.play_selected_open(game, net.localId)
                 if not ok then ongeldigeZetTimer = 1.0 end
                 return
             end
@@ -280,7 +284,7 @@ function game.mousepressed(x, y, button)
             if bpass and utils.inside(x, y, bpass.x, bpass.y, bpass.w, bpass.h) then
                 if net.isClient() then
                     net.pass_from_client()
-                elseif game.currentPlayer == 1 and game.extraTurn then
+                elseif game.currentPlayer == net.localId and game.extraTurn then
                     game.extraTurn = false
                     game.next_turn()
                 end
@@ -297,13 +301,13 @@ function game.mousepressed(x, y, button)
             -- DESELECT
             local bd = buttons.deselect
             if bd and utils.inside(x, y, bd.x, bd.y, bd.w, bd.h) then
-                utils.deselect_all(player.players[1].hand)
+                utils.deselect_all(player.players[net.localId].hand)
                 return
             end
         end
 
         -- Geen knop geraakt → kaart in hand (zichtbare posities)
-        local hand      = player.players[1].hand
+        local hand      = player.players[net.localId].hand
         local positions = ui.get_card_positions(hand)
         for i = #positions, 1, -1 do
             local p = positions[i]
@@ -316,7 +320,7 @@ function game.mousepressed(x, y, button)
 end
 
 function game.wheelmoved(x, y)
-    if game.currentPlayer == 1 then
+    if game.currentPlayer == net.localId then
         local CARD_H_SRC, CARD_W_SRC = 500, 300
         local CARD_H      = 160
         local SCALE       = CARD_H / CARD_H_SRC
@@ -324,13 +328,13 @@ function game.wheelmoved(x, y)
         local PADDING     = 15
         local cardSpace   = CARD_W + PADDING
 
-        local p = player.players[1]
+        local p = player.players[net.localId]
         p.scrollOffset = math.max(0, (p.scrollOffset or 0) - y * cardSpace)
     end
 end
 
 function game.keypressed(key)
-    if key == "space" and scene == "playing" and game.currentPlayer == 1 then
+    if key == "space" and scene == "playing" and game.currentPlayer == net.localId then
         local b = buttons and buttons.play
         if b then
             local cx, cy = b.x + b.w/2, b.y + b.h/2
@@ -352,6 +356,7 @@ function game.start(mode)
     -- Spelers resetten + delen
     --------------------------------------------------------------
     player.init(drawPile)                    -- vult hand & faceDown
+    game.maxPlayers = #player.players
 
     -------------------------------------------------------------- 2
     -- Basis-status resetten
@@ -371,14 +376,30 @@ function game.start(mode)
     game.state = "setupSelectOpen"
 
     -------------------------------------------------------------- 3
-    -- Eerste kaart op de pot
+    -- Lege pot & startspeler bepalen
     --------------------------------------------------------------
-    game.pot = { drawPile.draw() }
+    game.pot = {}
+    game.nextMustBeUnder7 = false
 
-    -- 7-regel meteen actief?
-    game.nextMustBeUnder7 = (game.pot[1].waarde == "7")
-    if game.nextMustBeUnder7 then
-        print("[GAME] Eerste kaart is een 7 → 7-regel actief")
+    local order = {"4","5","6","7","8","9","10","jack","queen","king","ace"}
+    local found
+    for _,v in ipairs(order) do
+        for pid=1,game.maxPlayers do
+            for _,c in ipairs(player.players[pid].hand) do
+                if c.waarde==v and rules.is_speelbaar(c, game.pot, false) then
+                    game.currentPlayer = pid
+                    found = v
+                    break
+                end
+            end
+            if found then break end
+        end
+        if found then break end
+    end
+    if found then
+        print(string.format("[INIT] P%d starts with %s", game.currentPlayer, found))
+    else
+        print("[INIT] no 4/5/… found")
     end
 
     print(string.format(
@@ -415,8 +436,10 @@ end
 -- game.next_turn()  – speler-wissel + AI-timer + fase-update
 --------------------------------------------------------------------
 function game.next_turn()
-    game.currentPlayer = (game.currentPlayer % #player.players) + 1
+    game.currentPlayer = (game.currentPlayer % game.maxPlayers) + 1
     game.state        = phase_for_player(game.currentPlayer)
+
+    print(string.format("[TURN] now player id=%d", game.currentPlayer))
 
     if game.mode == "ai" and game.currentPlayer == 2 then
         game.waitingForAI = true
