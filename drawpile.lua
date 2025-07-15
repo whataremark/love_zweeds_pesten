@@ -3,7 +3,7 @@ local drawPile = {}
 --codex-- Load and shuffle a deck with the configured amount of sets
 function drawPile.init(count)
     count = count or 1
-    drawPile.cards = {}
+    drawPile.cards = drawPile.cards or {}        -- ← voorkomt nil
 
     local kaartmap = "png"
     local bestanden = love.filesystem.getDirectoryItems(kaartmap)
@@ -71,8 +71,6 @@ function drawPile.draw()
     return c
 end
 
-function drawPile.count()
-    return #drawPile.cards
-end
+function drawPile.count()   return #(drawPile.cards or {}) end
 
 return drawPile
