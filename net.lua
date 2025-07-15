@@ -172,12 +172,12 @@ local function import_state(snap)
     end
     player.players = new              -- ← zet op module, niet lokale var
 
-
-    game.currentPlayer    = snap.currentPlayer
-    game.nextMustBeUnder7 = snap.nextMustBeUnder7
-    game.state            = snap.state
-    game.ronde            = snap.ronde
-    game.maxPlayers       = #new
+   local g = net.game       -- altijd aanwezig na net.set_game()
+   g.currentPlayer    = snap.currentPlayer
+   g.nextMustBeUnder7 = snap.nextMustBeUnder7
+   g.state            = snap.state
+   g.ronde            = snap.ronde
+   g.maxPlayers       = #new
 end
 
 
@@ -213,13 +213,6 @@ function net.connect(ip)
     net.localId = 2
     return "multiplayer-client"
 end
-
-
-
-local function inflate_card(c)
-    return {kleur=c.kleur, waarde=c.waarde, naam=c.naam, afbeelding=getImage(c.naam)}
-end
-
 
 
 ----------------------------------------------------------------------
