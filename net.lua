@@ -164,22 +164,26 @@ end
 
 ----------------------------------------------------------------------
 -- 2.  Herstel snapshot aan client-kant
-----------------------------------------------------------------------
 local function import_state(snap)
     local new = {}
     for i,sp in ipairs(snap.players or {}) do
-        new[i] = inflate_player(sp)      -- hand/faceUp/faceDown gevuld
+        new[i] = inflate_player(sp)
     end
-    player.players = new              -- ← zet op module, niet lokale var
+    player.players = new           -- handen / open / blind
 
-   local g = net.game       -- altijd aanwezig na net.set_game()
-   g.currentPlayer    = snap.currentPlayer
-   g.nextMustBeUnder7 = snap.nextMustBeUnder7
-   g.state            = snap.state
-   g.ronde            = snap.ronde
-   g.maxPlayers       = #new
-end
+    -- ⬇︎  pot overnemen  ⬇︎
+    net.game.pot = {}
+    for _,c in ipairs(snap.pot or {}) do
+        table.insert(net.game.pot, inflate_card(c))
+    end
 
+    local g = net.game
+    g.currentPlayer    = snap.currentPlayer
+    g.nextMustBeUnder7 = snap.nextMustBeUnder7
+    g.state            = snap.state
+    g.ronde            = snap.ronde
+    g.maxPlayers       = #new
+ end
 
 function net.set_game(g)
     net.openDone = 0
@@ -280,14 +284,22 @@ local function handle_host(msg)
         print("[net] client connected")
     return
     end
-        --------------------------------------------------------------
+    
+   if msg.cmd == "OPEN_ADD" then
+        local p = player.players[msg.id]
+        table.insert(p.faceUp, inflate_card(msg.card))
+        net.send_state()          -- broadcast update
+        return
+   end
+
+    --------------------------------------------------------------
     -- Client heeft z’n 3 open kaarten klaar
     --------------------------------------------------------------
     if msg.cmd == "OPEN_DONE" then
         net.openDone = (net.openDone or 0) + 1     -- 1 client → 1 melding
         if net.openDone == 1 then                  -- host zelf al klaar
-            game.finalize_setup()                  -- bepaal startspeler
-            net.send_state()                       -- push nieuwe fase
+            net.game.finalize_setup()
+            net.send_state()
         end
         return
     end
@@ -303,20 +315,20 @@ local function handle_host(msg)
                     end
                 end
             end
-            rules.play_selected_cards(game, msg.id)
+            rules.play_selected_cards(net.game, msg.id)
             utils.refill_hand(p.hand, drawPile, config.CARDS_INHAND)
             utils.update_phase_for_player(game, msg.id)
         end
     elseif msg.cmd=="PICKUP" then
         local p=player.players[msg.id]
-        utils.transfer_all_cards(p.hand, game.pot)
+        utils.transfer_all_cards(p.hand, net.game.pot)
         utils.deselect_all(p.hand)
-        game.nextMustBeUnder7=false
-        game.next_turn()
+        net.game.nextMustBeUnder7 = false
+        net.game.next_turn()
     elseif msg.cmd=="PASS" then
         if game.currentPlayer==msg.id and game.extraTurn then
-            game.extraTurn=false
-            game.next_turn()
+            net.game.extraTurn=false
+            net.game.next_turn()
         end
     end
     net.send_state()

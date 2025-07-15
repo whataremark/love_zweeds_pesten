@@ -165,14 +165,25 @@ function game.mousepressed(x, y, button)
     -- 1.  SETUP‑fase – kies 3 open kaarten
     ------------------------------------------------------------------
     if game.state == "setupSelectOpen" and button == 1 then
+        local faceUp    = player.players[myId].faceUp
+        if #faceUp >= config.SETUP_OPEN then return end   -- ← stop na 3
         local hand      = player.players[myId].hand
         local positions = ui.get_card_positions(hand)
 
         for i = #positions, 1, -1 do
             local p = positions[i]
             if utils.inside(x, y, p.x, p.y, p.w, p.h) then
+                -- kaart uit hand naar faceUp verplaatst
                 local kaart = table.remove(hand, i)
                 table.insert(player.players[myId].faceUp, kaart)
+                -- ✱  alleen de multiplayer‑client stuurt dit pakket
+                if net.isClient() then
+                    net.send({
+                        cmd  = "OPEN_ADD",
+                        id   = myId,
+                        card = { kleur = kaart.kleur, waarde = kaart.waarde }
+                    })
+                end
 
                 if #player.players[myId].faceUp == config.SETUP_OPEN then
                     ------------------------------------------------------
