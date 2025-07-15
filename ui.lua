@@ -40,52 +40,30 @@ end
 -- • speler 2 (AI, boven): rijen onder de hand
 --------------------------------------------------------------------
 -- Stel doelhoogte (TARGET_H) staat al bovenin op 140 px
-local EXTRA_GAP = 70          -- extra afstand voor AI-rij
+-- helpers voor de Y‑positie van de face‑down / face‑up rijen
+-- TARGET_H staat al elders op 140 px
+local EXTRA_GAP  = 70
+local net        = require("net")
 
 local function row_faceDown_Y(boxY, index)
-    if index == 1 then                    -- Mens (onder): rij boven hand
-        return boxY - TARGET_H - 10       -- 10 px marge
-    else                                  -- AI (boven): rij onder hand
-        return boxY + TARGET_H + EXTRA_GAP
+    -- host‑only (ai) → localId is nil, dus fallback naar speler 1
+    local isMe = (index == (net.localId or 1))
+
+    if isMe then
+        return boxY - TARGET_H - 10          -- eigen rij boven hand
+    else
+        return boxY + TARGET_H + EXTRA_GAP   -- andere speler(s)
     end
 end
 
--- open kaart moet exact op de rug liggen → zelfde Y
 local function row_faceUp_Y(boxY, index)
     return row_faceDown_Y(boxY, index)
 end
 
--- Exporteer voor gebruik in mousepressed e.d.
-ui.row_faceUp_Y    = row_faceUp_Y
-ui.row_faceDown_Y  = row_faceDown_Y
-
-
+ui.row_faceUp_Y   = row_faceUp_Y
+ui.row_faceDown_Y = row_faceDown_Y
 ----------------------MENU---------------------------------------
 function ui.draw_menu(mouseX, mouseY)--------------------------------------------------------------------
--- Kaart-constanten & helpers
---------------------------------------------------------------------
---------------------------------------------------------------------
--- Y-posities voor open- en blind-rijen
--- • speler 1 (onderaan): rijen boven de hand
--- • speler 2 (AI, boven): rijen onder de hand
---------------------------------------------------------------------
-local function row_faceDown_Y(boxY, index)
-    if index == 1 then               -- mens
-        return boxY - TARGET_H - 10  -- 10 px marge boven de hand
-    else                              -- AI
-        return boxY + TARGET_H + 10  -- 10 px onder zijn hand
-    end
-end
-
--- open kaart moet exact op de rug liggen → zelfde Y
-local function row_faceUp_Y(boxY, index)
-    return row_faceDown_Y(boxY, index)
-end
-
--- Exporteer voor gebruik in mousepressed e.d.
-ui.row_faceUp_Y    = row_faceUp_Y
-ui.row_faceDown_Y  = row_faceDown_Y
-
     local w,h = love.graphics.getWidth(), love.graphics.getHeight()
     love.graphics.setFont(groteTitelFont)
     love.graphics.setColor(1,1,1)
@@ -473,7 +451,7 @@ function ui.get_card_positions(hand)
     local visible     = math.max(minVis, fitVis)
 
     -- Scroll-offset komt alléén van speler-object
-    local p           = require("player").players[1]
+    local p = require("player").players[net.localId or 1]
     local scroll      = p.scrollOffset or 0
     local beginIdx    = math.floor(scroll / cardSpace) + 1
     local endIdx      = math.min(#hand, beginIdx + visible - 1)

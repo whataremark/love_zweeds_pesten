@@ -223,6 +223,7 @@ function ai.update(dt, game, pot)
         print("[AI] kiest open kaarten: "..table.concat(vals, ", "))
 
         game.state = "playingHand"   -- setup klaar
+        game.finalize_setup()
         return
     end
 
