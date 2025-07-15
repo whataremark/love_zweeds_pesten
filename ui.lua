@@ -3,6 +3,7 @@ local ui = {}
 local game = require("game")
 local config = require("config")
 local player = require("player") 
+local net = require("net")
 
 local kaartHoogte = config.cardHeight
 local schaal = config.scale
@@ -232,6 +233,7 @@ function ui.draw_player_area(playerData, index, totalPlayers)
     local w, h  = love.graphics.getWidth(), love.graphics.getHeight()
     local hand  = playerData.hand or {}
 --  if #hand == 0 then return end
+    local isMe    = (index == net.localId) -- waaar is speler
 
     -- kaartafmetingen (bron 500×300 px, doel 160 px hoog)
     local CARD_H_SRC, CARD_W_SRC = 500, 300
@@ -244,7 +246,7 @@ function ui.draw_player_area(playerData, index, totalPlayers)
     -- Hand-box
     ------------------------------------------------------------------
     local boxH   = CARD_H + 40
-    local boxY   = (index == 1) and (h - boxH - 10) or 10
+    local boxY   = isMe and (h - boxH - 10) or 10   -- ⟵ 3
     local boxX   = 40
     local boxW   = w - 80
 
@@ -254,7 +256,7 @@ function ui.draw_player_area(playerData, index, totalPlayers)
     ------------------------------------------------------------------
     -- TEKENEN: Speler 1  (scrollbaar)
     ------------------------------------------------------------------
-    if index == 1 then
+    if isMe then
         local cardSpace    = CARD_W + PADDING
         local minVisible   = 6
         local fitVisible   = math.floor((boxW - 2 * PADDING) / cardSpace)
@@ -333,63 +335,65 @@ function ui.draw_player_area(playerData, index, totalPlayers)
     -- Naam-label
     ------------------------------------------------------------------
     love.graphics.setColor(0, 0, 0)
-    love.graphics.print("Speler " .. index, 20, boxY - 25)
+love.graphics.print("Speler " .. index ..
+                      (isMe and " (YOU)" or ""),   -- ⟵ 6 optioneel
+                      20, boxY - 25)
 
 
-------------------------------------------------------------------
--- FACE-DOWN rij  (blinde rug-kaarten)
-------------------------------------------------------------------
-local faceDown = playerData.faceDown
-if #faceDown > 0 then
-    local yRow = row_faceDown_Y(boxY, index)
-    local scaleDown = scale_to_target(cardBack)
-    local spacing   = cardBack:getWidth() * scaleDown + PADDING
-    local totalW   = #faceDown * CARD_W + (#faceDown - 1) * PADDING
-    local xStart   = (w - totalW) / 2
-    local imgScale = SCALE_BASE           -- zelfde hoogte als hand
-    
+    ------------------------------------------------------------------
+    -- FACE-DOWN rij  (blinde rug-kaarten)
+    ------------------------------------------------------------------
+    local faceDown = playerData.faceDown
+    if #faceDown > 0 then
+        local yRow = row_faceDown_Y(boxY, index)
+        local scaleDown = scale_to_target(cardBack)
+        local spacing   = cardBack:getWidth() * scaleDown + PADDING
+        local totalW   = #faceDown * CARD_W + (#faceDown - 1) * PADDING
+        local xStart   = (w - totalW) / 2
+        local imgScale = SCALE_BASE           -- zelfde hoogte als hand
+        
 
 
-    for i = 1, #faceDown do
-        love.graphics.setColor(1,1,1) --reset kleur naar wit??
-        love.graphics.draw(cardBack, xStart+(i-1)*spacing, yRow,
-                   0, scaleDown, scaleDown)
-    end
-end
-
-------------------------------------------------------------------
--- FACE-UP rij  (zichtbare open kaarten)
-------------------------------------------------------------------
-local faceUp = playerData.faceUp
-if #faceUp > 0 then
-    local scaleUp = scale_to_target(faceUp[1].afbeelding)
-    local spacing = faceUp[1].afbeelding:getWidth()*scaleUp + PADDING
-    local totalW  = #faceUp * spacing - PADDING
-    local xStart  = (w - totalW) / 2
-    local yRow    = row_faceUp_Y(boxY, index)
-
-    for i, kaart in ipairs(faceUp) do
-        local drawX = xStart + (i-1)*spacing
-
-        -- kaart (altijd)
-        love.graphics.setColor(1,1,1)
-        love.graphics.draw(kaart.afbeelding, drawX, yRow, 0, scaleUp, scaleUp)
-
-        -- gele selectie-rand (alleen als gekozen)
-        if kaart.selected then
-            love.graphics.setColor(1,1,0)
-            love.graphics.setLineWidth(3 / scaleUp)
-            love.graphics.rectangle(
-                "line",
-                drawX, yRow,
-                kaart.afbeelding:getWidth()*scaleUp,
-                kaart.afbeelding:getHeight()*scaleUp
-            )
-            love.graphics.setLineWidth(1)
-            love.graphics.setColor(1,1,1)     -- kleur herstellen
+        for i = 1, #faceDown do
+            love.graphics.setColor(1,1,1) --reset kleur naar wit??
+            love.graphics.draw(cardBack, xStart+(i-1)*spacing, yRow,
+                    0, scaleDown, scaleDown)
         end
     end
-end
+
+    ------------------------------------------------------------------
+    -- FACE-UP rij  (zichtbare open kaarten)
+    ------------------------------------------------------------------
+    local faceUp = playerData.faceUp
+    if #faceUp > 0 then
+        local scaleUp = scale_to_target(faceUp[1].afbeelding)
+        local spacing = faceUp[1].afbeelding:getWidth()*scaleUp + PADDING
+        local totalW  = #faceUp * spacing - PADDING
+        local xStart  = (w - totalW) / 2
+        local yRow    = row_faceUp_Y(boxY, index)
+
+        for i, kaart in ipairs(faceUp) do
+            local drawX = xStart + (i-1)*spacing
+
+            -- kaart (altijd)
+            love.graphics.setColor(1,1,1)
+            love.graphics.draw(kaart.afbeelding, drawX, yRow, 0, scaleUp, scaleUp)
+
+            -- gele selectie-rand (alleen als gekozen)
+            if kaart.selected then
+                love.graphics.setColor(1,1,0)
+                love.graphics.setLineWidth(3 / scaleUp)
+                love.graphics.rectangle(
+                    "line",
+                    drawX, yRow,
+                    kaart.afbeelding:getWidth()*scaleUp,
+                    kaart.afbeelding:getHeight()*scaleUp
+                )
+                love.graphics.setLineWidth(1)
+                love.graphics.setColor(1,1,1)     -- kleur herstellen
+            end
+        end
+    end
     -- ===============================================
     -- Stap 3: Tijdelijke blinde kaart tonen (reveal)
     -- ===============================================
