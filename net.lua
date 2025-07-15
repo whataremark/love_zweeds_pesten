@@ -146,6 +146,22 @@ local function inflate_card(c)   -- voor import_state
     }
 end
 
+local function inflate_player(sp)
+    local t = { hand = {}, faceUp = {}, faceDown = {} }
+
+    for _,c in ipairs(sp.hand     or {}) do
+        table.insert(t.hand,     inflate_card(c))
+    end
+    for _,c in ipairs(sp.faceUp   or {}) do
+        table.insert(t.faceUp,   inflate_card(c))
+    end
+    for _,c in ipairs(sp.faceDown or {}) do
+        table.insert(t.faceDown, inflate_card(c))
+    end
+    return t
+end
+
+
 ----------------------------------------------------------------------
 -- 2.  Herstel snapshot aan client-kant
 ----------------------------------------------------------------------
