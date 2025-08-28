@@ -1,0 +1,29 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "rooms": {
+      "$roomId": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        "players": {
+          "$uid": {
+            ".write": "$uid === auth.uid"
+          }
+        },
+        "moves": {
+          "$moveId": {
+            ".write": "auth != null && (!data.exists() || data.child('uid').val() === auth.uid)",
+            ".validate": "newData.hasChildren(['uid','payload','ts'])"
+          }
+        },
+        "state": {
+          ".write": false
+        }
+        // "turn": { // Example: enforce turn order
+        //   ".write": "auth.uid === data.parent().child('currentPlayer').val()"
+        // }
+      }
+    }
+  }
+}
