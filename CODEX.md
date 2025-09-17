@@ -12,3 +12,10 @@ Deze repository bevat een eenvoudige Love2D implementatie van het kaartspel "Zwe
 ## Laatste wijzigingen
 
 
+
+## Bugs:
+Als speler zijn laatse kaart speelt, (anderre speler heeft nog kaarrten idk of relevant)
+dan loopt het spel vast, console zegt dat speler 2 aan de beurt is maar spelers kunnen beide niks doen, als player 1 (die dus leeg is)
+ op speel drukt dan staat er geen kaarten geselcteerd....
+
+ 
