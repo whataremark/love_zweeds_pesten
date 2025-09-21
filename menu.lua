@@ -10,10 +10,10 @@ local hintFont     = love.graphics.newFont(16)
 
 ------------------------------ achtergrondkaartjes
 local palette = {
-    {0.94, 0.58, 0.67},
-    {0.45, 0.76, 0.93},
-    {0.58, 0.74, 0.99},
-    {0.82, 0.72, 0.95},
+    {0.14, 0.33, 0.24},
+    {0.20, 0.46, 0.30},
+    {0.11, 0.26, 0.20},
+    {0.24, 0.52, 0.34},
 }
 
 local cards = {}
@@ -40,6 +40,7 @@ local options = {
 }
 function menu.load()
      menu.time     = 0
+     menu.selected = 1
 
     cards = {}
     local cardCount = 8
@@ -66,21 +67,23 @@ local function drawBackground(w, h)
     local steps = 12
     for i = 0, steps - 1 do
         local t   = i / (steps - 1)
-        local r   = 0.07 * (1 - t) + 0.03 * t
-        local g   = 0.09 * (1 - t) + 0.05 * t
-        local b   = 0.16 * (1 - t) + 0.12 * t
+        local r   = 0.03 * (1 - t) + 0.01 * t
+        local g   = 0.18 * (1 - t) + 0.09 * t
+        local b   = 0.11 * (1 - t) + 0.06 * t
         love.graphics.setColor(r, g, b)
         local y   = h * (i / steps)
         love.graphics.rectangle("fill", 0, y, w, h / steps + 1)
     end
     -- zachte spotlight
-    love.graphics.setColor(1, 1, 1, 0.05)
-    love.graphics.circle("fill", w * 0.65, h * 0.25, math.max(w, h) * 0.6)
+       love.graphics.setColor(1, 1, 1, 0.04)
+    love.graphics.circle("fill", w * 0.6, h * 0.35, math.max(w, h) * 0.55)
 end
 
 local function drawFloatingCards(w, h)
     local cx, cy   = w * 0.5, h * 0.52
     local radius   = math.min(w, h) * 0.42
+    local prevFont = love.graphics.getFont()
+    love.graphics.setFont(cardFont)
     for _, card in ipairs(cards) do
         local wave  = math.sin(menu.time * card.speed + card.phase)
         local baseX = cx + math.cos(card.angle) * radius * 0.8
@@ -105,15 +108,20 @@ local function drawFloatingCards(w, h)
         love.graphics.setLineWidth(4)
         love.graphics.rectangle("line", -cardW / 2, -cardH / 2, cardW, cardH, 20, 20)
 
+        love.graphics.setColor(1, 1, 1, 0.85)
+        love.graphics.printf("Zweeds\nPesten", -cardW / 2 + 14, -cardH / 2 + 26, cardW - 28, "center")
+
+
         love.graphics.pop()
     end
+    love.graphics.setFont(prevFont)
     love.graphics.setLineWidth(1)
 end
 
 function menu.draw()
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
 
-    rawBackground(w, h)
+    drawBackground(w, h)
     drawFloatingCards(w, h)
 
     local panelW   = math.min(560, w * 0.64)
@@ -122,13 +130,13 @@ function menu.draw()
     local panelY   = (h - panelH) / 2
     local pulse    = 0.5 + 0.5 * math.sin(menu.time * 2.6)
 
-    love.graphics.setColor(0, 0, 0, 0.25)
+    love.graphics.setColor(0, 0, 0, 0.3)
     love.graphics.rectangle("fill", panelX + 10, panelY + 14, panelW, panelH, 24, 24)
 
-    love.graphics.setColor(0.11, 0.14, 0.22, 0.92)
+    love.graphics.setColor(0.07, 0.14, 0.11, 0.94)
     love.graphics.rectangle("fill", panelX, panelY, panelW, panelH, 24, 24)
 
-      love.graphics.setColor(1, 1, 1, 0.08)
+    love.graphics.setColor(1, 1, 1, 0.08)
     love.graphics.rectangle("line", panelX, panelY, panelW, panelH, 24, 24)
 
     love.graphics.setColor(1, 1, 1, 1)
@@ -144,12 +152,12 @@ function menu.draw()
     love.graphics.setFont(optionFont)
 
     for i, opt in ipairs(options) do
-          local isSelected = i == menu.selected
+        local isSelected = i == menu.selected
         local y          = optionY + (i - 1) * (optionH + 12)
 
         if isSelected then
             local glow = 0.18 + pulse * 0.22
-            love.graphics.setColor(0.29 + glow, 0.39 + glow, 0.78, 0.9)
+            love.graphics.setColor(0.16 + glow * 0.4, 0.38 + glow, 0.21 + glow * 0.35, 0.94)
             love.graphics.rectangle("fill", panelX + 40, y - 6, panelW - 80, optionH + 12, 16, 16)
         end
 
@@ -167,6 +175,9 @@ function menu.draw()
 end
 
 function menu.keypressed(key)
+    if not menu.selected then
+        menu.selected = 1
+    end
     if key == "up"   then
         menu.selected = (menu.selected - 2) % #options + 1
         return
@@ -177,8 +188,7 @@ function menu.keypressed(key)
     end
 
     local opt = options[menu.selected]
-    if key == "return" or key == "kpenter" or key == "space" or key == opt.key then
-        opt.next()                          -- ← alleen dát doet het werk
+     if opt and (key == "return" or key == "kpenter" or key == "space" or key == opt.key) then                       -- ← alleen dát doet het werk
     end
 end
 
