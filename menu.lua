@@ -49,10 +49,25 @@ local options = {
     end
 },
 }
+
+local function activateSelected()
+    local index = menu.selected or 1
+    local opt   = options[index]
+    if not opt then
+        return
+    end
+    menu.selected = index
+    if opt.next then
+        opt.next()
+    end
+end
+
 function menu.load()
-     menu.time     = 0
-     menu.selected = 1
-     ensureFonts()
+    menu.time     = 0
+    menu.selected = 1
+
+    ensureFonts()
+
 
     cards = {}
     local cardCount = 8
@@ -87,11 +102,13 @@ local function drawBackground(w, h)
         love.graphics.rectangle("fill", 0, y, w, h / steps + 1)
     end
     -- zachte spotlight
-       love.graphics.setColor(1, 1, 1, 0.04)
+    love.graphics.setColor(1, 1, 1, 0.04)
+
     love.graphics.circle("fill", w * 0.6, h * 0.35, math.max(w, h) * 0.55)
 end
 
 local function drawFloatingCards(w, h)
+    ensureFonts()
     local cx, cy   = w * 0.5, h * 0.52
     local radius   = math.min(w, h) * 0.42
     local prevFont = love.graphics.getFont()
@@ -123,7 +140,6 @@ local function drawFloatingCards(w, h)
         love.graphics.setColor(1, 1, 1, 0.85)
         love.graphics.printf("Zweeds\nPesten", -cardW / 2 + 14, -cardH / 2 + 26, cardW - 28, "center")
 
-
         love.graphics.pop()
     end
     love.graphics.setFont(prevFont)
@@ -132,6 +148,7 @@ end
 
 function menu.draw()
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
+    ensureFonts()
 
     drawBackground(w, h)
     drawFloatingCards(w, h)
@@ -200,7 +217,9 @@ function menu.keypressed(key)
     end
 
     local opt = options[menu.selected]
-     if opt and (key == "return" or key == "kpenter" or key == "space" or key == opt.key) then                       -- ← alleen dát doet het werk
+    if opt and (key == "return" or key == "kpenter" or key == "space" or key == opt.key) then
+        activateSelected()
+
     end
 end
 
@@ -219,7 +238,7 @@ function menu.mousepressed(x, y, button)
         local yOpt = optionY + (i - 1) * (optionH + 12)
         if x >= panelX + 40 and x <= panelX + panelW - 40 and y >= yOpt - 6 and y <= yOpt + optionH + 6 then
             menu.selected = i
-            menu.keypressed("return")   -- activeer direct
+            activateSelected()   -- activeer direct
             return
         end
     end
