@@ -3,10 +3,21 @@ local state      = require("state")
 local menu       = {}
 
 ------------------------------ fonts één keer maken
-local titleFont    = love.graphics.newFont(52)
-local subtitleFont = love.graphics.newFont(24)
-local optionFont   = love.graphics.newFont(22)
-local hintFont     = love.graphics.newFont(16)
+local titleFont
+local subtitleFont
+local optionFont
+local hintFont
+local cardFont
+
+local function ensureFonts()
+    if titleFont then return end
+
+    titleFont    = love.graphics.newFont(52)
+    subtitleFont = love.graphics.newFont(24)
+    optionFont   = love.graphics.newFont(22)
+    hintFont     = love.graphics.newFont(16)
+    cardFont     = love.graphics.newFont(26)
+end
 
 ------------------------------ achtergrondkaartjes
 local palette = {
@@ -41,6 +52,7 @@ local options = {
 function menu.load()
      menu.time     = 0
      menu.selected = 1
+     ensureFonts()
 
     cards = {}
     local cardCount = 8
