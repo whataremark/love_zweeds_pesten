@@ -68,7 +68,6 @@ function menu.load()
 
     ensureFonts()
 
-
     cards = {}
     local cardCount = 8
     for i = 1, cardCount do
@@ -103,7 +102,6 @@ local function drawBackground(w, h)
     end
     -- zachte spotlight
     love.graphics.setColor(1, 1, 1, 0.04)
-
     love.graphics.circle("fill", w * 0.6, h * 0.35, math.max(w, h) * 0.55)
 end
 
@@ -149,7 +147,6 @@ end
 function menu.draw()
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
     ensureFonts()
-
     drawBackground(w, h)
     drawFloatingCards(w, h)
 
@@ -219,7 +216,6 @@ function menu.keypressed(key)
     local opt = options[menu.selected]
     if opt and (key == "return" or key == "kpenter" or key == "space" or key == opt.key) then
         activateSelected()
-
     end
 end
 
