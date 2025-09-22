@@ -47,6 +47,7 @@ ui.drag         = { active = false }
 --- Helpers ----------------------------------------------------------------------
 local function clamp(min, value, max)
     if max < min then max = min end
+
     if value < min then return min end
     if value > max then return max end
     return value
@@ -61,6 +62,7 @@ end
 local function ensureFonts()
     local bigSize   = math.max(22, math.floor(28 * ui.scale))
     local smallSize = math.max(16, math.floor(18 * ui.scale))
+
 
     if not ui.fontBig or ui.fontBigSize ~= bigSize then
         ui.fontBig = love.graphics.newFont(bigSize)
@@ -166,6 +168,16 @@ local function hintText(game, isTurn, playable)
         end
         return "Selecteer kaarten met dezelfde waarde om te spelen."
     end
+
+    ui.handView = {
+        xStart = xStart,
+        viewportW = viewportW,
+        contentW = contentW,
+        maxScroll = maxScroll,
+        offset = pData.scrollOffset,
+        hitboxes = {},
+    }
+    return ui.handView
 end
 
 local function computeHandView(pData)
@@ -214,7 +226,13 @@ local function formatStatusLines(game, isTurn)
 
     if game.nextMustBeUnder7 then
         table.insert(lines, "Volgende kaart ≤ 7")
+
     end
+end
+
+local function clearScissor()
+    love.graphics.setScissor()
+end
 
     if game.invalidTimer and game.invalidTimer > 0 then
         table.insert(lines, "Ongeldige zet")
@@ -225,6 +243,8 @@ local function formatStatusLines(game, isTurn)
     else
         table.insert(lines, "Scroll met wiel of sleep om de hand te bekijken")
     end
+    return selected
+end
 
     return lines
 end
@@ -680,7 +700,11 @@ local function drawFaceDownRow(pData, startY)
     for i = 1, #faceDown do
         local x = xStart + (i - 1) * stride
         love.graphics.draw(cardBack, math.floor(x), math.floor(startY), 0, scaleImg, scaleImg)
+
     end
+    local maxScroll = math.max(0, (#cards * step + ui.pad) - rect.w)
+    if pData.scrollOffset > maxScroll then pData.scrollOffset = maxScroll end
+    if pData.scrollOffset < 0 then pData.scrollOffset = 0 end
 
     ui.faceDownRect = { x = xStart, y = startY, w = totalW, h = h }
     return startY + h + ui.pad
@@ -737,9 +761,9 @@ local function drawHandBottom(game, pData)
     cursorY = drawFaceDownRow(pData, cursorY)
     cursorY = drawFaceUpRow(pData, cursorY)
 
+
     local view = computeHandView(pData)
     if not view then return end
-
     local baseline = math.max(cursorY, rect.y + rect.h - ui.cardH - ui.pad)
     baseline = math.min(baseline, rect.y + rect.h - ui.cardH)
     local lift = math.floor(ui.pad * 0.7)
@@ -763,6 +787,183 @@ local function drawHandBottom(game, pData)
                 ui.drawCard(card, x, drawY)
             end
         end
+    end
+
+    for _, info in ipairs(selectedBuffer) do
+        ui.drawCard(info.card, info.x, info.y, { selected = true })
+    end
+
+    drawOverflowIndicators(rect, view)
+    clearScissor()
+
+    if not isMyTurn(ui.game) then
+        love.graphics.setColor(0, 0, 0, 0.18)
+        love.graphics.rectangle("fill", rect.x, rect.y, rect.w, rect.h, 18, 18)
+        love.graphics.setColor(1, 1, 1, 0.7)
+        love.graphics.printf("Wachten op andere speler", rect.x, rect.y + rect.h - ui.fontSmall:getHeight() - ui.pad, rect.w, "center")
+        love.graphics.setColor(1, 1, 1, 1)
+    end
+end
+
+local function drawTopOpponent(opponent)
+    if not opponent then return end
+    local rect = ui.handRects.opponent
+    if not rect or rect.w <= 0 or rect.h <= 0 then return end
+
+    drawPanelBackground(rect, 0.75)
+
+    love.graphics.setFont(ui.fontSmall)
+    love.graphics.setColor(1, 1, 1, 0.82)
+    love.graphics.print("Tegenstander", rect.x + ui.pad, rect.y + ui.pad * 0.6)
+
+    local cards = opponent.hand or {}
+    if #cards == 0 then
+        love.graphics.setColor(1, 1, 1, 0.6)
+        love.graphics.printf("Geen kaarten", rect.x, rect.y + rect.h / 2 - ui.fontSmall:getHeight() / 2, rect.w, "center")
+        love.graphics.setColor(1, 1, 1, 1)
+        return
+    end
+
+    scissorRect(rect)
+    local stride = math.max(1, math.floor((rect.w - 2 * ui.pad) / math.max(1, #cards)))
+    stride = math.min(stride, ui.cardW)
+    local totalW = ui.cardW + math.max(0, (#cards - 1)) * stride
+    local startX = rect.x + (rect.w - totalW) / 2
+    local y = rect.y + rect.h / 2 - ui.cardH / 2
+    local scaleImg = ui.cardH / cardBack:getHeight()
+
+    for i = 1, #cards do
+        local x = startX + (i - 1) * stride
+        love.graphics.setColor(1, 1, 1, 0.85)
+        love.graphics.draw(cardBack, math.floor(x), math.floor(y), 0, scaleImg, scaleImg)
+    end
+    clearScissor()
+    love.graphics.setColor(1, 1, 1, 1)
+end
+
+local function drawPileStack(drawPile, x, y)
+    local count = drawPile and drawPile.count and drawPile.count() or 0
+    local layers = math.min(4, count)
+    local scale = ui.cardH / cardBack:getHeight()
+    for i = 1, layers do
+        love.graphics.setColor(1, 1, 1, 0.25 + 0.15 * (i - 1))
+        love.graphics.draw(cardBack, x - (i - 1) * ui.scale * 4, y - (i - 1) * ui.scale * 3, 0, scale, scale)
+    end
+    love.graphics.setColor(1, 1, 1, 0.8)
+    love.graphics.setFont(ui.fontSmall)
+    love.graphics.printf("Trekstapel\n" .. count, x - ui.cardW * 0.2, y + ui.cardH + ui.pad * 0.2, ui.cardW * 1.4, "center")
+    love.graphics.setColor(1, 1, 1, 1)
+end
+
+local function drawPot(pot, rect)
+    if not rect then return end
+    local x = rect.x
+    local y = rect.y
+    local top = pot[#pot]
+    local prev = pot[#pot - 1]
+
+    if prev and prev.afbeelding then
+        love.graphics.setColor(1, 1, 1, 0.4)
+        local scale = ui.cardH / prev.afbeelding:getHeight()
+        love.graphics.draw(prev.afbeelding, x - ui.pad * 0.3, y + ui.pad * 0.3, 0, scale, scale)
+    end
+
+    if top and top.afbeelding then
+        love.graphics.setColor(1, 1, 1, 1)
+        local scale = ui.cardH / top.afbeelding:getHeight()
+        love.graphics.draw(top.afbeelding, x, y, 0, scale, scale)
+    else
+        love.graphics.setColor(1, 1, 1, 0.2)
+        love.graphics.rectangle("line", x, y, ui.cardW, ui.cardH, 14, 14)
+    end
+
+    love.graphics.setColor(1, 1, 1, 0.8)
+    love.graphics.setFont(ui.fontSmall)
+    love.graphics.printf("Aflegstapel\n" .. #pot, x - ui.cardW * 0.1, y + ui.cardH + ui.pad * 0.2, ui.cardW * 1.2, "center")
+    love.graphics.setColor(1, 1, 1, 1)
+end
+
+function ui.button(x, y, w, h, label, enabled, id)
+    x, y, w, h = math.floor(x), math.floor(y), math.floor(w), math.floor(h)
+    local pointerX, pointerY = love.mouse.getPosition()
+    local hovered = utils.inside(pointerX, pointerY, x, y, w, h)
+    local radius = math.floor(12 * ui.scale)
+    local baseColor = {0.16, 0.41, 0.28}
+    if id == "play" then baseColor = {0.12, 0.46, 0.32} end
+    if not enabled then
+        love.graphics.setColor(baseColor[1], baseColor[2], baseColor[3], 0.25)
+    elseif hovered then
+        love.graphics.setColor(baseColor[1] + 0.08, baseColor[2] + 0.08, baseColor[3] + 0.08, 0.95)
+    else
+        love.graphics.setColor(baseColor[1], baseColor[2], baseColor[3], 0.85)
+    end
+    love.graphics.rectangle("fill", x, y, w, h, radius, radius)
+    love.graphics.setColor(1, 1, 1, enabled and 0.92 or 0.55)
+    love.graphics.setFont(ui.fontBig)
+    love.graphics.printf(label, x, y + (h - ui.fontBig:getHeight()) / 2, w, "center")
+    love.graphics.setColor(1, 1, 1, 1)
+
+    ui.buttons[id] = { x = x, y = y, w = w, h = h, enabled = enabled, label = label }
+end
+
+local function drawCenterArea(pot, drawPile, buttons)
+    local rect = ui.areas.center
+    if not rect then return end
+    drawPanelBackground(rect, 0.85)
+
+    scissorRect(rect)
+    local colW = math.floor(rect.w / 3)
+    local cardY = rect.y + (rect.h - ui.cardH) / 2
+    local minCardX = rect.x + ui.pad
+    local maxCardX = rect.x + rect.w - ui.cardW - ui.pad
+    if maxCardX < minCardX then maxCardX = minCardX end
+    local drawX = clamp(minCardX, rect.x + (colW - ui.cardW) / 2, maxCardX)
+    local potX = clamp(minCardX, rect.x + colW + (colW - ui.cardW) / 2, maxCardX)
+    local btnColX = rect.x + colW * 2 + ui.pad
+
+    ui.centerState.pot = { x = math.floor(potX), y = math.floor(cardY), w = ui.cardW, h = ui.cardH }
+    ui.centerState.draw = { x = math.floor(drawX), y = math.floor(cardY), w = ui.cardW, h = ui.cardH }
+
+    drawPileStack(drawPile, ui.centerState.draw.x, ui.centerState.draw.y)
+    drawPot(pot, ui.centerState.pot)
+
+    local buttonHeight = math.max(ui.minTap, math.floor(ui.fontBig:getHeight() + ui.pad * 1.1))
+    local maxWidth = math.floor(rect.w / 3 - ui.pad * 2)
+    local buttonWidth = math.max(ui.minTap * 2, math.min(maxWidth, math.floor(240 * ui.scale)))
+    local gap = ui.pad
+
+    if ui.compact then
+        local btnY = ui.centerState.pot.y + ui.cardH + ui.pad * 1.5
+        btnY = math.min(btnY, rect.y + rect.h - buttonHeight - ui.pad)
+        local totalW = #buttons * buttonWidth + math.max(0, #buttons - 1) * gap
+        local startX = rect.x + (rect.w - totalW) / 2
+        for i, btn in ipairs(buttons) do
+            local x = startX + (i - 1) * (buttonWidth + gap)
+            ui.button(x, btnY, buttonWidth, buttonHeight, btn.label, btn.enabled, btn.id)
+        end
+        ui.centerState.buttonRow = { x = math.floor(startX), y = math.floor(btnY), w = math.floor(totalW), h = buttonHeight }
+        ui.centerState.buttonColumn = nil
+    else
+        local totalH = #buttons * buttonHeight + math.max(0, #buttons - 1) * gap
+        local startY = rect.y + (rect.h - totalH) / 2
+        local maxBtnX = rect.x + rect.w - buttonWidth - ui.pad
+        if maxBtnX < rect.x + ui.pad then maxBtnX = rect.x + ui.pad end
+        local x = clamp(rect.x + ui.pad, btnColX, maxBtnX)
+        ui.centerState.buttonColumn = { x = math.floor(x), y = math.floor(startY), w = buttonWidth, h = totalH }
+        ui.centerState.buttonRow = nil
+        for i, btn in ipairs(buttons) do
+            local y = startY + (i - 1) * (buttonHeight + gap)
+            ui.button(x, y, buttonWidth, buttonHeight, btn.label, btn.enabled, btn.id)
+        end
+    end
+
+    clearScissor()
+
+    love.graphics.setFont(ui.fontSmall)
+    love.graphics.setColor(1, 1, 1, 0.7)
+    love.graphics.printf("Dubbelklik/tap om te spelen", rect.x, rect.y + rect.h - ui.fontSmall:getHeight() - ui.pad, rect.w, "center")
+    love.graphics.setColor(1, 1, 1, 1)
+end
 
         ui.handHitboxes[index] = {
             x = hitX,
@@ -1013,7 +1214,10 @@ local function handleBlindClick(x, y)
     if not ui.faceDownRect then return false end
     if not utils.inside(x, y, ui.faceDownRect.x, ui.faceDownRect.y, ui.faceDownRect.w, ui.faceDownRect.h + ui.cardH * 0.1) then
         return false
+
     end
+    return false
+end
 
     local stack = player.players[localPlayerId()].faceDown
     if #stack == 0 then return true end
@@ -1075,7 +1279,9 @@ local function handleHandClick(x, y)
                 ui.lastTap.time = now
             end
             return true
+
         end
+        return true
     end
 
     local area = ui.areas.handBottom
@@ -1160,6 +1366,7 @@ function ui.touchpressed(id, x, y)
         ui.buttons.activeId = id
         return true
     end
+
     if handlePotClick(px, py) then return true end
     if handleDrawPileClick(px, py) then return true end
     if handleSetupOpenClick(px, py) then return true end
@@ -1209,6 +1416,7 @@ function ui.toggleDebug()
 end
 
 --- Legacy helpers ---------------------------------------------------------------
+
 function ui.draw_end_screen(winner, players)
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
     love.graphics.setColor(0, 0, 0, 0.7)

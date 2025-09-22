@@ -23,3 +23,4 @@ cfg.cardPad   = cfg.cardPadding
 cfg.phoneBP   = cfg.phoneBreakpoint
 
 return cfg
+
