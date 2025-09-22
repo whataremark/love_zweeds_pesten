@@ -13,4 +13,5 @@ return {
     CARDS_INHAND = 3,
     SETUP_OPEN  = 3,
     BLIND_SIZE  = 3,
+
 }

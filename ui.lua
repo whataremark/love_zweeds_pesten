@@ -12,12 +12,14 @@ local drawPileModule = require("drawpile")
 local cardBack = love.graphics.newImage("png/back.png")
 
 local DESIGN_W, DESIGN_H = 1280, 720
+
 local DOUBLE_TAP_TIME = 0.30
 
 ui.scale      = 1
 ui.pad        = 16
 ui.safe       = 16
 ui.minTap     = config.minTap or 40
+
 ui.fontBig    = nil
 ui.fontSmall  = nil
 ui.areas      = {}
@@ -32,6 +34,7 @@ ui.game        = nil
 ui.debug       = false
 ui.handRects   = { player = nil, opponent = nil }
 ui.handLayout  = { step = 0, visible = 0, viewport = 0 }
+
 
 local function clamp(min, value, max)
     if value < min then return min end
@@ -51,6 +54,16 @@ local function ensureFonts()
         ui.fontSmall = love.graphics.newFont(smallSize)
         ui.fontSmallSize = smallSize
     end
+
+    ui.handView = {
+        xStart = xStart,
+        viewportW = viewportW,
+        contentW = contentW,
+        maxScroll = maxScroll,
+        offset = pData.scrollOffset,
+        hitboxes = {},
+    }
+    return ui.handView
 end
 
 local function resetInteractionCaches()
@@ -183,6 +196,7 @@ local function collectSelected(cards)
         if card.selected then
             table.insert(selected, card)
         end
+
     end
     return selected
 end
@@ -885,6 +899,7 @@ local function handlePotClick(x, y)
     if rect and utils.inside(x, y, rect.x, rect.y, rect.w, rect.h) then
         if ui.game then
             ui.game.showPotOverlay = not ui.game.showPotOverlay
+
         end
         return true
     end
@@ -903,6 +918,7 @@ local function handleDrawPileClick(x, y)
 end
 
 local function handleHandClick(x, y)
+
     local pid = localPlayerId()
     local pData = player.players[pid]
     if not pData then return false end
@@ -987,6 +1003,7 @@ local function handleSetupOpenClick(x, y)
             return true
         end
     end
+
     return false
 end
 
@@ -1061,6 +1078,7 @@ function ui.wheelmoved(dx, dy)
     end
     local step = ui.handLayout and ui.handLayout.step or math.floor(ui.cardW * 0.6)
     local factor = math.max(ui.minTap, step) * 0.5
+
     if love.keyboard.isDown("lshift", "rshift") then
         factor = factor * 2
     end
@@ -1142,6 +1160,7 @@ end
 function ui.activate(action)
     triggerAction(action)
 end
+
 
 -- --- Legacy helpers -----------------------------------------------------------
 function ui.draw_end_screen(winner, players)
