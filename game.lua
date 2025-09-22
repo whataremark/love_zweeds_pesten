@@ -158,6 +158,8 @@ function game.keypressed(key)
         if ui.activate then
             ui.activate("play")
         end
+    elseif key == "f2" and ui.toggleDebug then
+        ui.toggleDebug()
     end
 end
 
