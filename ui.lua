@@ -269,11 +269,13 @@ function ui.layout(w, h)
         opponent = makeSize(0.8),
     }
 
-    ensureFonts()
+
+    local baseW = config.cardWidth or 140
+    local baseH = config.cardHeight or 200
+    local aspect = baseW / baseH
 
     local innerW = math.max(0, w - 2 * ui.safe)
     local buttonH = math.max(ui.minTap, math.floor(ui.fontBig:getHeight() + ui.pad * 1.2))
-
 
     ui.areas.buttons = {
         x = ui.safe,
@@ -283,7 +285,6 @@ function ui.layout(w, h)
     }
 
     local cursorBottom = ui.areas.buttons.y - ui.pad
-
 
     local handH = ui.cardSizes.hand.h + ui.pad * 2
     ui.areas.handBottom = {
@@ -296,11 +297,11 @@ function ui.layout(w, h)
 
     local faceBlockH = ui.cardSizes.faceDown.h + ui.cardSizes.open.h + ui.pad * 3
     ui.areas.faceBottom = {
-
         x = ui.safe,
         y = cursorBottom - faceBlockH,
         w = innerW,
         h = faceBlockH,
+
     }
     cursorBottom = ui.areas.faceBottom.y - ui.pad
 
@@ -400,6 +401,7 @@ function ui.layout(w, h)
         end
     end
 
+
     adjustSections(sections, centralHeight)
 
     if ui.compact then
@@ -458,7 +460,6 @@ function ui.layout(w, h)
         w = ui.areas.buttons.w,
         h = ui.areas.buttons.h,
     } }
-
 
     ui.handHitboxes = {}
     ui.faceUpHitboxes = {}
@@ -545,7 +546,11 @@ local function drawInfoPanel(game, hint, statusLines)
         if text == "" then
             y = y + lineHeight * 0.6
         else
-            local wrapped = select(1, ui.fontSmall:getWrap(text, width))
+            local wrapped = ui.fontSmall:getWrap(text, width)
+            if type(wrapped) ~= "table" then
+                wrapped = { tostring(text) }
+            end
+
             for _, row in ipairs(wrapped) do
                 love.graphics.printf(row, area.x + ui.pad, y, width, "left")
                 y = y + lineHeight
@@ -704,7 +709,6 @@ local function drawCenterArea(game)
     local cardY = area.y + math.max(ui.pad, (area.h - size.h - ui.fontSmall:getHeight() - ui.pad * 2) / 2)
     cardY = math.floor(cardY + 0.5)
 
-
     local drawLayout = { x = math.floor(startX + 0.5), y = cardY }
     local potLayout = { x = math.floor(startX + size.w + gap + 0.5), y = cardY }
 
@@ -718,6 +722,7 @@ local function drawCenterArea(game)
     love.graphics.printf(string.format("Pot: %d", #game.pot), potLayout.x - ui.pad, labelY, size.w + ui.pad * 2, "center")
     love.graphics.setColor(1, 1, 1, 1)
     clearScissor()
+
     ui.centerLayout.draw = { x = drawLayout.x, y = cardY, w = size.w, h = size.h }
     ui.centerLayout.pot = { x = potLayout.x, y = cardY, w = size.w, h = size.h }
 end
@@ -786,6 +791,7 @@ local function drawBottomStacks(pData)
     local openSize = ui.cardSizes.open or { w = math.floor(ui.cardW * 0.85), h = math.floor(ui.cardH * 0.85) }
     local width = area.w - ui.pad * 2
     local labelHeight = ui.fontSmall:getHeight()
+
     local downCount = math.min(#faceDown, 3)
     local downGap = downCount > 1 and math.min(downSize.w * 0.6, (width - downSize.w) / (downCount - 1)) or 0
     local downTotal = downCount > 0 and (downSize.w + (downCount - 1) * downGap) or downSize.w
@@ -867,7 +873,6 @@ local function drawHandBottom(game, pData)
     local cardW = view.cardW or (ui.cardSizes.hand and ui.cardSizes.hand.w) or ui.cardW
     local baseline = rect.y + rect.h - cardH - ui.pad
     local lift = math.max(4, math.floor(cardH * 0.12))
-
 
     ui.handHitboxes = {}
     local selectedLater = {}
