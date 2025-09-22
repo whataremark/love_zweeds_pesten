@@ -269,7 +269,10 @@ function ui.layout(w, h)
         opponent = makeSize(0.8),
     }
 
-    ensureFonts()
+
+    local baseW = config.cardWidth or 140
+    local baseH = config.cardHeight or 200
+    local aspect = baseW / baseH
 
     local innerW = math.max(0, w - 2 * ui.safe)
     local buttonH = math.max(ui.minTap, math.floor(ui.fontBig:getHeight() + ui.pad * 1.2))
@@ -298,6 +301,7 @@ function ui.layout(w, h)
         y = cursorBottom - faceBlockH,
         w = innerW,
         h = faceBlockH,
+
     }
     cursorBottom = ui.areas.faceBottom.y - ui.pad
 
@@ -397,6 +401,7 @@ function ui.layout(w, h)
         end
     end
 
+
     adjustSections(sections, centralHeight)
 
     if ui.compact then
@@ -493,6 +498,7 @@ end
 --- HUD rendering -----------------------------------------------------------------
 local function drawInfoPanel(game, hint, statusLines)
     local area = ui.areas.infoPanel
+
     if not area or area.w <= 0 or area.h <= 0 then return end
 
     drawPanelBackground(area, 0.16)
@@ -544,6 +550,7 @@ local function drawInfoPanel(game, hint, statusLines)
             if type(wrapped) ~= "table" then
                 wrapped = { tostring(text) }
             end
+
             for _, row in ipairs(wrapped) do
                 love.graphics.printf(row, area.x + ui.pad, y, width, "left")
                 y = y + lineHeight
@@ -594,6 +601,7 @@ function ui.button(x, y, w, h, label, enabled, id)
         draw = {0.78, 0.2, 0.2},
         play = {0.16, 0.55, 0.32},
         pass = {0.95, 0.75, 0.25},
+
     }
     local baseColor = palettes[id] or {0.18, 0.33, 0.5}
     if not enabled then
@@ -613,6 +621,7 @@ function ui.button(x, y, w, h, label, enabled, id)
     love.graphics.setColor(1, 1, 1, 1)
 
     ui.buttons[id] = { x = x, y = y, w = w, h = h, enabled = enabled, label = label }
+
 end
 
 local function drawButtonsRow(area, states)
@@ -627,6 +636,7 @@ local function drawButtonsRow(area, states)
     local usableW = area.w - ui.pad * 2
     local width = math.max(ui.minTap * 1.6, math.floor((usableW - gap * 2) / 3))
     local totalW = width * 3 + gap * 2
+
     local startX = area.x + (area.w - totalW) / 2
     local y = area.y + (area.h - buttonH) / 2
 
@@ -653,6 +663,7 @@ local function drawDrawPile(layout, count)
         love.graphics.setColor(1, 1, 1, 0.25 + 0.15 * i)
         ui.drawCard(nil, layout.x + offset, layout.y - offset, { back = true, height = size.h })
     end
+
     love.graphics.setColor(1, 1, 1, 1)
 end
 
@@ -710,7 +721,6 @@ local function drawCenterArea(game)
     love.graphics.printf(string.format("Deck: %d", drawCount), drawLayout.x - ui.pad, labelY, size.w + ui.pad * 2, "center")
     love.graphics.printf(string.format("Pot: %d", #game.pot), potLayout.x - ui.pad, labelY, size.w + ui.pad * 2, "center")
     love.graphics.setColor(1, 1, 1, 1)
-
     clearScissor()
 
     ui.centerLayout.draw = { x = drawLayout.x, y = cardY, w = size.w, h = size.h }
@@ -788,6 +798,7 @@ local function drawBottomStacks(pData)
     local downX = area.x + (area.w - downTotal) / 2
     local downY = area.y + area.h - downSize.h - ui.pad
 
+
     love.graphics.setFont(ui.fontSmall)
     love.graphics.setColor(1, 1, 1, 0.75)
     love.graphics.printf("Dichte kaarten", area.x + ui.pad, downY - labelHeight - ui.pad * 0.2, area.w - ui.pad * 2, "left")
@@ -804,6 +815,7 @@ local function drawBottomStacks(pData)
         love.graphics.printf("Geen dichte kaarten", area.x + ui.pad, downY + downSize.h / 2 - labelHeight / 2, area.w - ui.pad * 2, "left")
         love.graphics.setColor(1, 1, 1, 1)
     end
+
 
     local openCount = #faceUp
     local openGap = openCount > 1 and math.min(openSize.w * 0.6, (width - openSize.w) / (openCount - 1)) or 0
@@ -869,6 +881,7 @@ local function drawHandBottom(game, pData)
         local x = view.xStart + (index - 1) * view.step
         local hitW = view.hitW
         local hitX = x - (hitW - cardW) / 2
+
         hitX = clamp(rect.x, hitX, rect.x + rect.w - hitW)
         local selected = card.selected
         local drawY = selected and (baseline - lift) or baseline
@@ -886,6 +899,7 @@ local function drawHandBottom(game, pData)
 
     for _, info in ipairs(selectedLater) do
         ui.drawCard(info.card, info.x, info.y, { height = cardH, selected = true })
+
     end
 
     drawOverflowIndicators(rect, view)
@@ -945,6 +959,7 @@ local function drawOpponentFaceDown(opponent)
     local rect = ui.areas.opponentFaceDown
     if not rect or rect.w <= 0 or rect.h <= 0 then return end
 
+
     drawPanelBackground(rect, 0.12)
     scissorRect(rect)
 
@@ -985,6 +1000,7 @@ end
 local function drawTopOpponent(opponent)
     drawOpponentHand(opponent)
     drawOpponentFaceDown(opponent)
+
 end
 
 --- Debug overlay ----------------------------------------------------------------
@@ -1030,6 +1046,7 @@ function ui.draw(game, drawPile)
     local buttonsArea = ui.areas.buttons
     if buttonsArea and buttonsArea.w > 0 and buttonsArea.h > 0 then
         drawButtonsRow(buttonsArea, states)
+
     end
 
     drawPotOverlay(game)
