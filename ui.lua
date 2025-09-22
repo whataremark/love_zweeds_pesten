@@ -327,10 +327,9 @@ local function drawHandBottom(pData)
 
     love.graphics.setFont(ui.fontSmall)
     love.graphics.setColor(1, 1, 1, 0.85)
+    local handY = area.y + ui.pad * 1.2 + ui.cardHeight * 0.45
     local handLabelY = handY - ui.fontSmall:getHeight() - ui.pad * 0.4
     love.graphics.print("Jouw hand", area.x + ui.pad, handLabelY)
-
-    local handY = area.y + ui.pad * 1.2 + ui.cardHeight * 0.45
     local view = computeHandView(pData)
 
     for index, card in ipairs(pData.hand or {}) do
@@ -386,6 +385,7 @@ local function drawHandBottom(pData)
         love.graphics.setColor(1, 1, 1, 0.7)
         love.graphics.printf("Wachten op andere speler", area.x, area.y + area.h - ui.fontSmall:getHeight() - ui.pad, area.w, "center")
         love.graphics.setColor(1, 1, 1, 1)
+
     end
 end
 
@@ -806,6 +806,7 @@ local function handleOpenRowClick(x, y)
         local hit = ui.faceUpView.hitboxes[index]
         if hit and utils.inside(x, y, hit.x, hit.y, hit.w, hit.h) then
             player.toggle_select(faceUp, index, "open")
+
             return true
         end
     end
