@@ -146,7 +146,6 @@ end
 
 function menu.draw()
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
-
     ensureFonts()
     drawBackground(w, h)
     drawFloatingCards(w, h)
