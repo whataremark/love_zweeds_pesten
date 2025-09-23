@@ -4,6 +4,8 @@ local state = { current = nil }
 local gameState = require("game")
 local ui        = require("ui")
 
+local unpack = table.unpack or unpack
+
 local uiCallbacks = {
     mousepressed  = "mousepressed",
     mousereleased = "mousereleased",
@@ -38,7 +40,9 @@ for _, cb in ipairs{
         end
         local uiName = uiCallbacks[cb]
         if uiName and state.current == gameState and ui[uiName] then
-            ui[uiName](...)
+            local args = { ... }
+            table.insert(args, gameState.uiState)
+            ui[uiName](unpack(args))
         end
     end
 end

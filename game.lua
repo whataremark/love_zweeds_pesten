@@ -41,6 +41,79 @@ local function phase_for_player(i)
     return utils.phase_for_player(i)
 end
 
+local function ensureUIState()
+    game.uiState = game.uiState or { players = {}, actions = {}, ui = {}, turnInfo = {} }
+    local state = game.uiState
+
+    state.game = game
+    state.players = state.players or {}
+    for i, pdata in ipairs(player.players) do
+        local entry = state.players[i]
+        if not entry then
+            entry = {}
+            state.players[i] = entry
+        end
+        entry.id = i
+        entry.name = pdata.name or ("Speler " .. i)
+        entry.hand = pdata.hand
+        entry.faceDown = pdata.faceDown
+        entry.faceUp = pdata.faceUp
+    end
+    for i = #player.players + 1, #state.players do
+        state.players[i] = nil
+    end
+
+    state.me = net.localId or 1
+    state.pot = game.pot
+    state.center = state.center or {}
+    state.center.lastCard = game.pot[#game.pot]
+    state.center.prevCard = game.pot[#game.pot - 1]
+
+    state.turnInfo = {
+        string.format("Ronde %d", game.ronde or 1),
+        string.format("Speler aan zet: %d", game.currentPlayer or 1),
+        string.format("Fase: %s", game.state or "onbekend"),
+    }
+    if game.nextMustBeUnder7 then
+        table.insert(state.turnInfo, "Volgende kaart ≤ 7")
+    end
+    if game.extraTurn then
+        table.insert(state.turnInfo, "Extra beurt actief")
+    end
+
+    state.actions = state.actions or {}
+    local myTurn = (game.currentPlayer or 1) == (state.me or 1)
+    state.actions.canDraw = true
+    state.actions.canPlay = myTurn
+    state.actions.canPass = myTurn
+
+    state.ui = state.ui or {}
+    if game.showPotOverlay and (not state.ui.modal or state.ui.modal.type ~= "pot") then
+        state.ui.modal = { type = "pot" }
+    elseif not game.showPotOverlay and state.ui.modal and state.ui.modal.type == "pot" then
+        state.ui.modal = nil
+    end
+    game.showPotOverlay = state.ui.modal and state.ui.modal.type == "pot" or false
+
+    if type(state.emit) ~= "function" then
+        function state:emit(eventName, payload)
+            if game.handleUIEvent then
+                game.handleUIEvent(eventName, payload)
+            else
+                self.events = self.events or {}
+                table.insert(self.events, { name = eventName, payload = payload })
+            end
+        end
+    end
+
+    return state
+end
+
+function game.handleUIEvent(eventName, payload)
+    game.pendingUIEvents = game.pendingUIEvents or {}
+    table.insert(game.pendingUIEvents, { name = eventName, payload = payload })
+end
+
 ----------------------------------------------------------------------
 -- 3.  Initialisatie wanneer de state ge-enterd wordt
 ----------------------------------------------------------------------
@@ -62,8 +135,8 @@ function game.load(cfg)
     game.invalidTimer = 0
     game.showPotOverlay = false
 
-    ui.layout(love.graphics.getWidth(), love.graphics.getHeight())
-    ui.game = game
+    ensureUIState()
+    ui.load(nil, game.uiState)
 end
 
 ----------------------------------------------------------------------
@@ -114,8 +187,9 @@ function game.update(dt)
         scene = "gameover"
     end
 
+    local uiState = ensureUIState()
     if ui and ui.update then
-        ui.update(dt)
+        ui.update(dt, uiState)
     end
 end
 
@@ -125,6 +199,8 @@ end
 function game.draw()
     love.graphics.setBackgroundColor(0.1, 0.4, 0.1)
 
+    local uiState = ensureUIState()
+
     if scene == "gameover" then
         ui.draw_end_screen(game.winner, player.players)
         return
@@ -133,9 +209,7 @@ function game.draw()
     love.graphics.setColor(1, 1, 1)
     love.graphics.draw(bgCanvas, 0, 0)
 
-    local w, h = love.graphics.getWidth(), love.graphics.getHeight()
-    ui.layout(w, h)
-    ui.draw(game, drawPile)
+    ui.draw(uiState)
 end
 
 function game.is_playing()
