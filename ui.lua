@@ -298,19 +298,25 @@ function ui.layout(w, h)
     ui.cardH = math.max(24, math.floor(baseH * ui.scale))
     ui.cardW = math.max(16, math.floor(ui.cardH * aspect + 0.5))
 
+    -- één maat voor alle kaarten
     local function makeSize(mult)
         local hSize = math.max(18, math.floor(ui.cardH * mult))
         local wSize = math.max(12, math.floor(hSize * aspect + 0.5))
         return { w = wSize, h = hSize }
     end
 
+    -- Kies 0.80 als prettige standaard; wil je ze groter/kleiner? Pas de factor hier aan.
+    local ALL = makeSize(0.80)
+
     ui.cardSizes = {
-        hand = { w = ui.cardW, h = ui.cardH },
-        open = makeSize(0.85),
-        faceDown = makeSize(0.65),
-        deck = makeSize(0.8),
-        opponent = makeSize(0.8),
+    hand     = ALL,
+    open     = ALL,
+    faceDown = ALL,
+    deck     = ALL,
+    opponent = ALL,
     }
+    ui.cardSizes.faceDown = ui.cardSizes.open
+    ui.cardSizes.deck     = ui.cardSizes.open
 
 
     local baseW = config.cardWidth or 140
@@ -339,7 +345,8 @@ function ui.layout(w, h)
     }
     cursorBottom = ui.areas.handBottom.y - ui.pad
 
-    local faceBlockH = ui.cardSizes.faceDown.h + ui.cardSizes.open.h + ui.pad * 3
+    local labelHeight = math.floor(ui.fontSmall:getHeight() + ui.pad * 0.6)
+    local faceBlockH = ui.cardSizes.faceDown.h + ui.cardSizes.open.h + ui.pad * 3 + labelHeight * 2
     ui.areas.faceBottom = {
         x = ui.safe,
         y = cursorBottom - faceBlockH,
@@ -857,25 +864,39 @@ local function drawBottomStacks(pData)
 
 
     local openCount = #faceUp
-    local openGap = openCount > 1 and math.min(openSize.w * 0.6, (width - openSize.w) / (openCount - 1)) or 0
-    local openTotal = openCount > 0 and (openSize.w + (openCount - 1) * openGap) or openSize.w
-    local openX = area.x + (area.w - openTotal) / 2
-    local openY = downY - openSize.h - math.floor(ui.pad * 0.6)
+    local openSize  = ui.cardSizes.open
+    local openY     = downY - openSize.h - math.floor(ui.pad * 0.6)
 
     love.graphics.setFont(ui.fontSmall)
     love.graphics.setColor(1, 1, 1, 0.75)
     love.graphics.printf("Open kaarten", area.x + ui.pad, openY - labelHeight - ui.pad * 0.2, area.w - ui.pad * 2, "left")
     love.graphics.setColor(1, 1, 1, 1)
 
+    ui.faceUpHitboxes = {}
+
     if openCount == 0 then
         love.graphics.setColor(1, 1, 1, 0.5)
         love.graphics.printf("Geen open kaarten", area.x + ui.pad, openY + openSize.h / 2 - labelHeight / 2, area.w - ui.pad * 2, "left")
         love.graphics.setColor(1, 1, 1, 1)
     else
-        for index, card in ipairs(faceUp) do
-            local x = openX + (index - 1) * openGap
+        local cols = math.max(1, downCount)
+        local show = math.min(openCount, cols)
+        for i = 1, show do
+            local x = downX + (i - 1) * downGap
+            local card = faceUp[i]
             ui.drawCard(card, x, openY, { height = openSize.h, selected = card.selected })
-            ui.faceUpHitboxes[index] = { x = x, y = openY, w = openSize.w, h = openSize.h }
+            ui.faceUpHitboxes[i] = { x = x, y = openY, w = openSize.w, h = openSize.h }
+        end
+        if openCount > cols then
+            local start   = cols + 1
+            local extraDx = math.max(4, math.floor(openSize.w * 0.40))
+            local baseX   = downX + (cols - 1) * downGap + openSize.w + extraDx
+            for i = start, openCount do
+                local x = baseX + (i - start) * extraDx
+                local card = faceUp[i]
+                ui.drawCard(card, x, openY, { height = openSize.h, selected = card.selected })
+                ui.faceUpHitboxes[i] = { x = x, y = openY, w = openSize.w, h = openSize.h }
+            end
         end
     end
 
