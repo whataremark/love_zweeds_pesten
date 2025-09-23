@@ -317,6 +317,7 @@ function ui.layout(w, h)
     local baseH = config.cardHeight or 200
     local aspect = baseW / baseH
 
+    ensureFonts()
     local innerW = math.max(0, w - 2 * ui.safe)
     local buttonH = math.max(ui.minTap, math.floor(ui.fontBig:getHeight() + ui.pad * 1.2))
 
@@ -652,7 +653,7 @@ function ui.button(x, y, w, h, label, enabled, id)
         love.graphics.setColor(baseColor[1], baseColor[2], baseColor[3], 0.85)
     end
     local radius = math.floor(16 * ui.scale)
-    love.graphics.rectangle("fill", x, y, w, h, radius, radius
+    love.graphics.rectangle("fill", x, y, w, h, radius, radius)
 
     love.graphics.setFont(ui.fontBig)
     love.graphics.setColor(1, 1, 1, active and 0.95 or (enabled and 0.88 or 0.45))
