@@ -18,6 +18,10 @@ local ai        --- later laden voor circular dependency
 ----------------------------------------------------------------------
 local bgCanvas
 local scene             = "playing"       -- "playing" | "gameover"
+local ronde             = 0
+local ongeldigeZetTimer = 0
+local toonPotOverlay    = false
+local buttons           = nil             -- actie-knoppen van ui
 
 ----------------------------------------------------------------------
 -- 2.  Kern-state (onveranderd uit je oude game.lua)
@@ -41,79 +45,6 @@ local function phase_for_player(i)
     return utils.phase_for_player(i)
 end
 
-local function ensureUIState()
-    game.uiState = game.uiState or { players = {}, actions = {}, ui = {}, turnInfo = {} }
-    local state = game.uiState
-
-    state.game = game
-    state.players = state.players or {}
-    for i, pdata in ipairs(player.players) do
-        local entry = state.players[i]
-        if not entry then
-            entry = {}
-            state.players[i] = entry
-        end
-        entry.id = i
-        entry.name = pdata.name or ("Speler " .. i)
-        entry.hand = pdata.hand
-        entry.faceDown = pdata.faceDown
-        entry.faceUp = pdata.faceUp
-    end
-    for i = #player.players + 1, #state.players do
-        state.players[i] = nil
-    end
-
-    state.me = net.localId or 1
-    state.pot = game.pot
-    state.center = state.center or {}
-    state.center.lastCard = game.pot[#game.pot]
-    state.center.prevCard = game.pot[#game.pot - 1]
-
-    state.turnInfo = {
-        string.format("Ronde %d", game.ronde or 1),
-        string.format("Speler aan zet: %d", game.currentPlayer or 1),
-        string.format("Fase: %s", game.state or "onbekend"),
-    }
-    if game.nextMustBeUnder7 then
-        table.insert(state.turnInfo, "Volgende kaart ≤ 7")
-    end
-    if game.extraTurn then
-        table.insert(state.turnInfo, "Extra beurt actief")
-    end
-
-    state.actions = state.actions or {}
-    local myTurn = (game.currentPlayer or 1) == (state.me or 1)
-    state.actions.canDraw = true
-    state.actions.canPlay = myTurn
-    state.actions.canPass = myTurn
-
-    state.ui = state.ui or {}
-    if game.showPotOverlay and (not state.ui.modal or state.ui.modal.type ~= "pot") then
-        state.ui.modal = { type = "pot" }
-    elseif not game.showPotOverlay and state.ui.modal and state.ui.modal.type == "pot" then
-        state.ui.modal = nil
-    end
-    game.showPotOverlay = state.ui.modal and state.ui.modal.type == "pot" or false
-
-    if type(state.emit) ~= "function" then
-        function state:emit(eventName, payload)
-            if game.handleUIEvent then
-                game.handleUIEvent(eventName, payload)
-            else
-                self.events = self.events or {}
-                table.insert(self.events, { name = eventName, payload = payload })
-            end
-        end
-    end
-
-    return state
-end
-
-function game.handleUIEvent(eventName, payload)
-    game.pendingUIEvents = game.pendingUIEvents or {}
-    table.insert(game.pendingUIEvents, { name = eventName, payload = payload })
-end
-
 ----------------------------------------------------------------------
 -- 3.  Initialisatie wanneer de state ge-enterd wordt
 ----------------------------------------------------------------------
@@ -130,13 +61,11 @@ function game.load(cfg)
     game.start(cfg and cfg.mode or "ai")
 
     -- reset lokale timers / flags
-    scene = "playing"
-    game.ronde = game.ronde or 1
-    game.invalidTimer = 0
-    game.showPotOverlay = false
-
-    ensureUIState()
-    ui.load(nil, game.uiState)
+    scene             = "playing"
+    ronde             = 0
+    ongeldigeZetTimer = 0
+    toonPotOverlay    = false
+    buttons           = nil
 end
 
 ----------------------------------------------------------------------
@@ -151,7 +80,12 @@ function game.update(dt)
         if net.isHost() then net.send_state() end
     end
 
-    -- Reveal-timer (blinde kaart)
+    -- A) Ongeldige-zet-timer
+    if ongeldigeZetTimer > 0 then
+        ongeldigeZetTimer = ongeldigeZetTimer - dt
+    end
+
+    -- B) Reveal-timer (blinde kaart)
     if game.reveal.timer > 0 then
         game.reveal.timer = game.reveal.timer - dt
         if game.reveal.timer <= 0 then
@@ -186,11 +120,6 @@ function game.update(dt)
     if game.winner then
         scene = "gameover"
     end
-
-    local uiState = ensureUIState()
-    if ui and ui.update then
-        ui.update(dt, uiState)
-    end
 end
 
 ----------------------------------------------------------------------
@@ -198,8 +127,6 @@ end
 ----------------------------------------------------------------------
 function game.draw()
     love.graphics.setBackgroundColor(0.1, 0.4, 0.1)
-
-    local uiState = ensureUIState()
 
     if scene == "gameover" then
         ui.draw_end_screen(game.winner, player.players)
@@ -209,46 +136,262 @@ function game.draw()
     love.graphics.setColor(1, 1, 1)
     love.graphics.draw(bgCanvas, 0, 0)
 
-    ui.draw(uiState)
-end
+    ui.draw_pot(game.pot, ongeldigeZetTimer > 0, toonPotOverlay)
+    ui.draw_deck(drawPile)
+    ui.draw_all_players(player.players)
 
-function game.is_playing()
-    return scene == "playing"
+    love.graphics.setColor(0, 0, 0)
+    love.graphics.print("Ronde: "           .. ronde,                  20, 20)
+    love.graphics.print("Kaarten in pot: "  .. #game.pot,             20, 40)
+    love.graphics.print("Speler aan zet: "  .. game.currentPlayer,    20, 60)
+    love.graphics.print("AI-timer: "        .. string.format("%.2f", game.aiTimer), 20, 80)
+
+    if game.state ~= "setupSelectOpen" and game.state ~= "setupAISelect" then
+        buttons = ui.draw_action_buttons()
+    else
+        buttons = nil
+    end
 end
 
 ----------------------------------------------------------------------
 -- 6.  Input-callbacks (uit je oude main.lua)
 ----------------------------------------------------------------------
-function game.mousepressed(x, y, button) end
-function game.mousereleased(x, y, button) end
-function game.mousemoved(x, y, dx, dy) end
-function game.wheelmoved(dx, dy) end
-function game.touchpressed(id, x, y, dx, dy, pressure) end
-function game.touchreleased(id, x, y, dx, dy, pressure) end
-function game.touchmoved(id, x, y, dx, dy, pressure) end
+function game.mousepressed(x, y, button)
+    if game.reveal.timer > 0 then return end
+    local myId = net.localId or 1
+    --if #faceUp >= config.SETUP_OPEN then return end
+
+    ------------------------------------------------------------------
+    -- 1.  SETUP‑fase – kies 3 open kaarten
+    ------------------------------------------------------------------
+    if game.state == "setupSelectOpen" and button == 1 then
+        local faceUp    = player.players[myId].faceUp
+        if #faceUp >= config.SETUP_OPEN then return end   -- ← stop na 3
+        local hand      = player.players[myId].hand
+        local positions = ui.get_card_positions(hand)
+
+        for i = #positions, 1, -1 do
+            local p = positions[i]
+            if utils.inside(x, y, p.x, p.y, p.w, p.h) then
+                -- kaart uit hand naar faceUp verplaatst
+                local kaart = table.remove(hand, i)
+                table.insert(player.players[myId].faceUp, kaart)
+                -- ✱  alleen de multiplayer‑client stuurt dit pakket
+                if net.isClient() then
+                    net.send({
+                        cmd  = "OPEN_ADD",
+                        id   = myId,
+                        card = { kleur = kaart.kleur,
+                                waarde = kaart.waarde,
+                                naam   = kaart.naam }      --nieuw
+                    })
+                end
+
+                if #player.players[myId].faceUp == config.SETUP_OPEN then
+                    ------------------------------------------------------
+                    -- A. Solo (AI)  → AI moet open kaarten kiezen
+                    ------------------------------------------------------
+                    if game.mode == "ai" then
+                        game.state = "setupAISelect"
+                    end
+
+                    ------------------------------------------------------
+                    -- B. Multiplayer ‑ host finalizeert, client meldt klaar
+                    ------------------------------------------------------
+                    local iAmHost = (game.mode == "multiplayer" and net.isHost())
+
+                    if iAmHost or game.mode ~= "multiplayer" then
+                        game.finalize_setup()          -- host  of  solo
+                    else
+                        -- client: laat host weten dat zijn open‑fase klaar is
+                        net.send({cmd = "OPEN_DONE", id = myId})
+                    end
+                end
+                return
+            end
+        end
+    end
+
+    ------------------------------------------------------------------
+    -- 2.  OPEN‑fase – kaart uit faceUp selecteren
+    ------------------------------------------------------------------
+    if game.state == "playingOpen"
+    and game.currentPlayer == myId
+    and button == 1 then
+
+        local fp = player.players[myId].faceUp    -- lokaal
+        if #fp == 0 then return end               -- niks te selecteren
+
+        local w = love.graphics.getWidth()
+        local TARGET_H, PADDING = 140, 15
+        local boxH   = TARGET_H + 40
+        local boxY   = love.graphics.getHeight() - boxH - 10
+        local yRow   = ui.row_faceUp_Y(boxY, myId)
+
+        if y < yRow or y > yRow + TARGET_H then return end
+
+        local first   = fp[1].afbeelding
+        local scale   = TARGET_H / first:getHeight()
+        local cardW   = first:getWidth() * scale
+        local spacing = cardW + PADDING
+        local totalW  = #fp * spacing - PADDING
+        local xStart  = (w - totalW) / 2
+        local col     = math.floor((x - xStart) / spacing) + 1
+
+        if fp[col] then
+            player.toggle_select(fp, col, "open")
+        end
+        return
+    end
+
+
+  ------------------------------------------------------------------
+    -- 3.  BLIND‑fase – klik op een faceDown‑kaart
+    ------------------------------------------------------------------
+    if game.state == "playingBlind"
+       and game.currentPlayer == myId
+       and button == 1 then
+
+        local boxY = love.graphics.getHeight() - (160 + 40) - 10
+        local yRow = ui.row_faceDown_Y(boxY, myId)
+        if y >= yRow and y <= yRow + 160 then
+            local kaart = table.remove(player.players[myId].faceDown, 1)
+            game.reveal.timer  = 1.0
+            game.reveal.card   = kaart
+            game.reveal.player = myId
+            return
+        end
+    end
+
+    ------------------------------------------------------------------
+    -- 4.  ACTIE‑KNOPPEN + kaartselectie in hand
+    ------------------------------------------------------------------
+    if button == 1 then
+        if buttons then
+            -- PICK‑UP
+            local b = buttons.pickup
+            if b and utils.inside(x, y, b.x, b.y, b.w, b.h) then
+                if net.isClient() and game.currentPlayer == myId then
+                    net.pickup_from_client()
+                elseif game.currentPlayer == myId then
+                    utils.transfer_all_cards(player.players[myId].hand, game.pot)
+                    utils.deselect_all(player.players[myId].hand)
+                    game.nextMustBeUnder7 = false
+                    game.next_turn()
+                end
+                return
+            end
+
+            -- PLAY (hand‑fase)
+            local bp = buttons.play
+            if bp and utils.inside(x, y, bp.x, bp.y, bp.w, bp.h)
+               and game.state == "playingHand" then
+
+                if game.currentPlayer ~= myId then return end
+                if net.isClient() then
+                    local cards = {}
+                    for _,k in ipairs(player.players[myId].hand) do
+                        if k.selected then
+                            table.insert(cards, {kleur=k.kleur, waarde=k.waarde})
+                        end
+                    end
+                    net.play_from_client(cards)
+                    utils.deselect_all(player.players[myId].hand)
+                else
+                    local ok = rules.play_selected_cards(game, myId)
+                    if ok then
+                        local p = player.players[myId]
+                        utils.refill_hand(p.hand, drawPile, config.CARDS_INHAND)
+                        utils.update_phase_for_player(game, myId)
+                    else
+                        ongeldigeZetTimer = 1.0
+                    end
+                end
+                return
+            end
+
+            -- PLAY (open‑fase)
+            if bp and utils.inside(x, y, bp.x, bp.y, bp.w, bp.h)
+               and game.state == "playingOpen" then
+                local ok = rules.play_selected_open(game, myId)
+                if not ok then ongeldigeZetTimer = 1.0 end
+                return
+            end
+
+            -- PASS
+            local bpass = buttons.pass
+            if bpass and utils.inside(x, y, bpass.x, bpass.y, bpass.w, bpass.h) then
+                if net.isClient() then
+                    net.pass_from_client()
+                elseif game.currentPlayer == myId and game.extraTurn then
+                    game.extraTurn = false
+                    game.next_turn()
+                end
+                return
+            end
+
+            -- BEKIJK POT
+            local bv = buttons.pot
+            if bv and utils.inside(x, y, bv.x, bv.y, bv.w, bv.h) then
+                toonPotOverlay = not toonPotOverlay
+                return
+            end
+
+            -- DESELECT
+            local bd = buttons.deselect
+            if bd and utils.inside(x, y, bd.x, bd.y, bd.w, bd.h) then
+                utils.deselect_all(player.players[myId].hand)
+                return
+            end
+        end
+
+        -- Kaart in hand selecteren
+        local hand      = player.players[myId].hand
+        local positions = ui.get_card_positions(hand)
+        for i = #positions, 1, -1 do
+            local p = positions[i]
+            if utils.inside(x, y, p.x, p.y, p.w, p.h) then
+                player.toggle_select(hand, i, game.state)
+                return
+            end
+        end
+    end
+end
+
+function game.wheelmoved(x, y)
+    if player.players[net.localId] then
+        local CARD_H_SRC, CARD_W_SRC = 500, 300
+        local CARD_H      = 160
+        local SCALE       = CARD_H / CARD_H_SRC
+        local CARD_W      = CARD_W_SRC * SCALE
+        local PADDING     = 15
+        local cardSpace   = CARD_W + PADDING
+
+        local p = player.players[net.localId]
+        p.scrollOffset = math.max(0, (p.scrollOffset or 0) - y * cardSpace)
+    end
+end
 
 function game.keypressed(key)
-    if key == "space" and scene == "playing" then
-        if ui.activate then
-            ui.activate("play")
+    if key == "space" and scene == "playing" and game.currentPlayer == net.localId then
+        local b = buttons and buttons.play
+        if b then
+            local cx, cy = b.x + b.w/2, b.y + b.h/2
+            game.mousepressed(cx, cy, 1)
         end
-    elseif key == "f2" and ui.toggleDebug then
-        ui.toggleDebug()
     end
 end
 
 --------------------------------------------------------------------
 -- game.start(mode)  – nieuwe ronde opzetten
 --------------------------------------------------------------------
-function game.start(mode, playersWanted)
+function game.start(mode)
     -------------------------------------------------------------- 0
     -- Trekstapel maken en schudden  ➜  **alleen de host doet dit**
     --------------------------------------------------------------
     if mode ~= "multiplayer-client" then
-        -- geef het gewenste aantal spelers door (extra arg is veilig als player.init het negeert)
-        drawPile.init(game.deckCount)
-        player.init(drawPile, playersWanted)
-        -- en zet vervolgens wat de player-module daadwerkelijk heeft aangemaakt
+        drawPile.init(game.deckCount)        -- host: deck & shuffle
+        player.init(drawPile)                -- host: kaarten delen
         game.maxPlayers = #player.players
     else
         -- client wacht op eerste STATE, weet maxPlayers nog niet
@@ -265,9 +408,8 @@ function game.start(mode, playersWanted)
     game.waitingForAI  = false
     game.extraTurn     = false
     game.winner        = nil
-    game.ronde         = 1
+    game.ronde         = 0
     game.state         = "setupSelectOpen"   -- mens kiest open kaarten
-    game.showPotOverlay = false
 
     -------------------------------------------------------------- 2
     -- Lege pot & start‑speler bepalen  ➜  host alleen

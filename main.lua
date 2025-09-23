@@ -10,12 +10,7 @@ function love.update(dt)        state.update(dt)        end
 function love.draw()            state.draw()            end
 function love.keypressed(...)   state.keypressed(...)   end
 function love.mousepressed(...) state.mousepressed(...) end
-function love.mousereleased(...) state.mousereleased(...) end
-function love.mousemoved(...)    state.mousemoved(...)    end
 function love.wheelmoved(...)   state.wheelmoved(...)   end
-function love.touchpressed(...) state.touchpressed(...) end
-function love.touchreleased(...) state.touchreleased(...) end
-function love.touchmoved(...)   state.touchmoved(...)   end
 
 function love.textinput(text)
     state.textinput(text)

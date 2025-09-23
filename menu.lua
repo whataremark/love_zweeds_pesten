@@ -30,31 +30,25 @@ local palette = {
 local cards = {}
 
 ------------------------------ menu-opties
--- menu.lua
 local options = {
-  { key="1", label="AI • 1 speler (1v1)", next=function()
-      state.enter(require("game"), { mode="ai", players=2 })
-    end },
-  { key="2", label="AI • 2 spelers (totaal 3)", next=function()
-      state.enter(require("game"), { mode="ai", players=3 })
-    end },
-  { key="3", label="AI • 3 spelers (totaal 4)", next=function()
-      state.enter(require("game"), { mode="ai", players=4 })
-    end },
-
-  -- bestaande online opties laat ik staan
-  { key="h", label="Host game", next=function()
-      state.enter(require("host_lobby"), { name="My Lobby" })
-    end },
-  { key="j", label="Join game", next=function()
-      state.enter(require("browser"))
-    end },
-  { key="d", label="Debug-join 192.168.178.166", next=function()
-      require("net").connect("192.168.178.166")
-      state.enter(require("client_lobby"), { ip = "192.168.178.166" })
-    end },
+    {key="a", label="Play vs AI",      next=function()
+        state.enter(require("game"), {mode="ai"})
+    end},
+    {key="h", label="Host game",       next=function()
+        state.enter(require("host_lobby"), {name="My Lobby"})
+    end},
+    {key="j", label="Join game",       next=function()
+        state.enter(require("browser"))
+    end},
+    --AUTOMATISCH JOIN PC UTRECHT
+    {key   = "d",
+    label = "Debug-join 192.168.178.166",
+    next  = function()
+        require("net").connect("192.168.178.166")
+        state.enter(require("client_lobby"), { ip = "192.168.178.166" })
+    end
+},
 }
-
 
 local function activateSelected()
     local index = menu.selected or 1
