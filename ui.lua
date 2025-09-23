@@ -855,7 +855,10 @@ function ui.resize(w, h)
     ui.viewport.h = h
     ui.metrics = computeMetrics(w, h)
     local aspect = ui.assets.cardBack and (ui.assets.cardBack:getWidth() / ui.assets.cardBack:getHeight()) or 0.7
-    local targetH = (utils.detectOrientation(w, h) == "horizontal") and math.floor(h * 0.22) or math.floor(h * 0.19)
+    -- nieuwe: iets compacter overal
+    local isH = (utils.detectOrientation(w, h) == "horizontal")
+    -- desktop (16:9) net wat kleiner, phone nog iets compacter
+    local targetH = isH and math.floor(h * 50) or math.floor(h * 0.16)
     ui.cardSize = utils.calcCardSize(targetH, aspect)
     ui.metrics.gap = math.max(ui.metrics.gap, math.floor(ui.cardSize.w * 0.25))
     ensureFonts()

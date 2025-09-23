@@ -240,13 +240,15 @@ end
 --------------------------------------------------------------------
 -- game.start(mode)  – nieuwe ronde opzetten
 --------------------------------------------------------------------
-function game.start(mode)
+function game.start(mode, playersWanted)
     -------------------------------------------------------------- 0
     -- Trekstapel maken en schudden  ➜  **alleen de host doet dit**
     --------------------------------------------------------------
     if mode ~= "multiplayer-client" then
-        drawPile.init(game.deckCount)        -- host: deck & shuffle
-        player.init(drawPile)                -- host: kaarten delen
+        -- geef het gewenste aantal spelers door (extra arg is veilig als player.init het negeert)
+        drawPile.init(game.deckCount)
+        player.init(drawPile, playersWanted)
+        -- en zet vervolgens wat de player-module daadwerkelijk heeft aangemaakt
         game.maxPlayers = #player.players
     else
         -- client wacht op eerste STATE, weet maxPlayers nog niet
