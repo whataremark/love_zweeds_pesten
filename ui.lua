@@ -111,6 +111,7 @@ local function ensureFonts()
         if fallback then
             ui.fontBigSize = fallback:getHeight()
         end
+
     end
 
     if not ui.fontSmall then
@@ -311,7 +312,10 @@ function ui.layout(w, h)
         opponent = makeSize(0.8),
     }
 
-    ensureFonts()
+
+    local baseW = config.cardWidth or 140
+    local baseH = config.cardHeight or 200
+    local aspect = baseW / baseH
 
     local innerW = math.max(0, w - 2 * ui.safe)
     local buttonH = math.max(ui.minTap, math.floor(ui.fontBig:getHeight() + ui.pad * 1.2))
@@ -340,6 +344,7 @@ function ui.layout(w, h)
         y = cursorBottom - faceBlockH,
         w = innerW,
         h = faceBlockH,
+
     }
     cursorBottom = ui.areas.faceBottom.y - ui.pad
 
@@ -438,6 +443,7 @@ function ui.layout(w, h)
             end
         end
     end
+
 
     adjustSections(sections, centralHeight)
 
@@ -645,16 +651,15 @@ function ui.button(x, y, w, h, label, enabled, id)
     else
         love.graphics.setColor(baseColor[1], baseColor[2], baseColor[3], 0.85)
     end
-
     local radius = math.floor(16 * ui.scale)
-    love.graphics.rectangle("fill", x, y, w, h, radius, radius)
+    love.graphics.rectangle("fill", x, y, w, h, radius, radius
 
     love.graphics.setFont(ui.fontBig)
     love.graphics.setColor(1, 1, 1, active and 0.95 or (enabled and 0.88 or 0.45))
     love.graphics.printf(label, x + 6, y + (h - ui.fontBig:getHeight()) / 2, w - 12, "center")
     love.graphics.setColor(1, 1, 1, 1)
-
     ui.buttons[id] = { x = x, y = y, w = w, h = h, enabled = enabled, label = label }
+
 end
 
 local function drawButtonsRow(area, states)
@@ -695,6 +700,7 @@ local function drawDrawPile(layout, count)
         love.graphics.setColor(1, 1, 1, 0.25 + 0.15 * i)
         ui.drawCard(nil, layout.x + offset, layout.y - offset, { back = true, height = size.h })
     end
+
     love.graphics.setColor(1, 1, 1, 1)
 end
 
@@ -752,7 +758,7 @@ local function drawCenterArea(game)
     love.graphics.printf(string.format("Deck: %d", drawCount), drawLayout.x - ui.pad, labelY, size.w + ui.pad * 2, "center")
     love.graphics.printf(string.format("Pot: %d", #game.pot), potLayout.x - ui.pad, labelY, size.w + ui.pad * 2, "center")
     love.graphics.setColor(1, 1, 1, 1)
-
+    clearScissor()
     clearScissor()
 
     ui.centerLayout.draw = { x = drawLayout.x, y = cardY, w = size.w, h = size.h }
@@ -830,6 +836,7 @@ local function drawBottomStacks(pData)
     local downX = area.x + (area.w - downTotal) / 2
     local downY = area.y + area.h - downSize.h - ui.pad
 
+
     love.graphics.setFont(ui.fontSmall)
     love.graphics.setColor(1, 1, 1, 0.75)
     love.graphics.printf("Dichte kaarten", area.x + ui.pad, downY - labelHeight - ui.pad * 0.2, area.w - ui.pad * 2, "left")
@@ -846,6 +853,7 @@ local function drawBottomStacks(pData)
         love.graphics.printf("Geen dichte kaarten", area.x + ui.pad, downY + downSize.h / 2 - labelHeight / 2, area.w - ui.pad * 2, "left")
         love.graphics.setColor(1, 1, 1, 1)
     end
+
 
     local openCount = #faceUp
     local openGap = openCount > 1 and math.min(openSize.w * 0.6, (width - openSize.w) / (openCount - 1)) or 0
@@ -986,6 +994,7 @@ end
 local function drawOpponentFaceDown(opponent)
     local rect = ui.areas.opponentFaceDown
     if not rect or rect.w <= 0 or rect.h <= 0 then return end
+
 
     drawPanelBackground(rect, 0.12)
     scissorRect(rect)
