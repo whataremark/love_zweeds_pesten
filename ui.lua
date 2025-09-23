@@ -65,17 +65,60 @@ local function clamp01(value)
     return value
 end
 
+local function tryLoadFont(size)
+    local ok, font = pcall(love.graphics.newFont, size)
+    if ok and font then
+        return font
+    end
+    return nil
+end
+
 local function ensureFonts()
     local bigSize   = math.max(22, math.floor(28 * ui.scale))
     local smallSize = math.max(16, math.floor(18 * ui.scale))
 
-    if not ui.fontBig or ui.fontBigSize ~= bigSize then
-        ui.fontBig = love.graphics.newFont(bigSize)
-        ui.fontBigSize = bigSize
+    if (not ui.fontBig) or ui.fontBigSize ~= bigSize then
+        local newFont = tryLoadFont(bigSize)
+        if newFont then
+            ui.fontBig = newFont
+            ui.fontBigSize = bigSize
+        elseif not ui.fontBig then
+            local fallback = love.graphics.getFont() or tryLoadFont(18)
+            ui.fontBig = fallback
+            if fallback then
+                ui.fontBigSize = fallback:getHeight()
+            end
+        end
     end
-    if not ui.fontSmall or ui.fontSmallSize ~= smallSize then
-        ui.fontSmall = love.graphics.newFont(smallSize)
-        ui.fontSmallSize = smallSize
+
+    if (not ui.fontSmall) or ui.fontSmallSize ~= smallSize then
+        local newFont = tryLoadFont(smallSize)
+        if newFont then
+            ui.fontSmall = newFont
+            ui.fontSmallSize = smallSize
+        else
+            local fallback = ui.fontBig or love.graphics.getFont() or tryLoadFont(12)
+            ui.fontSmall = fallback
+            if fallback then
+                ui.fontSmallSize = fallback:getHeight()
+            end
+        end
+    end
+
+    if not ui.fontBig then
+        local fallback = love.graphics.getFont() or tryLoadFont(18)
+        ui.fontBig = fallback
+        if fallback then
+            ui.fontBigSize = fallback:getHeight()
+        end
+
+    end
+
+    if not ui.fontSmall then
+        ui.fontSmall = ui.fontBig
+        if ui.fontSmall then
+            ui.fontSmallSize = ui.fontSmall:getHeight()
+        end
     end
 end
 
@@ -498,7 +541,6 @@ end
 --- HUD rendering -----------------------------------------------------------------
 local function drawInfoPanel(game, hint, statusLines)
     local area = ui.areas.infoPanel
-
     if not area or area.w <= 0 or area.h <= 0 then return end
 
     drawPanelBackground(area, 0.16)
@@ -550,7 +592,6 @@ local function drawInfoPanel(game, hint, statusLines)
             if type(wrapped) ~= "table" then
                 wrapped = { tostring(text) }
             end
-
             for _, row in ipairs(wrapped) do
                 love.graphics.printf(row, area.x + ui.pad, y, width, "left")
                 y = y + lineHeight
@@ -601,7 +642,6 @@ function ui.button(x, y, w, h, label, enabled, id)
         draw = {0.78, 0.2, 0.2},
         play = {0.16, 0.55, 0.32},
         pass = {0.95, 0.75, 0.25},
-
     }
     local baseColor = palettes[id] or {0.18, 0.33, 0.5}
     if not enabled then
@@ -611,15 +651,13 @@ function ui.button(x, y, w, h, label, enabled, id)
     else
         love.graphics.setColor(baseColor[1], baseColor[2], baseColor[3], 0.85)
     end
-
     local radius = math.floor(16 * ui.scale)
-    love.graphics.rectangle("fill", x, y, w, h, radius, radius)
+    love.graphics.rectangle("fill", x, y, w, h, radius, radius
 
     love.graphics.setFont(ui.fontBig)
     love.graphics.setColor(1, 1, 1, active and 0.95 or (enabled and 0.88 or 0.45))
     love.graphics.printf(label, x + 6, y + (h - ui.fontBig:getHeight()) / 2, w - 12, "center")
     love.graphics.setColor(1, 1, 1, 1)
-
     ui.buttons[id] = { x = x, y = y, w = w, h = h, enabled = enabled, label = label }
 
 end
@@ -636,7 +674,6 @@ local function drawButtonsRow(area, states)
     local usableW = area.w - ui.pad * 2
     local width = math.max(ui.minTap * 1.6, math.floor((usableW - gap * 2) / 3))
     local totalW = width * 3 + gap * 2
-
     local startX = area.x + (area.w - totalW) / 2
     local y = area.y + (area.h - buttonH) / 2
 
@@ -721,6 +758,7 @@ local function drawCenterArea(game)
     love.graphics.printf(string.format("Deck: %d", drawCount), drawLayout.x - ui.pad, labelY, size.w + ui.pad * 2, "center")
     love.graphics.printf(string.format("Pot: %d", #game.pot), potLayout.x - ui.pad, labelY, size.w + ui.pad * 2, "center")
     love.graphics.setColor(1, 1, 1, 1)
+    clearScissor()
     clearScissor()
 
     ui.centerLayout.draw = { x = drawLayout.x, y = cardY, w = size.w, h = size.h }
@@ -881,7 +919,6 @@ local function drawHandBottom(game, pData)
         local x = view.xStart + (index - 1) * view.step
         local hitW = view.hitW
         local hitX = x - (hitW - cardW) / 2
-
         hitX = clamp(rect.x, hitX, rect.x + rect.w - hitW)
         local selected = card.selected
         local drawY = selected and (baseline - lift) or baseline
@@ -899,7 +936,6 @@ local function drawHandBottom(game, pData)
 
     for _, info in ipairs(selectedLater) do
         ui.drawCard(info.card, info.x, info.y, { height = cardH, selected = true })
-
     end
 
     drawOverflowIndicators(rect, view)
@@ -1000,7 +1036,6 @@ end
 local function drawTopOpponent(opponent)
     drawOpponentHand(opponent)
     drawOpponentFaceDown(opponent)
-
 end
 
 --- Debug overlay ----------------------------------------------------------------
@@ -1046,7 +1081,6 @@ function ui.draw(game, drawPile)
     local buttonsArea = ui.areas.buttons
     if buttonsArea and buttonsArea.w > 0 and buttonsArea.h > 0 then
         drawButtonsRow(buttonsArea, states)
-
     end
 
     drawPotOverlay(game)
