@@ -38,6 +38,9 @@ game.extraTurn         = false
 game.winner            = nil
 game.reveal            = { timer = 0, player = nil, card = nil }
 
+-- NIEUW: generieke rotatie
+local function next_seat(i, max) return (i % max) + 1 end
+
 ----------------------------------------------------------------------
 -- Hulp: fase bepalen
 ----------------------------------------------------------------------
@@ -49,18 +52,16 @@ end
 -- 3.  Initialisatie wanneer de state ge-enterd wordt
 ----------------------------------------------------------------------
 function game.load(cfg)
-    ui = ui or require("ui")   -- lazy require, pas nu is de lus weg
+    ui    = ui    or require("ui")
     rules = rules or require("rules")
     ai    = ai    or require("ai")
 
-    -- achtergrond één keer prerenderen
     bgCanvas = utils.generate_green_felt_background(
                    love.graphics.getWidth(), love.graphics.getHeight())
 
-    -- start een nieuwe ronde in gevraagde modus (ai / host / client)
-    game.start(cfg and cfg.mode or "ai")
+    -- ⬇︎ voeg aiCount doorgeefluik toe (val terug op 1)
+    game.start(cfg and cfg.mode or "ai", cfg and cfg.aiCount or 1)
 
-    -- reset lokale timers / flags
     scene             = "playing"
     ronde             = 0
     ongeldigeZetTimer = 0
@@ -385,13 +386,46 @@ end
 --------------------------------------------------------------------
 -- game.start(mode)  – nieuwe ronde opzetten
 --------------------------------------------------------------------
-function game.start(mode)
+function game.start(mode, aiCount)
     -------------------------------------------------------------- 0
     -- Trekstapel maken en schudden  ➜  **alleen de host doet dit**
     --------------------------------------------------------------
     if mode ~= "multiplayer-client" then
         drawPile.init(game.deckCount)        -- host: deck & shuffle
-        player.init(drawPile)                -- host: kaarten delen
+
+        ------------------------------------------------------------------
+        -- NIEUW: AI-seats uitbreiden zonder MP te breken
+        -- - We roepen jouw bestaande player.init(drawPile) aan (zoals nu),
+        --   en vullen daarna extra AI-spelers aan tot gewenst aantal.
+        ------------------------------------------------------------------
+        player.init(drawPile)                -- jouw bestaande uitdelen
+
+        -- Alleen in AI-modus willen we 1..3 extra AI's kunnen hebben
+        if mode ~= "multiplayer-host" and mode ~= "multiplayer-client" then
+            local desired = 1 + (tonumber(aiCount) or 1)     -- 1 speler + N AI
+            if desired < 2 then desired = 2 end              -- min. 1 AI
+            if desired > (config.MAX_SEATS or 4) then
+                desired = (config.MAX_SEATS or 4)
+            end
+
+            -- Zorg dat alle niet-1 seats als AI gemarkeerd zijn
+            for i = 2, #player.players do
+                player.players[i].isAI = true
+            end
+
+            -- Voeg ontbrekende AI-spelers toe en deel kaarten
+            while #player.players < desired do
+                local p = { hand = {}, faceUp = {}, faceDown = {}, scrollOffset = 0, isAI = true }
+                for _ = 1, (config.HAND_SIZE or 6) do
+                    table.insert(p.hand, drawPile.draw())
+                end
+                for _ = 1, (config.BLIND_SIZE or 3) do
+                    table.insert(p.faceDown, drawPile.draw())
+                end
+                table.insert(player.players, p)
+            end
+        end
+
         game.maxPlayers = #player.players
     else
         -- client wacht op eerste STATE, weet maxPlayers nog niet
@@ -399,7 +433,7 @@ function game.start(mode)
     end
 
     -------------------------------------------------------------- 1
-    -- Basis‑status resetten
+    -- Basis-status resetten
     --------------------------------------------------------------
     game.mode = (mode == "multiplayer-host" or mode == "multiplayer-client")
                 and "multiplayer" or (mode or "ai")
@@ -412,13 +446,13 @@ function game.start(mode)
     game.state         = "setupSelectOpen"   -- mens kiest open kaarten
 
     -------------------------------------------------------------- 2
-    -- Lege pot & start‑speler bepalen  ➜  host alleen
+    -- Lege pot & start-speler bepalen  ➜  host alleen
     --------------------------------------------------------------
     game.pot = {}
     game.nextMustBeUnder7 = false
 
     -------------------------------------------------------------- 3
-    -- Netwerk‑koppeling
+    -- Netwerk-koppeling
     --------------------------------------------------------------
     if mode == "multiplayer-host" then
         net.set_game(game)
@@ -427,7 +461,6 @@ function game.start(mode)
         net.set_game(game)     -- snapshot zal alles vullen
     end
 end
-
 
 ----------------------------------------------------------------------
 -- nadat álle spelers hun 3 open kaarten hebben gekozen
@@ -488,20 +521,21 @@ end
 -- game.next_turn()  – speler-wissel + AI-timer + fase-update
 --------------------------------------------------------------------
 function game.next_turn()
-    game.currentPlayer = (game.currentPlayer % game.maxPlayers) + 1
-    utils.update_phase_for_player(game, game.currentPlayer)
+  -- als iemand al ‘finished’ is: winner check in check_winner()
+  repeat
+    game.currentPlayer = next_seat(game.currentPlayer, game.maxPlayers)
+  until true  -- (eventueel overslaan van 'finished' seats)
 
-    print(string.format("[TURN] now player id=%d", game.currentPlayer))
-
-    if game.mode == "ai" and game.currentPlayer == 2 then
-        game.waitingForAI = true
-        game.aiTimer      = 0.5            -- korte denk-pauze
-    else
-        game.waitingForAI = false
-        game.aiTimer      = 0
-    end
-    game.check_winner()
+  utils.update_phase_for_player(game, game.currentPlayer)
+  -- AI timer gating (alleen wanneer de huidige speler AI is)
+  if game.mode == "ai" and player.players[game.currentPlayer].isAI then
+    game.waitingForAI = true
+    game.aiTimer      = 0.5
+  else
+    game.waitingForAI = false
+  end
 end
+
 
 
 
@@ -510,14 +544,14 @@ end
 -- game.check_winner()  – einde-spel controle
 --------------------------------------------------------------------
 function game.check_winner()
-    for i, p in ipairs(player.players) do
-        if #p.hand == 0 and #p.faceUp == 0 and #p.faceDown == 0 then
-            game.winner = i
-            scene       = "gameover"       -- activeer draw-scherm
-            print("[GAME] Speler "..i.." wint!")
-            return
-        end
+  for i=1, game.maxPlayers do
+    local p = player.players[i]
+    if #p.hand==0 and #p.faceUp==0 and #p.faceDown==0 then
+      game.winner = i
+      return true
     end
+  end
+  return false
 end
 
 return game

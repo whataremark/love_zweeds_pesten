@@ -1,6 +1,7 @@
 -- menu.lua  (met AI-keuze)
 local state      = require("state")
 local menu       = {}
+local aiCount = 1   -- standaard 1 AI
 
 ------------------------------ fonts één keer maken
 local titleFont
@@ -31,23 +32,21 @@ local cards = {}
 
 ------------------------------ menu-opties
 local options = {
-    {key="a", label="Play vs AI",      next=function()
-        state.enter(require("game"), {mode="ai"})
-    end},
-    {key="h", label="Host game",       next=function()
-        state.enter(require("host_lobby"), {name="My Lobby"})
-    end},
-    {key="j", label="Join game",       next=function()
-        state.enter(require("browser"))
-    end},
-    --AUTOMATISCH JOIN PC UTRECHT
-    {key   = "d",
-    label = "Debug-join 192.168.178.166",
-    next  = function()
-        require("net").connect("192.168.178.166")
-        state.enter(require("client_lobby"), { ip = "192.168.178.166" })
-    end
-},
+  { key="1", label="Play vs 1 AI", next=function()
+      state.enter(require("game"), { mode="ai", aiCount = 1 })
+    end },
+  { key="2", label="Play vs 2 AI", next=function()
+      state.enter(require("game"), { mode="ai", aiCount = 2 })
+    end },
+  { key="3", label="Play vs 3 AI", next=function()
+      state.enter(require("game"), { mode="ai", aiCount = 3 })
+    end },
+  { key="h", label="Host game", next=function()
+      state.enter(require("host_lobby"), { name="My Lobby" })
+    end },
+  { key="j", label="Join game", next=function()
+      state.enter(require("browser"))
+    end },
 }
 
 local function activateSelected()
@@ -201,22 +200,13 @@ function menu.draw()
 end
 
 function menu.keypressed(key)
-    if not menu.selected then
-        menu.selected = 1
-    end
-    if key == "up"   then
-        menu.selected = (menu.selected - 2) % #options + 1
-        return
-    end
-    if key == "down" then
-        menu.selected =  menu.selected      % #options + 1
-        return
-    end
-
-    local opt = options[menu.selected]
-    if opt and (key == "return" or key == "kpenter" or key == "space" or key == opt.key) then
-        activateSelected()
-    end
+  if key == "up"   then menu.selected = math.max(1, (menu.selected or 1)-1) return end
+  if key == "down" then menu.selected = math.min(#options, (menu.selected or 1)+1) return end
+  if key == "return" then options[menu.selected].next(); return end
+  if key == "1" or key == "2" or key == "3" then
+      options[ ({["1"]=1,["2"]=2,["3"]=3})[key] ].next()
+      return
+  end
 end
 
 function menu.mousepressed(x, y, button)
