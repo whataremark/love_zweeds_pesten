@@ -80,28 +80,42 @@ end
 --------------------------------------------------------------------
 --  Hulpfunctie: bepaal nieuwe fase voor een speler
 --------------------------------------------------------------------
-local function phase_for_player_cached(id)
-    -- LAZY‑require voorkomt require‑loop
-    local playerMod = require("player")
-
-    local p = playerMod.players[id]
+local function phase_for_player_obj(p)
     if not p then return "unknown" end
-
     if #p.hand     > 0 then return "playingHand"
     elseif #p.faceUp   > 0 then return "playingOpen"
     elseif #p.faceDown > 0 then return "playingBlind"
-    else                      return "finished"
-    end
+    else                      return "finished" end
 end
 
 function utils.phase_for_player(id)
-    return phase_for_player_cached(id)
+    local playerMod = require("player")
+    return phase_for_player_obj(playerMod.players[id])
 end
 
+-- ⚠️ schrijf de fase op de speler zelf; alleen currentPlayer spiegelt naar game.state
 function utils.update_phase_for_player(game, id)
-    game.state = phase_for_player_cached(id)
+    local playerMod = require("player")
+    local p = playerMod.players[id]
+    if not p then return "unknown" end
+    p.phase = phase_for_player_obj(p)
+    if id == game.currentPlayer then
+        game.state = p.phase
+    end
+    return p.phase
 end
 
+-- handig: cached phase ophalen; zo nodig eerst berekenen
+function utils.phase_of(game, id)
+    local playerMod = require("player")
+    local p = playerMod.players[id]
+    if not p then return "unknown" end
+    -- GEEN state-mutatie hier: puur afleiden uit de actuele stapels
+    if #p.hand     > 0 then return "playingHand"
+    elseif #p.faceUp   > 0 then return "playingOpen"
+    elseif #p.faceDown > 0 then return "playingBlind"
+    else                      return "finished" end
+end
 
 function utils.update_reveal_logic(dt, game)
     if game.reveal.timer > 0 then

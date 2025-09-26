@@ -160,9 +160,9 @@ end
 ----------------------------------------------------------------------
 function game.mousepressed(x, y, button)
     if game.reveal.timer > 0 then return end
-    local myId = net.localId or 1
-    --if #faceUp >= config.SETUP_OPEN then return end
-    local btns = buttons or game._uiButtons
+    local myId    = net.localId or 1
+    local myPhase = utils.phase_of(game, myId)
+    local btns    = buttons or game._uiButtons
 
     ------------------------------------------------------------------
     -- 0) PRIORITEIT: PLAY (open-fase) vóór selectie afhandelen
@@ -170,7 +170,7 @@ function game.mousepressed(x, y, button)
     if button == 1 and btns then
         local bp = btns.play
         if bp and utils.inside(x, y, bp.x, bp.y, bp.w, bp.h)
-           and game.state == "playingOpen"
+           and myPhase == "playingOpen"
            and game.currentPlayer == myId then
 
             -- debug: tel selectie
@@ -243,7 +243,7 @@ function game.mousepressed(x, y, button)
     ------------------------------------------------------------------
     -- 2.  OPEN‑fase – kaart uit faceUp selecteren
     ------------------------------------------------------------------
-    if game.state == "playingOpen"
+    if myPhase == "playingOpen"
         and game.currentPlayer == myId
         and button == 1 then
 
@@ -281,7 +281,7 @@ function game.mousepressed(x, y, button)
   ------------------------------------------------------------------
     -- 3.  BLIND‑fase – klik op een faceDown‑kaart
     -----------------------------------------------------------------
-    if game.state == "playingBlind"
+    if myPhase == "playingBlind"
        and game.currentPlayer == myId
        and button == 1 then
 
@@ -317,7 +317,8 @@ function game.mousepressed(x, y, button)
 -- PLAY (hand-fase)
         local bp = btns.play
         if bp and utils.inside(x, y, bp.x, bp.y, bp.w, bp.h)
-           and game.state == "playingHand" then
+        and myPhase == "playingHand"
+        and game.currentPlayer == myId then
 
             if game.currentPlayer ~= myId then return end
             if net.isClient() then
@@ -342,29 +343,8 @@ function game.mousepressed(x, y, button)
             return
         end
     
-            -- PLAY (open-fase)
-do
-  local bp = buttons and buttons.play
-  if bp and utils.inside(x, y, bp.x, bp.y, bp.w, bp.h) then
-    if game.state == "playingOpen" then
-      if game.currentPlayer ~= myId then return end
-      -- tel selectie (debug)
-      local sel = 0
-      for _,k in ipairs(player.players[myId].faceUp or {}) do
-        if k.selected then sel = sel + 1 end
-      end
-      print(("[CLICK] PLAY(open) seat=%d cur=%d selectedOpen=%d")
-            :format(myId, game.currentPlayer, sel))
-
-      local ok = rules.play_selected_open(game, myId)
-      print("[PLAY_OPEN] result =", ok)
-      if not ok then ongeldigeZetTimer = 1.0 end
-      return
-    end
-  end
-
             -- PASS
-            local bpass = buttons.pass
+            local bpass = btns.pass
             if bpass and utils.inside(x, y, bpass.x, bpass.y, bpass.w, bpass.h) then
                 if net.isClient() then
                     net.pass_from_client()
@@ -376,14 +356,14 @@ do
             end
 
             -- BEKIJK POT
-            local bv = buttons.pot
+            local bv = btns.pot
             if bv and utils.inside(x, y, bv.x, bv.y, bv.w, bv.h) then
                 toonPotOverlay = not toonPotOverlay
                 return
             end
 
             -- DESELECT
-            local bd = buttons.deselect
+            local bd = btns.deselect
             if bd and utils.inside(x, y, bd.x, bd.y, bd.w, bd.h) then
                 utils.deselect_all(player.players[myId].hand)
                 return
@@ -399,13 +379,13 @@ do
         for i = #positions, 1, -1 do
             local p = positions[i]
             if utils.inside(x, y, p.x, p.y, p.w, p.h) then
-                player.toggle_select(hand, i, game.state)
+                player.toggle_select(hand, i, myPhase)
                 return
             end
         end
     end
 end
-end
+
 
 function game.wheelmoved(x, y)
     if player.players[net.localId] then
