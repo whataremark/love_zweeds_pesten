@@ -1,125 +1,168 @@
-local json   = require("json")
+local json     = require("json")
 local drawPile = require("drawpile")
-local rules  = require("rules")
-local player = require("player")
-local utils  = require("utils")
-local config = require("config")
-local game --empty for circular dependency
+local rules    = require("rules")
+local player   = require("player")
+local utils    = require("utils")
+local config   = require("config")
+local socket   = require("socket")
 
 local net = {}
 
-net.localId = 1
-
-local import_state
-
-net.mode   = nil -- 'host' or 'client'
-net.server = nil
-net.conn   = nil
-net.client = nil
-net.netGame = nil
-net.started = false
+net.localId     = 1
+net.mode        = nil   -- 'host' or 'client'
+net.server      = nil
+net.conn        = nil
+net.client      = nil
+net.netGame     = nil
+net.started     = false
 
 net.game        = nil     -- wordt later gekoppeld via net.set_game
 net.newClients  = {}      -- wachtrij met binnengekomen namen/IP's
 
+----------------------------------------------------------------------
+-- Broadcast / discovery (LAN)
+----------------------------------------------------------------------
+local BCAST_PORT    = 22123
+local MAGIC         = "CARDGAME_LOBBY"
+local udp           = socket.udp
 
--- roept elke  ~2s  net.update_lan(dt)  aan als je host bent
----------------------------------------------------------------------------
--- net.update_lan(dt, lobbyName)
---  ⏱️  Wordt door de host-lobby elke ~2 s aangeroepen om op het LAN
---     een UDP-broadcast te sturen zodat Join-clients de server kunnen zien.
----------------------------------------------------------------------------
-local BCAST_PORT  = 22123
-local MAGIC       = "CARDGAME_LOBBY"
-local socket       = require("socket")
-local udp = socket.udp         -- ❶ nodig voor scan_lan()
+-- Beacon (host) – hergebruik dezelfde UDP-socket
+local beaconSocket  = nil
+local lastBeaconTime = 0
 
-local beaconSocket = nil        -- hergebruik dezelfde socket telkens
-local lastBeacon   = 0
+-- Scanner (client) – permanente luister-socket
+local scanSocket    = nil
 
-function net.update_lan(dt, lobbyName)
-    if not net.isHost() then return end         -- alleen host zendt uit
+-- Bepaal broadcast-doelen: universeel + /24 van je actieve NIC
+local function compute_broadcast_targets()
+    local list = { "255.255.255.255" }
+    local probe = socket.udp()
+    probe:settimeout(0)
+    -- gebruik een “peer” naar 8.8.8.8 om je lokale NIC te leren kennen
+    pcall(function() probe:setpeername("8.8.8.8", 53) end)
+    local ip = probe:getsockname()
+    if ip and ip:match("^%d+%.%d+%.%d+%.%d+$") then
+        local a,b,c,_ = ip:match("(%d+)%.(%d+)%.(%d+)%.(%d+)")
+        table.insert(list, string.format("%s.%s.%s.255", a,b,c))
+    end
+    probe:close()
 
-    -------------------------------------------------------------------
-    -- 1.  Socket aanmaken (één keer) en correct binden
-    -------------------------------------------------------------------
+    -- unique
+    local seen, out = {}, {}
+    for _,addr in ipairs(list) do
+        if not seen[addr] then seen[addr] = true; table.insert(out, addr) end
+    end
+    return out
+end
+
+-- Stuur elke ~2s een beacon met lobby-naam (alleen host)
+function net.update_lan(_dt, lobbyName)
+    if not net.isHost() then return end
+
     if not beaconSocket then
         beaconSocket = socket.udp()
-        beaconSocket:setoption("broadcast", true)      -- uitzend-flag
-        beaconSocket:setsockname("0.0.0.0", 0)         -- bind aan willekeurige poort
+        beaconSocket:setoption("broadcast", true)
+        beaconSocket:setsockname("0.0.0.0", 0)
     end
 
-    -------------------------------------------------------------------
-    -- 2.  Om de ±2 seconden een pakket uitsturen
-    -------------------------------------------------------------------
-    lastBeacon = lastBeacon + dt
-    if lastBeacon < 2 then return end
-    lastBeacon = 0
+    -- gebruik klok i.p.v. dt
+    local now = (love.timer and love.timer.getTime()) or os.clock()
+    if (now - lastBeaconTime) < 2 then return end
+    lastBeaconTime = now
 
     local payload = MAGIC .. "|" .. (lobbyName or "Lobby")
-
-    -------------------------------------------------------------------
-    -- 3.  Stuur naar universeel én subnet-broadcast (bv. 192.168.178.255)
-    -------------------------------------------------------------------
-    local targets = {
-        "255.255.255.255",
-        "192.168.178.255",   -- ← vervang dit adres door jouw eigen subnet
-    }
+    local targets = compute_broadcast_targets()
 
     for _,bc in ipairs(targets) do
-        local ok, err = beaconSocket:sendto(payload, bc, BCAST_PORT)
-        print("[beacon]", bc, ok and #payload or err)
+        local nbytes, err = beaconSocket:sendto(payload, bc, BCAST_PORT)
+        if nbytes then
+            print("[beacon]", bc, nbytes)
+        else
+            -- veel OS'en weigeren 255.255.255.255 → onderdruk die melding
+            local e = tostring(err or "")
+            if not e:lower():find("permission") then
+                print("[beacon]", bc, e)
+            end
+        end
     end
 end
 
--- geeft lijst { {ip="...", name="..."}, … }
+-- Non-blocking scan; roep dit b.v. 4x per seconde in je client-lobby
+-- Retourneert lijst { {ip="...", name="..."}, ... } voor wat er dit frame is gezien
 function net.scan_lan()
-    local s      = udp()
-    s:settimeout(0)
-    s:setsockname("*", BCAST_PORT)
-    local hosts  = {}
-    for _ = 1,50 do      -- max 50 pakketten lezen
-        local data, ip = s:receivefrom()
+    if not scanSocket then
+        scanSocket = socket.udp()
+        scanSocket:settimeout(0)
+        pcall(function() scanSocket:setoption("reuseaddr", true) end)
+        pcall(function() scanSocket:setoption("reuseport", true) end)
+        scanSocket:setsockname("0.0.0.0", BCAST_PORT)
+    end
+
+    local found = {}
+    for _ = 1, 50 do
+        local data, ip = scanSocket:receivefrom()
         if not data then break end
         if data:sub(1, #MAGIC) == MAGIC then
             local name = data:match("|(.+)$") or "Server"
-            hosts[ip]  = name
+            found[ip]  = name
         end
     end
-    s:close()
+
     local list = {}
-    for ip, name in pairs(hosts) do table.insert(list, {ip=ip, name=name}) end
+    for ip,name in pairs(found) do
+        table.insert(list, { ip = ip, name = name })
+    end
     table.sort(list, function(a,b) return a.ip < b.ip end)
     return list
 end
 
-
--- NET-BEGIN helper
-function net.isMultiplayer()
-    return net.mode ~= nil
-end
-function net.isHost() return net.mode == "host" end
-function net.isClient() return net.mode == "client" end
--- NET-END helper
+----------------------------------------------------------------------
+-- NET-helpers
+----------------------------------------------------------------------
+function net.isMultiplayer() return net.mode ~= nil end
+function net.isHost()        return net.mode == "host" end
+function net.isClient()      return net.mode == "client" end
 
 -- Attempt to bind; if it fails we become client
 function net.start()
     local srv = socket.bind("*", 22122)
     if srv then
         srv:settimeout(0)
-        net.mode = "host"
-        net.server = srv
+        net.mode    = "host"
+        net.server  = srv
         net.localId = 1
         return "multiplayer-host"
     else
         local c = socket.tcp()
         c:settimeout(0)
         c:connect("localhost", 22122)
-        net.mode = "client"
-        net.client = c
+        net.mode    = "client"
+        net.client  = c
         net.localId = 2
         return "multiplayer-client"
     end
+end
+
+function net.host()
+    local srv, err = socket.bind("*", 22122)
+    if not srv then return nil, err end
+    srv:settimeout(0)
+    net.mode    = "host"
+    net.server  = srv
+    net.localId = 1
+    return "multiplayer-host"
+end
+
+function net.connect(ip)
+    ip = ip or "localhost"
+    local c = socket.tcp()
+    c:settimeout(0)
+    local ok, err = c:connect(ip, 22122)
+    if not ok and err ~= "timeout" then return nil, err end
+    net.mode    = "client"
+    net.client  = c
+    net.localId = 2
+    return "multiplayer-client"
 end
 
 ----------------------------------------------------------------------
@@ -133,14 +176,12 @@ local function getImage(name)
     return imageCache[name]
 end
 
-local function slim_card(c)      -- voor export_state
+local function slim_card(c)
     return { kleur = c.kleur, waarde = c.waarde, naam = c.naam }
 end
 
 local function inflate_card(c)
-    -- ↓ Fallback: als naam ontbreekt, bouw hem uit kleur + waarde
     local nm = c.naam or (c.kleur .. "_" .. tostring(c.waarde))
-
     return {
         kleur      = c.kleur,
         waarde     = c.waarde,
@@ -151,104 +192,14 @@ end
 
 local function inflate_player(sp)
     local t = { hand = {}, faceUp = {}, faceDown = {} }
-
-    for _,c in ipairs(sp.hand     or {}) do
-        table.insert(t.hand,     inflate_card(c))
-    end
-    for _,c in ipairs(sp.faceUp   or {}) do
-        table.insert(t.faceUp,   inflate_card(c))
-    end
-    for _,c in ipairs(sp.faceDown or {}) do
-        table.insert(t.faceDown, inflate_card(c))
-    end
+    for _,c in ipairs(sp.hand     or {}) do table.insert(t.hand,     inflate_card(c)) end
+    for _,c in ipairs(sp.faceUp   or {}) do table.insert(t.faceUp,   inflate_card(c)) end
+    for _,c in ipairs(sp.faceDown or {}) do table.insert(t.faceDown, inflate_card(c)) end
     return t
 end
 
-
 ----------------------------------------------------------------------
--- 2.  Herstel snapshot aan client-kant
-local function import_state(snap)
-    local new = {}
-        -- ❶  vooraf opslaan van oude selectie
-    local oldSel = {}
-    if player.players[net.localId or 1] then
-        for _,c in ipairs(player.players[net.localId or 1].hand) do
-            if c.selected then
-                oldSel[c.kleur .. c.waarde] = true
-            end
-        end
-    end
-    
-    for i,sp in ipairs(snap.players or {}) do
-        new[i] = inflate_player(sp)
-    end
-    player.players = new           -- handen / open / blind
-
-    -- ❸  selectie terugzetten voor lokale speler
-    local me = net.localId or 1
-    for _,c in ipairs(new[me].hand) do
-        if oldSel[c.kleur .. c.waarde] then
-            c.selected = true
-        end
-    end
-
-    -- ⬇︎  pot overnemen  ⬇︎
-    net.game.pot = {}
-    for _,c in ipairs(snap.pot or {}) do
-        table.insert(net.game.pot, inflate_card(c))
-    end
-
-    local g = net.game
-    g.currentPlayer    = snap.currentPlayer
-    g.nextMustBeUnder7 = snap.nextMustBeUnder7
-    g.state            = snap.state
-    g.ronde            = snap.ronde
-    g.maxPlayers       = #new
-
-    -- draw pile size → vul dummy‐ruggen zodat ui.draw_deck iets tekent
-   drawPile.cards = {}
-   for i = 1, (snap.drawCount or 0) do
-       drawPile.cards[i] = { naam = "back" }   -- inhoud niet relevant
-   end
- end
-
-function net.set_game(g)
-    net.openDone = 0
-    net.game = g
-    -- ❷  Toegepast bij eerste binnenkomst van de echte game-state
-    if net.pendingState then
-        import_state(net.pendingState)
-        net.pendingState = nil
-    end
-end
-
-
-function net.host()
-    -- probeer te binden; lukt het niet dan nil + error
-    local srv, err = socket.bind("*", 22122)
-    if not srv then return nil, err end
-    srv:settimeout(0)
-    net.mode   = "host"
-    net.server = srv
-    net.localId = 1
-    return "multiplayer-host"
-end
-
-function net.connect(ip)
-    ip = ip or "localhost"
-    local c = socket.tcp()
-    c:settimeout(0)
-    local ok, err = c:connect(ip, 22122)
-    if not ok and err ~= "timeout" then return nil, err end
-    net.mode   = "client"
-    net.client = c
-    net.localId = 2
-    return "multiplayer-client"
-end
-
-
-----------------------------------------------------------------------
--- 1.  Maak een plat snapshot voor JSON
+-- Snapshot import / export
 ----------------------------------------------------------------------
 local function export_state()
     if not net.game then return {} end
@@ -263,15 +214,13 @@ local function export_state()
         winner           = net.game.winner,
         state            = net.game.state,
         deckCount        = net.game.deckCount,
-        drawCount        = #drawPile.cards,     -- ← NIEUW
+        drawCount        = #drawPile.cards,
     }
 
-    -- pot
     for _,k in ipairs(net.game.pot) do
         table.insert(snap.pot, slim_card(k))
     end
 
-    -- spelers
     for i,sp in ipairs(player.players) do
         local t = { hand = {}, faceUp = {}, faceDown = {} }
         for _,k in ipairs(sp.hand)     do table.insert(t.hand,     slim_card(k)) end
@@ -283,84 +232,127 @@ local function export_state()
     return snap
 end
 
+local function import_state(snap)
+    local new = {}
 
+    -- selectie van lokale speler bewaren
+    local oldSel = {}
+    if player.players[net.localId or 1] then
+        for _,c in ipairs(player.players[net.localId or 1].hand) do
+            if c.selected then
+                oldSel[c.kleur .. c.waarde] = true
+            end
+        end
+    end
 
+    for i,sp in ipairs(snap.players or {}) do
+        new[i] = inflate_player(sp)
+    end
+    player.players = new
+
+    -- selectie terugzetten
+    local me = net.localId or 1
+    for _,c in ipairs(new[me].hand or {}) do
+        if oldSel[c.kleur .. c.waarde] then c.selected = true end
+    end
+
+    -- pot
+    net.game.pot = {}
+    for _,c in ipairs(snap.pot or {}) do
+        table.insert(net.game.pot, inflate_card(c))
+    end
+
+    local g = net.game
+    g.currentPlayer    = snap.currentPlayer
+    g.nextMustBeUnder7 = snap.nextMustBeUnder7
+    g.state            = snap.state
+    g.ronde            = snap.ronde
+    g.maxPlayers       = #new
+
+    -- draw pile size → dummy ruggen zodat ui.draw_deck iets tekent
+    drawPile.cards = {}
+    for i = 1, (snap.drawCount or 0) do
+        drawPile.cards[i] = { naam = "back" }
+    end
+end
+
+function net.set_game(g)
+    net.openDone = 0
+    net.game = g
+    if net.pendingState then
+        import_state(net.pendingState)
+        net.pendingState = nil
+    end
+end
+
+----------------------------------------------------------------------
+-- Transport
+----------------------------------------------------------------------
 function net.send(msg)
-    local line = json.encode(msg) .. "\n"     -- ✱ altijd met newline
-
-    -- Host stuurt naar de verbonden client
-    if net.isHost()   and net.conn   then
+    local line = json.encode(msg) .. "\n"
+    if net.isHost() and net.conn then
         net.conn:send(line)
-
-    -- Client stuurt naar de host
     elseif net.isClient() and net.client then
         net.client:send(line)
     end
 end
 
--- wordt aangeroepen zodra er een geldig game-object is gekoppeld
 function net.send_state()
     if not net.conn or not net.game then return end
-    -- stuur een plat snapshot, geen functies
     net.send({ cmd = "STATE", game = export_state() })
 end
 
-
+----------------------------------------------------------------------
+-- Handlers
+----------------------------------------------------------------------
 local function handle_host(msg)
     if msg.cmd == "HELLO" then
-        table.insert(hosts, "Client")   -- later naam mee-sturen
+        -- optioneel: table.insert(net.newClients, "Client")
         print("[net] client connected")
-    return
+        return
     end
 
-    ------------------------------------------------------------------
-    -- 1.  Client legt één face‑up kaart (OPEN_ADD)
-    ------------------------------------------------------------------
-   if msg.cmd == "OPEN_ADD" then
+    -- 1) Client legt één face-up kaart (OPEN_ADD)
+    if msg.cmd == "OPEN_ADD" then
         local p   = player.players[msg.id]
-        local new = inflate_card(msg.card)          -- kaart object bewaren
+        local new = inflate_card(msg.card)
         table.insert(p.faceUp, new)
 
-        -- dezelfde kaart uit de hand van de speler halen
+        -- dezelfde kaart uit de hand halen
         for i,k in ipairs(p.hand) do
             if k.kleur == new.kleur and k.waarde == new.waarde then
                 table.remove(p.hand, i)
                 break
             end
         end
-        
-        net.send_state()          -- broadcast update
+
+        net.send_state()
         return
-   end
+    end
 
-
-       ------------------------------------------------------------------
-    -- 2.  Client speelt z’n geselecteerde face‑up kaart (OPEN_PLAY)
-    ------------------------------------------------------------------
+    -- 2) Client speelt geselecteerde face-up kaart (OPEN_PLAY)
     if msg.cmd == "OPEN_PLAY" then
-        local p = player.players[msg.id]
+        local p    = player.players[msg.id]
         local card = table.remove(p.faceUp, msg.index)
-        if not card then return end                -- safety
+        if not card then return end
         rules.handle_card_effects(net.game, msg.id, card)
         utils.update_phase_for_player(net.game, msg.id)
         net.send_state()
         return
     end
 
-    
-    --------------------------------------------------------------
-    -- Client heeft z’n 3 open kaarten klaar
-    --------------------------------------------------------------
+    -- 3) Client klaar met open kaarten
     if msg.cmd == "OPEN_DONE" then
-        net.openDone = (net.openDone or 0) + 1     -- 1 client → 1 melding
-        if net.openDone == 1 then                  -- host zelf al klaar
+        net.openDone = (net.openDone or 0) + 1
+        if net.openDone == 1 then
             net.game.finalize_setup()
             net.send_state()
         end
         return
     end
-    --------------------------------------------------------------
-    if msg.cmd=="PLAY" then
+
+    -- 4) Hand-play / pickup / pass
+    if msg.cmd == "PLAY" then
         local p = player.players[msg.id]
         if p then
             for _,c in ipairs(p.hand) do c.selected=false end
@@ -375,29 +367,30 @@ local function handle_host(msg)
             utils.refill_hand(p.hand, drawPile, config.CARDS_INHAND)
             utils.update_phase_for_player(net.game, msg.id)
         end
-    elseif msg.cmd=="PICKUP" then
-        local p=player.players[msg.id]
+        net.send_state()
+        return
+
+    elseif msg.cmd == "PICKUP" then
+        local p = player.players[msg.id]
         utils.transfer_all_cards(p.hand, net.game.pot)
         utils.deselect_all(p.hand)
         net.game.nextMustBeUnder7 = false
         net.game.next_turn()
-    elseif msg.cmd=="PASS" then
-        if game.currentPlayer==msg.id and game.extraTurn then
-            net.game.extraTurn=false
+        net.send_state()
+        return
+
+    elseif msg.cmd == "PASS" then
+        if net.game.currentPlayer == msg.id and net.game.extraTurn then
+            net.game.extraTurn = false
             net.game.next_turn()
+            net.send_state()
         end
+        return
     end
-    net.send_state()
 end
 
 local function handle_client(msg)
     if msg.cmd == "STATE" then
-        -- tijdens SETUP mogen snapshots mijn (lokale) faceUp/faceDown
-        -- niet overschrijven; accepteer ze pas na finalize_setup
-        local setup = (net.game and net.game.state == "setupSelectOpen")
-                        and (msg.game.state == "setupSelectOpen")
-        local myTurn = (msg.game.currentPlayer == (net.localId or 1))
-
         if not net.game then
             net.pendingState = msg.game
             net.started      = true
@@ -406,89 +399,85 @@ local function handle_client(msg)
         end
     end
 end
+
 ----------------------------------------------------------------------
 --  Netwerk-update – host- en client-pad strikt gescheiden
 ----------------------------------------------------------------------
 function net.update(dt)
-    ------------------------------------------------------------------
-    --  HOST-zijde
-    ------------------------------------------------------------------
+    -- HOST
     if net.isHost() then
-        --------------------------------------------------------------
-        -- 1.  Accept nieuwe client (max 1)
-        --------------------------------------------------------------
+        -- 1) Accept nieuwe client (max 1)
         if net.server and not net.conn then
             local c = net.server:accept()
             if c then
                 c:settimeout(0)
                 net.conn = c
-
                 local dc = (net.game and net.game.deckCount) or 1
                 net.send({ cmd="HELLO", seed=os.time(), deckCount = dc })
                 table.insert(net.newClients, "Client")
             end
         end
 
-        --------------------------------------------------------------
-        -- 2.  Inkomende berichten van de client
-        --------------------------------------------------------------
+        -- 2) Inkomende berichten
         if net.conn then
             local line = net.conn:receive("*l")
             while line do
-                local msg = json.decode(line)
-                handle_host(msg)
+                local ok, msg = pcall(json.decode, line)
+                if ok and type(msg)=="table" then
+                    handle_host(msg)
+                end
                 line = net.conn:receive("*l")
             end
         end
 
-        --------------------------------------------------------------
-        -- 3.  Push elke frame de spel-status (zolang game bestaat)
-        --------------------------------------------------------------
+        -- 3) Push state
         if net.game and net.conn then
-            net.send_state()                           -- newline zit al in net.send
+            net.send_state()
         end
+
+        -- 4) LAN-beacon
+        net.update_lan(dt, net.lobbyName or "Lobby")
     end
 
-    ------------------------------------------------------------------
-    --  CLIENT-zijde  (stond eerst per ongeluk in host-blok)
-    ------------------------------------------------------------------
+    -- CLIENT
     if net.isClient() and net.client then
-        local line, err = net.client:receive("*l")     -- wacht op newline
-            while line do                                -- ← alleen échte regels
-                        -- (debug) toon begin van de regel
-
-                        if line:match("^[%s]*[{%[]") then        -- lijkt JSON?
-                            local ok, msg = pcall(json.decode, line)
-                            if ok and type(msg)=="table" then
-                                handle_client(msg)               -- zet net.started
-                            end
-                        end
-                        line, err = net.client:receive("*l")     -- volgende regel (kan nil zijn)
-                    end                                          -- bij nil stopt lus → geen freeze
+        local line, err = net.client:receive("*l")
+        while line do
+            if line:match("^[%s]*[{%[]") then
+                local ok, msg = pcall(json.decode, line)
+                if ok and type(msg)=="table" then
+                    handle_client(msg)
                 end
+            end
+            line, err = net.client:receive("*l")
+        end
+    end
 end
 
-
+----------------------------------------------------------------------
+-- Client→Host helpers
+----------------------------------------------------------------------
 function net.play_from_client(cards)
-    net.send({cmd="PLAY", id=net.localId, cards=cards})
+    net.send({cmd="PLAY",   id=net.localId, cards=cards})
 end
 function net.pickup_from_client()
     net.send({cmd="PICKUP", id=net.localId})
 end
 function net.pass_from_client()
-    net.send({cmd="PASS", id=net.localId})
+    net.send({cmd="PASS",   id=net.localId})
 end
 
 function net.poll_new_client_name()
     return table.remove(net.newClients, 1)
 end
 
--- één face‑up kaart spelen (client → host)
+-- één face-up kaart spelen (client → host)
 function net.play_open_from_client(idx)
-    net.send({ cmd = "OPEN_PLAY",
-               id   = net.localId,   -- speler‑id van de client
-               index = idx })        -- positie in zijn faceUp‑tabel
+    net.send({
+        cmd   = "OPEN_PLAY",
+        id    = net.localId,
+        index = idx
+    })
 end
-
 
 return net
