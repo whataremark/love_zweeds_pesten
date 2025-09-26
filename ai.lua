@@ -154,6 +154,15 @@ function ai.play_for(game, pot, seatId)
     end
 
     utils.refill_hand(p.hand, drawPile, config.CARDS_INHAND)
+
+    if game.mode == "ai"
+   and player.players[seatId]
+   and player.players[seatId].isAI
+   and game.currentPlayer == seatId
+   and not game.waitingForAI then
+    if game._arm_ai_timer_if_needed then game._arm_ai_timer_if_needed() end
+    return
+end
 end
 
 ----------------------------------------------------------------------
@@ -194,7 +203,6 @@ end
 ----------------------------------------------------------------------
 function ai.update(dt, game, pot)
     if game.mode ~= "ai" then return end
-
     -- Busy met reveal → AI wacht
     if game.reveal and game.reveal.timer > 0 then return end
 

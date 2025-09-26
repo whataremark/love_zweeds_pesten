@@ -15,4 +15,7 @@ config.BLIND_SIZE   = 3
 -- NIEUW: maximale seats (AI of mens)
 config.MAX_SEATS = 4
 
+AI_THINK_MIN = 5.65
+AI_THINK_MAX = 7.25
+
 return config

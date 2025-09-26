@@ -15,7 +15,18 @@ local cardBack = love.graphics.newImage("png/back.png")
 local groteTitelFont = love.graphics.newFont(40)
 local kleineTitelFont = love.graphics.newFont(20)
 
-
+-- Turn-indicator styling
+local TURN_GLOW_COLOR = {1.00, 0.85, 0.20} -- goud
+local function draw_turn_glow(x, y, w, h, radius)
+    local t = love.timer.getTime()
+    local a = 0.55 + 0.35 * math.sin(t * 3.2)       -- pulserende alpha
+    local lw = 3 + 2 * (0.5 + 0.5 * math.sin(t*4))  -- pulserende lijndikte
+    love.graphics.setColor(TURN_GLOW_COLOR[1], TURN_GLOW_COLOR[2], TURN_GLOW_COLOR[3], a)
+    love.graphics.setLineWidth(lw)
+    love.graphics.rectangle("line", x, y, w, h, radius or 18, radius or 18)
+    love.graphics.setLineWidth(1)
+    love.graphics.setColor(1,1,1)
+end
 
 --------------------------------------------------------------------
 -- Hulpfuncties om de Y-posities van de rijen terug te geven
@@ -254,6 +265,11 @@ function ui.draw_player_area(playerData, index, totalPlayers)
 
         love.graphics.setColor(1,1,1,0.97)
         love.graphics.rectangle("line", boxX, boxY, boxW, boxH, 18, 18)
+        
+        if index == game.currentPlayer then
+            draw_turn_glow(boxX-6, boxY-6, boxW+12, boxH+12, 18)
+        end
+
         love.graphics.setColor(1,1,1)
 
         -- scrollbare hand
@@ -336,6 +352,9 @@ function ui.draw_player_area(playerData, index, totalPlayers)
 
         love.graphics.setColor(1,1,1,0.97)
         love.graphics.rectangle("line", boxX, boxY, boxW, boxH, 18, 18)
+        if index == game.currentPlayer then
+            draw_turn_glow(boxX-6, boxY-6, boxW+12, boxH+12, 18)
+        end
         love.graphics.setColor(1,1,1)
 
         local totalCards = #hand
@@ -386,33 +405,33 @@ function ui.draw_player_area(playerData, index, totalPlayers)
             end
         end
 
-    ------------------------------------------------------------------
-    -- SEAT: LEFT / RIGHT – geroteerde hand + open/blind als verticale kolommen
-    ------------------------------------------------------------------
-    ------------------------------------------------------------------
-    -- SEAT: LEFT / RIGHT – geroteerde hand + open/blind als verticale kolommen
+------------------------------------------------------------------
+    -- SEAT: LEFT / RIGHT – geroteerde hand + open/blind kolom + border
     ------------------------------------------------------------------
     else
         local total       = #hand
         local backW_src   = cardBack:getWidth()
         local backH_src   = cardBack:getHeight()
 
-        -- 90° rotatie: links = +90°, rechts = -90°
-        local rotHand   = (seat == "left") and math.pi/2 or -math.pi/2
+        local rotHand     = (seat == "left") and math.pi/2 or -math.pi/2
 
-        -- Hand: hoogte op scherm ≈ CARD_H (na rotatie: height = backW_src * s)
-        local sHand     = math.min(0.9, math.max(0.18, CARD_H / backW_src))
-        local cardW_rot = backH_src * sHand      -- scherm-breedte na rotatie
-        local cardH_rot = backW_src * sHand      -- scherm-hoogte na rotatie
+        -- 1) Kleinere schaal dan top/bottom (20% kleiner → pas aan naar smaak)
+        local baseScale   = CARD_H / backW_src      -- zou hoogte 160 geven
+        local SIDE_SHRINK = 0.5                    -- ⬅️ maak alles kleiner
+        local sHand       = baseScale * SIDE_SHRINK
 
-        -- ✅ SPACING (géén overlap) voor de HAND-kolom
-        local GAP_HAND  = math.floor(cardH_rot * 0.18)
-        local stepH     = cardH_rot + GAP_HAND
+        -- afmetingen na rotatie
+        local cardW_rot   = backH_src * sHand       -- ‘breedte’ op scherm
+        local cardH_rot   = backW_src * sHand       -- ‘hoogte’  op scherm
 
-        -- Pas kolom in beschikbare hoogte
+        -- verticale spacing (géén overlap)
+        local GAP_HAND    = math.floor(cardH_rot * 0.18)
+        local stepH       = cardH_rot + GAP_HAND
+
+        -- kolom in hoogte passen
         local topMargin, bottomMargin = 120, 180
-        local availH   = math.max(120, h - topMargin - bottomMargin)
-        local needH    = (total > 0) and (cardH_rot + (total - 1) * stepH) or 0
+        local availH     = math.max(120, h - topMargin - bottomMargin)
+        local needH      = (total > 0) and (cardH_rot + (total - 1) * stepH) or 0
         if needH > availH then
             local f = availH / needH
             sHand     = sHand * f
@@ -423,17 +442,44 @@ function ui.draw_player_area(playerData, index, totalPlayers)
             needH     = (total > 0) and (cardH_rot + (total - 1) * stepH) or 0
         end
 
+        -- 2) Extra horizontale ruimte tussen hand en open/blind
+        local SIDE_GAP_X  = 36                      -- ⬅️ meer/ minder X-ruimte
+
+        -- X-positie van de hand-kolom (linker rand van de kolom)
         local xCol  = (seat == "left") and 28 or (w - cardW_rot - 28)
         local yTop  = topMargin + (availH - needH) / 2
 
+        -- X-positie van open/blind-kolom (linker rand)
+        local xStack = (seat == "left")
+                        and (xCol + cardW_rot + SIDE_GAP_X)
+                        or  (xCol - SIDE_GAP_X - cardW_rot)
+
+        -- 3) Witte border (verticale box) rond beide kolommen
+    -- ▸ Border: alleen rond de HAND-kolom (niet om open/blind)
+    do
+        local PAD   = 6         -- dunne rand, dicht rond de hand
+        local boxX  = xCol - PAD
+        local boxY  = yTop - PAD
+        local boxW  = cardW_rot + 2*PAD
+        local boxH  = needH + 2*PAD
+        love.graphics.setColor(1,1,1,0.97)
+        love.graphics.setLineWidth(2)
+        love.graphics.rectangle("line", boxX, boxY, boxW, boxH, 18, 18)
+        love.graphics.setLineWidth(1)
+        love.graphics.setColor(1,1,1)
+         if index == game.currentPlayer then
+            draw_turn_glow(boxX-6, boxY-6, boxW+12, boxH+12, 18)
+        end
+    end
+
+
+
         -- HAND-kolom (backs) met spacing
         for i = 1, total do
-            local cx = xCol + cardW_rot/2
+            local cx = (xCol + cardW_rot/2)
             local cy = yTop + (i-1) * stepH + cardH_rot/2
-            love.graphics.setColor(1,1,1)
             love.graphics.draw(cardBack, cx, cy, rotHand, sHand, sHand, backW_src/2, backH_src/2)
         end
-        love.graphics.setColor(1,1,1)
 
         -- label
         local nameX = (seat=="left") and xCol or (xCol - 10)
@@ -441,52 +487,42 @@ function ui.draw_player_area(playerData, index, totalPlayers)
         draw_name(nameX, nameY, seat=="right")
 
         ------------------------------------------------------------------
-        -- OPEN & BLIND als VERTICALE KOLOMMEN naast de hand
-        --  - schaal = sHand  → exact even groot als backs
-        --  - spacing (géén overlap)
-        --  - ⚠️ gebruik de EIGEN img-afmetingen als origin (fix “gigantisch”)
+        -- Open & Blind als VERTICALE kolom naast de hand
+        --  - schaal per kaart zodat geroteerde hoogte == back-hoogte (→ even groot)
+        --  - gebruikt dezelfde spacing als hand
         ------------------------------------------------------------------
-        -- vervang in LEFT/RIGHT-branch alleen vertical_stack(...) door dit:
-local function vertical_stack(cards, isFaceDown)
-    local count = #cards
-    if count == 0 then return end
+        local function vertical_stack(cards, isFaceDown)
+            local count = #cards
+            if count == 0 then return end
 
-    -- hoogte voor spacing gebaseerd op de BACK-afmeting
-    local oneH   = backW_src * sHand            -- geroteerde hoogte van 1 back
-    local GAP_S  = math.floor(oneH * 0.18)
-    local stepS  = oneH + GAP_S
+            local oneH   = backW_src * sHand          -- doel-hoogte na 90°
+            local GAP_S  = math.floor(oneH * 0.18)
+            local stepS  = oneH + GAP_S
 
-    -- gecentreerd t.o.v. de handkolom
-    local needS  = oneH + (count - 1) * stepS
-    local yStart = yTop + (needH - needS) / 2
+            local needS  = oneH + (count - 1) * stepS
+            local yStart = yTop + (needH - needS) / 2
 
-    -- X naast de hand (open & blind delen dezelfde X)
-    local gapX   = 14
-    local cxBase = (seat=="left")
-        and (xCol + cardW_rot + gapX)
-        or  (xCol - gapX)
+            -- teken exact naast de hand
+            local cxLeft = xStack
 
-    for i = 1, count do
-        local img = isFaceDown and cardBack or (cards[i] and cards[i].afbeelding)
-        local iw  = (img and img.getWidth)  and img:getWidth()  or backW_src
-        local ih  = (img and img.getHeight) and img:getHeight() or backH_src
+            for i = 1, count do
+                local img = isFaceDown and cardBack or (cards[i] and cards[i].afbeelding)
+                local iw  = (img and img.getWidth)  and img:getWidth()  or backW_src
+                local ih  = (img and img.getHeight) and img:getHeight() or backH_src
 
-        -- ⭐ Belangrijk: schaal per afbeelding zodat de geroteerde HOOGTE
-        -- exact gelijk is aan die van back.png
-        -- (na 90° rotatie wordt hoogte = imgWidth * scale)
-        local sImg = sHand * (backW_src / iw)
+                -- schaal ieder front zodat hoogte == oneH
+                local sImg = sHand * (backW_src / iw)
 
-        local ox, oy = iw/2, ih/2
-        local cx     = cxBase + ((seat=="left") and (iw*sImg/2) or -(iw*sImg/2))
-        local cy     = yStart + (i-1) * stepS + oneH/2
+                local ox, oy = iw/2, ih/2
+                local cx     = cxLeft + (seat=="left" and (iw*sImg/2) or (cardW_rot - iw*sImg/2))
+                local cy     = yStart + (i-1) * stepS + oneH/2
 
-        love.graphics.setColor(1,1,1)
-        love.graphics.draw(img or cardBack, cx, cy, rotHand, sImg, sImg, ox, oy)
-    end
-end
+                love.graphics.draw(img or cardBack, cx, cy, rotHand, sImg, sImg, ox, oy)
+            end
+        end
 
-        vertical_stack(playerData.faceDown or {}, true)   -- blind (backs)
-        vertical_stack(playerData.faceUp   or {}, false)  -- open (fronts)
+        vertical_stack(playerData.faceDown or {}, true)     -- blind (backs)
+        vertical_stack(playerData.faceUp   or {}, false)    -- open (fronts)
     end
 
 
