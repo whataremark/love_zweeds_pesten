@@ -71,6 +71,45 @@ local function row_faceUp_Y(boxY, index)
     return row_faceDown_Y(boxY, index)
 end
 
+-- helper voor selectie bij facedown
+-- Gele selectie-rand (axis-aligned, ongeroteerd) — NULL-SAFE
+local function draw_selected_outline_rect(x, y, w, h, scale)
+    if type(x) ~= "number" or type(y) ~= "number"
+       or type(w) ~= "number" or type(h) ~= "number" then
+        -- ontbrekende metrics? niet tekenen i.p.v. crashen
+        return
+    end
+    if w <= 0 or h <= 0 then return end
+
+    love.graphics.setColor(1,1,0)
+    love.graphics.setLineWidth(3 / (scale or 1))
+    love.graphics.rectangle("line", x, y, w, h, 16, 16)
+    love.graphics.setLineWidth(1)
+    love.graphics.setColor(1,1,1)
+end
+
+-- Gele selectie-rand (geroteerd rond het midden) — NULL-SAFE
+local function draw_selected_outline_rot(cx, cy, iw, ih, s, rot)
+    if type(cx) ~= "number" or type(cy) ~= "number"
+       or type(iw) ~= "number" or type(ih) ~= "number"
+       or type(s)  ~= "number" then
+        return
+    end
+    if iw <= 0 or ih <= 0 or s <= 0 then return end
+
+    love.graphics.push()
+    love.graphics.translate(cx, cy)
+    love.graphics.rotate(rot or 0)
+    love.graphics.setColor(1,1,0)
+    love.graphics.setLineWidth(3)
+    love.graphics.rectangle("line", -(iw*s)/2, -(ih*s)/2, iw*s, ih*s, 16, 16)
+    love.graphics.setLineWidth(1)
+    love.graphics.setColor(1,1,1)
+    love.graphics.pop()
+end
+---
+
+
 ui.row_faceUp_Y   = row_faceUp_Y
 ui.row_faceDown_Y = row_faceDown_Y
 ----------------------MENU---------------------------------------
@@ -338,10 +377,26 @@ function ui.draw_player_area(playerData, index, totalPlayers)
             for i, kaart in ipairs(faceUp) do
                 love.graphics.setColor(1,1,1)
                 safe_draw_card(kaart.afbeelding, xStart3+(i-1)*space, yRow, s, s)
-            end
-        end
+                
+                -- na: safe_draw_card(kaart.afbeelding, xStart3+(i-1)*space, yRow, s, s)
+                if kaart.selected then
+                    local img = kaart.afbeelding or cardBack
+                    local rx  = xStart3 + (i-1)*space   -- zelfde X als waar je de kaart tekent
+                    local ry  = yRow                    -- zelfde Y
+                    local rw  = img:getWidth()  * s     -- geschaalde breedte
+                    local rh  = img:getHeight() * s     -- geschaalde hoogte
 
-    ------------------------------------------------------------------
+                    love.graphics.setColor(60, 1, 0)
+                    love.graphics.setLineWidth(3)       -- schermruimte; niet delen door s
+                    love.graphics.rectangle("line", rx, ry, rw, rh, 12, 12)
+                    love.graphics.setLineWidth(1)
+                    love.graphics.setColor(1, 1, 1)
+                end
+            end
+            end
+    
+
+    ----------------------------s--------------------------------------
     -- SEAT: TOP – horizontale backs, rijen via helpers
     ------------------------------------------------------------------
     elseif seat == "top" then
