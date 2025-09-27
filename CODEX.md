@@ -19,3 +19,8 @@ dan loopt het spel vast, console zegt dat speler 2 aan de beurt is maar spelers 
  op speel drukt dan staat er geen kaarten geselcteerd....
 
  
+  [SEL] phase=open  idx=2  target=ace clubs  al_geselecteerd=0
+  ÔåÆ select (open eerste)      ace clubs
+[CLICK] PLAY(open) seat=2 cur=2 selectedOpen=1
+[UTILS] effective_top_card: 9
+[PLAY_OPEN] result =    true
