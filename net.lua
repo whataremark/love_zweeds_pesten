@@ -375,58 +375,63 @@ local function handle_host(msg)
     --    - gate op 'zijn beurt' en 'fase=playingOpen'
     ------------------------------------------------------------------
     if msg.cmd == "OPEN_PLAY" then
-        local pid = msg.id
-        local p   = player.players[pid]; if not p then return end
+    local pid = msg.id
+    local p   = player.players[pid];  if not p then return end
 
-        -- gates: alleen verwerken als het echt zíjn beurt is en hij in open-fase zit
-        if net.game.currentPlayer ~= pid then
-            print(("[OPEN_PLAY] ignore: not player %d's turn (cur=%d)"):format(pid, net.game.currentPlayer))
-            return
-        end
-        if utils.phase_for_player(pid) ~= "playingOpen" then
-            print(("[OPEN_PLAY] ignore: phase not playingOpen for %d"):format(pid))
-            return
-        end
-
-        local played = 0
-        local function play_index(i)
-            local card = table.remove(p.faceUp, i)
-            if not card then return false end
-            rules.handle_card_effects(net.game, pid, card)
-            played = played + 1
-            return true
-        end
-
-        if type(msg.indices) == "table" and #msg.indices > 0 then
-            -- verwijder in dalende volgorde
-            table.sort(msg.indices, function(a,b) return a > b end)
-            for _, i in ipairs(msg.indices) do play_index(i) end
-
-        elseif type(msg.index) == "number" then
-            play_index(msg.index)
-
-        elseif type(msg.cards) == "table" and #msg.cards > 0 then
-            -- fallback: match op (kleur, waarde)
-            for _, rc in ipairs(msg.cards) do
-                local found
-                for i = #p.faceUp, 1, -1 do
-                    local fc = p.faceUp[i]
-                    if fc.kleur == rc.kleur and fc.waarde == rc.waarde then
-                        found = i
-                        break
-                    end
-                end
-                if found then play_index(found) end
-            end
-        else
-            print("[OPEN_PLAY] ignore: no indices/index/cards provided")
-            return
-        end
-
-        print(("[OPEN_PLAY] pid=%d played=%d"):format(pid, played))
-        utils.update_phase_for_player(net.game, pid)
-        net.send_state()
+    -- Alleen toelaten als het ook echt zíjn beurt is en zijn fase "open" is:
+    local phase = require("utils").phase_for_player(pid)
+    if net.game.currentPlayer ~= pid or phase ~= "playingOpen" then
+        print(("[HOST][OPEN_PLAY] geweigerd: turn=%s phase=%s"):format(net.game.currentPlayer, phase))
         return
+    end
+
+    -- Bepaal welke items uit faceUp verwijderd moeten worden.
+    -- Voorkeur: indices van client (dalend), anders reconstructie via 'cards'.
+    local toRemove = {}
+    if type(msg.indices) == "table" and #msg.indices > 0 then
+        for _,i in ipairs(msg.indices) do table.insert(toRemove, i) end
+        table.sort(toRemove, function(a,b) return a > b end) -- dalend!
+    elseif type(msg.cards) == "table" and #msg.cards > 0 then
+        -- reconstructie: zoek indices van deze kaarten in faceUp
+        local need = {}
+        for _,rc in ipairs(msg.cards) do
+        table.insert(need, rc.kleur .. "|" .. tostring(rc.waarde))
+        end
+        for i = #p.faceUp, 1, -1 do
+        local k = p.faceUp[i]
+        local key = k.kleur .. "|" .. tostring(k.waarde)
+        for j=#need,1,-1 do
+            if need[j] == key then
+            table.remove(need, j)
+            table.insert(toRemove, i)
+            break
+            end
+        end
+        end
+        table.sort(toRemove, function(a,b) return a > b end)
+    else
+        print("[HOST][OPEN_PLAY] geen indices/cards meegegeven")
+        return
+    end
+
+    if #toRemove == 0 then
+        print("[HOST][OPEN_PLAY] niets te spelen")
+        return
+    end
+
+    -- Verwijder open-kaarten en speel ze via rules.handle_card_effects
+    -- (géén handmatige pot-push; rules regelt effecten/extra beurt)
+    for _, idx in ipairs(toRemove) do
+        local card = table.remove(p.faceUp, idx)
+        if card then
+        rules.handle_card_effects(net.game, pid, card)
+        end
+    end
+
+    -- Fase bijwerken en status pushen
+    require("utils").update_phase_for_player(net.game, pid)
+    net.send_state()
+    return
     end
 
     ------------------------------------------------------------------
