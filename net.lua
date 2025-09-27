@@ -443,20 +443,6 @@ if msg.cmd == "OPEN_PLAY" then
     return
 end
 
-    -- Verwijder open-kaarten en speel ze via rules.handle_card_effects
-    -- (géén handmatige pot-push; rules regelt effecten/extra beurt)
-    for _, idx in ipairs(toRemove) do
-        local card = table.remove(p.faceUp, idx)
-        if card then
-        rules.handle_card_effects(net.game, pid, card)
-        end
-    end
-
-    -- Fase bijwerken en status pushen
-    require("utils").update_phase_for_player(net.game, pid)
-    net.send_state()
-    return
-    end
 
     ------------------------------------------------------------------
     -- 3) Client klaar met open kaarten
@@ -509,6 +495,7 @@ end
         return
     end
 end
+
 
 
 local function handle_client(msg)
