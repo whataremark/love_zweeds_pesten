@@ -410,48 +410,36 @@ function game.mousepressed(x, y, button)
             return
         end
         -- PLAY (open-fase)
--- PLAY (open-fase)
-        do
-        local bp = buttons and buttons.play
-        if bp and utils.inside(x, y, bp.x, bp.y, bp.w, bp.h) then
-            if myPhase == "playingOpen" and game.currentPlayer == myId then
-            local fp = player.players[myId].faceUp or {}
+   -- PLAY (open-fase)
+do
+  local bp = btns and btns.play
+  if bp and utils.inside(x, y, bp.x, bp.y, bp.w, bp.h)
+     and myPhase == "playingOpen"
+     and game.currentPlayer == myId then
 
-            -- verzamel geselecteerde open-kaarten + hun indices (op het scherm)
-            local indices, cards = {}, {}
-            for i = 1, #fp do
-                local k = fp[i]
-                if k.selected then
-                table.insert(indices, i)
-                table.insert(cards, { kleur = k.kleur, waarde = k.waarde, naam = k.naam })
-                end
-            end
+    local fp = player.players[myId].faceUp or {}
+    local indices = {}
+    -- verzamel geselecteerde open-kaarten
+    for i = 1, #fp do
+      if fp[i].selected then table.insert(indices, i) end
+    end
+    if #indices == 0 then return end
 
-            if #indices == 0 then
-                print("[OPEN] geen open kaart geselecteerd")
-                ongeldigeZetTimer = 0.8
-                return
-            end
+    -- DALEND sorteren zodat host veilig kan table.remove’en
+    table.sort(indices, function(a,b) return a > b end)
 
-            if net.isClient() then
-                -- ✅ Client: NIET lokaal spelen → stuur naar host
-                table.sort(indices, function(a,b) return a > b end) -- dalend verwijderen
-                print(("[NET->HOST] OPEN_PLAY indices=%s"):format(table.concat(indices, ",")))
-                net.play_open_from_client(indices, cards)
-
-                -- optioneel: visuele feedback (deselecteer, wacht op snapshot)
-                for _,k in ipairs(fp) do k.selected = false end
-                return
-            else
-                -- Host/solo: verwerk lokaal zoals voorheen
-                local ok = rules.play_selected_open(game, myId)
-                print("[PLAY_OPEN] host_result =", ok)
-                if not ok then ongeldigeZetTimer = 1.0 end
-                return
-            end
-            end
-        end
-        end
+    if net.isClient() then
+      print("[CLIENT] SEND OPEN_PLAY indices=", table.concat(indices, ","))
+      net.play_open_from_client(indices)       -- ✅ jouw helper
+      -- eventueel tijdelijk deselecteren:
+      for _,k in ipairs(fp) do k.selected = false end
+    else
+      local ok = rules.play_selected_open(game, myId)
+      if not ok then ongeldigeZetTimer = 1.0 end
+    end
+    return
+  end
+end
         --
             -- PASS
             local bpass = btns.pass
