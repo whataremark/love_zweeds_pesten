@@ -155,6 +155,11 @@ function game.update(dt)
 
     -- B) Reveal-timer (blinde kaart)
     if game.reveal.timer > 0 then
+        -- In multiplayer: alleen de HOST werkt reveal af; clients wachten op snapshots
+        if net.isMultiplayer() and not net.isHost() then
+            return
+        end
+
         game.reveal.timer = game.reveal.timer - dt
         if game.reveal.timer <= 0 then
             local p  = game.reveal.player
@@ -167,14 +172,22 @@ function game.update(dt)
                 local pl = player.players[p]
                 utils.transfer_all_cards(pl.hand, game.pot)
                 table.insert(pl.hand, k)
-                if p == net.localId then utils.deselect_all(pl.hand) end
+                if p == (net.localId or 1) then utils.deselect_all(pl.hand) end
                 game.next_turn()
             end
 
+            -- ✅ Reset HIER (binnen het <=0 blok) en vóór de return hieronder
             game.reveal.timer  = 0
             game.reveal.player = nil
             game.reveal.card   = nil
+
+            -- (optioneel) host kan meteen een snapshot sturen
+            if net.isMultiplayer() and net.isHost() then
+                net.send_state()
+            end
         end
+
+        -- verlaat update zolang we in de reveal-flow zitten
         return
     end
 
@@ -323,25 +336,28 @@ function game.mousepressed(x, y, button)
         end
 
 
-  ------------------------------------------------------------------
-    -- 3.  BLIND‑fase – klik op een faceDown‑kaart
-    -----------------------------------------------------------------
-    if myPhase == "playingBlind"
-       and game.currentPlayer == myId
-       and button == 1 then
+        -- 3. BLIND-fase – klik op een faceDown-kaart
+        if myPhase == "playingBlind"
+        and game.currentPlayer == myId
+        and button == 1 then
 
-        local boxY = love.graphics.getHeight() - (160 + 40) - 10
-        local yRow = ui.row_faceDown_Y(boxY, myId)
-        if y >= yRow and y <= yRow + 160 then
-            local kaart = table.remove(player.players[myId].faceDown, 1)
-            game.reveal.timer  = 1.0
-            game.reveal.card   = kaart
-            game.reveal.player = myId
-            return
+            local boxY = love.graphics.getHeight() - (160 + 40) - 10
+            local yRow = ui.row_faceDown_Y(boxY, myId)
+            if y >= yRow and y <= yRow + 160 then
+                if net.isClient() then
+                    -- Client vraagt de host om de blind-reveal te doen
+                    require("net").play_blind_from_client()
+                else
+                    -- Host (of solo): doet de reveal lokaal
+                    local kaart = table.remove(player.players[myId].faceDown, 1)
+                    game.reveal.timer  = 1.0
+                    game.reveal.card   = kaart
+                    game.reveal.player = myId
+                end
+                return
+            end
         end
-        -- BUITEN de blind-rij? NIET returnen → laat knoppen/andere zaken lopen
-    end
-    ------------------------------------------------------------------
+            ------------------------------------------------------------------
     -- 4.  ACTIE‑KNOPPEN + kaartselectie in hand
     ------------------------------------------------------------------
     if button == 1 and btns then
