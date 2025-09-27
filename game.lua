@@ -231,29 +231,7 @@ function game.mousepressed(x, y, button)
     local myPhase = utils.phase_of(game, myId)
     local btns    = buttons or game._uiButtons
 
-    ------------------------------------------------------------------
-    -- 0) PRIORITEIT: PLAY (open-fase) vóór selectie afhandelen
-    ------------------------------------------------------------------
-    if button == 1 and btns then
-        local bp = btns.play
-        if bp and utils.inside(x, y, bp.x, bp.y, bp.w, bp.h)
-           and myPhase == "playingOpen"
-           and game.currentPlayer == myId then
 
-            -- debug: tel selectie
-            local sel = 0
-            for _,k in ipairs(player.players[myId].faceUp or {}) do
-                if k.selected then sel = sel + 1 end
-            end
-            print(("[CLICK] PLAY(open) seat=%d cur=%d selectedOpen=%d")
-                  :format(myId, game.currentPlayer, sel))
-
-            local ok = rules.play_selected_open(game, myId)
-            print("[PLAY_OPEN] result =", ok)
-            if not ok then ongeldigeZetTimer = 1.0 end
-            return
-        end
-    end
 
 
     ------------------------------------------------------------------
