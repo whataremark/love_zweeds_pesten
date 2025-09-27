@@ -235,33 +235,68 @@ end
 local function import_state(snap)
     local new = {}
 
-    -- selectie van lokale speler bewaren
-    local oldSel = {}
-    if player.players[net.localId or 1] then
-        for _,c in ipairs(player.players[net.localId or 1].hand) do
+    ------------------------------------------------------------------
+    -- ❶ UI-ephemera van lokale speler bewaren (selecties + scroll)
+    ------------------------------------------------------------------
+    local meIdx     = net.localId or 1
+    local meOld     = player.players and player.players[meIdx]
+    local oldSelHand, oldSelOpen = {}, {}
+    local oldScroll = 0
+
+    if meOld then
+        -- geselecteerde kaarten in HAND
+        for _, c in ipairs(meOld.hand or {}) do
             if c.selected then
-                oldSel[c.kleur .. c.waarde] = true
+                oldSelHand[(c.kleur or "") .. (c.waarde or "")] = true
             end
         end
+        -- geselecteerde kaarten in OPEN
+        for _, c in ipairs(meOld.faceUp or {}) do
+            if c.selected then
+                oldSelOpen[(c.kleur or "") .. (c.waarde or "")] = true
+            end
+        end
+        -- huidige scroll
+        oldScroll = meOld.scrollOffset or 0
     end
 
-    for i,sp in ipairs(snap.players or {}) do
+    ------------------------------------------------------------------
+    -- ❷ Spelers uit snapshot opbouwen
+    ------------------------------------------------------------------
+    for i, sp in ipairs(snap.players or {}) do
         new[i] = inflate_player(sp)
     end
     player.players = new
 
-    -- selectie terugzetten
-    local me = net.localId or 1
-    for _,c in ipairs(new[me].hand or {}) do
-        if oldSel[c.kleur .. c.waarde] then c.selected = true end
+    ------------------------------------------------------------------
+    -- ❸ Selecties + scrollOffset terugzetten voor locale speler
+    ------------------------------------------------------------------
+    local me = player.players[meIdx]
+    if me then
+        for _, c in ipairs(me.hand or {}) do
+            if oldSelHand[(c.kleur or "") .. (c.waarde or "")] then
+                c.selected = true
+            end
+        end
+        for _, c in ipairs(me.faceUp or {}) do
+            if oldSelOpen[(c.kleur or "") .. (c.waarde or "")] then
+                c.selected = true
+            end
+        end
+        me.scrollOffset = oldScroll
     end
 
-    -- pot
+    ------------------------------------------------------------------
+    -- ❹ Pot reconstrueren
+    ------------------------------------------------------------------
     net.game.pot = {}
-    for _,c in ipairs(snap.pot or {}) do
+    for _, c in ipairs(snap.pot or {}) do
         table.insert(net.game.pot, inflate_card(c))
     end
 
+    ------------------------------------------------------------------
+    -- ❺ Eenvoudige gamevelden kopiëren
+    ------------------------------------------------------------------
     local g = net.game
     g.currentPlayer    = snap.currentPlayer
     g.nextMustBeUnder7 = snap.nextMustBeUnder7
@@ -269,7 +304,9 @@ local function import_state(snap)
     g.ronde            = snap.ronde
     g.maxPlayers       = #new
 
-    -- draw pile size → dummy ruggen zodat ui.draw_deck iets tekent
+    ------------------------------------------------------------------
+    -- ❻ Trekstapel-maat (voor UI) bijwerken
+    ------------------------------------------------------------------
     drawPile.cards = {}
     for i = 1, (snap.drawCount or 0) do
         drawPile.cards[i] = { naam = "back" }
