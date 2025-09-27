@@ -410,36 +410,45 @@ function game.mousepressed(x, y, button)
             return
         end
         -- PLAY (open-fase)
-   -- PLAY (open-fase)
-do
-  local bp = btns and btns.play
-  if bp and utils.inside(x, y, bp.x, bp.y, bp.w, bp.h)
-     and myPhase == "playingOpen"
-     and game.currentPlayer == myId then
+    -- PLAY (open-fase)
+    do
+    local btns = buttons or game._uiButtons
+    local bp   = btns and btns.play
+    if bp and utils.inside(x, y, bp.x, bp.y, bp.w, bp.h)
+        and utils.phase_of(game, myId) == "playingOpen"
+        and game.currentPlayer == myId then
 
-    local fp = player.players[myId].faceUp or {}
-    local indices = {}
-    -- verzamel geselecteerde open-kaarten
-    for i = 1, #fp do
-      if fp[i].selected then table.insert(indices, i) end
+        local fp = player.players[myId].faceUp or {}
+
+        -- verzamel geselecteerde open-kaarten → indices DALEND
+        local indices, cards = {}, {}
+        for i = #fp, 1, -1 do
+        if fp[i].selected then
+            table.insert(indices, i)
+            table.insert(cards, {kleur = fp[i].kleur, waarde = fp[i].waarde, naam = fp[i].naam})
+        end
+        end
+
+        print(("[CLICK] PLAY(open) seat=%d cur=%d selectedOpen=%d")
+            :format(myId, game.currentPlayer, #indices))
+
+        if #indices == 0 then return end
+
+        if net.isClient() then
+            -- ✅ stuur naar host; niet lokaal afspelen
+            net.play_open_from_client(indices, cards)
+            -- (optioneel) direct visueel deselecteren
+            for _,k in ipairs(fp) do k.selected = false end
+        else
+            -- host / solo → lokaal afhandelen
+            local ok = rules.play_selected_open(game, myId)
+            print("hij denkt dat client host is.")
+            print("[PLAY_OPEN][host] result =", ok)
+            if not ok then ongeldigeZetTimer = 1.0 end
+        end
+        return
     end
-    if #indices == 0 then return end
-
-    -- DALEND sorteren zodat host veilig kan table.remove’en
-    table.sort(indices, function(a,b) return a > b end)
-
-    if net.isClient() then
-      print("[CLIENT] SEND OPEN_PLAY indices=", table.concat(indices, ","))
-      net.play_open_from_client(indices)       -- ✅ jouw helper
-      -- eventueel tijdelijk deselecteren:
-      for _,k in ipairs(fp) do k.selected = false end
-    else
-      local ok = rules.play_selected_open(game, myId)
-      if not ok then ongeldigeZetTimer = 1.0 end
     end
-    return
-  end
-end
         --
             -- PASS
             local bpass = btns.pass
