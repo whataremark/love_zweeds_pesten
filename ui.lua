@@ -163,8 +163,8 @@ function ui.draw_deck(deck)
     local schaal = kaart_hoogte / cardBack:getHeight()
     local count = deck.count()
     local zichtbaar = math.min(count, 5)
+    
     for i = 0, zichtbaar - 1 do
-        love.graphics.setColor(1, 1, 1, 1 - i * 0.15)
         love.graphics.draw(cardBack, x + i * 2, y - i * 2, math.rad(-i * 2), schaal, schaal)
     end
     love.graphics.setColor(0, 0, 0)

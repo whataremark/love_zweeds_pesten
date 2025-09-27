@@ -12,6 +12,20 @@ function love.keypressed(...)   state.keypressed(...)   end
 function love.mousepressed(...) state.mousepressed(...) end
 function love.wheelmoved(...)   state.wheelmoved(...)   end
 
+function love.touchpressed(id, x, y, pressure)
+  state.touchpressed(id, x, y, pressure)
+end
+
+function love.touchmoved(id, x, y, dx, dy, pressure)
+  state.touchmoved(id, x, y, dx, dy, pressure)
+end
+
+function love.touchreleased(id, x, y, pressure)
+  state.touchreleased(id, x, y, pressure)
+end
+
+
+
 function love.textinput(text)
     state.textinput(text)
 end

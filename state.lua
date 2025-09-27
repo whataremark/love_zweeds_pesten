@@ -24,4 +24,20 @@ for _, cb in ipairs{
     end
 end
 
+
+function state.touchpressed(id, x, y, pressure)
+  local s = state.current
+  if s and s.touchpressed then s.touchpressed(id, x, y, pressure) end
+end
+
+function state.touchmoved(id, x, y, dx, dy, pressure)
+  local s = state.current
+  if s and s.touchmoved then s.touchmoved(id, x, y, dx, dy, pressure) end
+end
+
+function state.touchreleased(id, x, y, pressure)
+  local s = state.current
+  if s and s.touchreleased then s.touchreleased(id, x, y, pressure) end
+end
+
 return state

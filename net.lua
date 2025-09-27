@@ -369,13 +369,20 @@ local function handle_host(msg)
 
     -- 2) Client speelt geselecteerde face-up kaart (OPEN_PLAY)
     if msg.cmd == "OPEN_PLAY" then
-        local p    = player.players[msg.id]
-        local card = table.remove(p.faceUp, msg.index)
-        if not card then return end
+    local p = player.players[msg.id]; if not p then return end
+    local function play_one(i)
+        local card = table.remove(p.faceUp, i); if not card then return end
         rules.handle_card_effects(net.game, msg.id, card)
-        utils.update_phase_for_player(net.game, msg.id)
-        net.send_state()
-        return
+    end
+    if type(msg.index) == "table" then
+        table.sort(msg.index, function(a,b) return a > b end) -- dalend!
+        for _,i in ipairs(msg.index) do play_one(i) end
+    else
+        play_one(msg.index)
+    end
+    utils.update_phase_for_player(net.game, msg.id)
+    net.send_state()
+    return
     end
 
     -- 3) Client klaar met open kaarten
@@ -509,11 +516,11 @@ function net.poll_new_client_name()
 end
 
 -- één face-up kaart spelen (client → host)
-function net.play_open_from_client(idx)
+function net.play_open_from_client(indices)
     net.send({
         cmd   = "OPEN_PLAY",
         id    = net.localId,
-        index = idx
+        index = indices
     })
 end
 

@@ -38,6 +38,73 @@ game.extraTurn         = false
 game.winner            = nil
 game.reveal            = { timer = 0, player = nil, card = nil }
 
+-- Touch-drag scroll state (alleen mobiel)
+game.dragScroll = { active = false, startX = 0, startOffset = 0, touchId = nil }
+
+
+function game.touchpressed(id, x, y, pressure)
+    local myId = net.localId or 1
+    local w, h = love.graphics.getWidth(), love.graphics.getHeight()
+    -- bbox van de eigen hand (onderaan), gelijk aan ui.get_card_positions
+    local CARD_H = 160
+    local boxH   = CARD_H + 40
+    local boxY   = h - boxH - 10
+    local yCards = boxY + 20
+
+    if y >= yCards and y <= (yCards + CARD_H) then
+        local p = player.players[myId]; if not p then return end
+        local _, maxScroll = _compute_scroll_bounds_for_local()
+        game.dragScroll.active      = true
+        game.dragScroll.touchId     = id
+        game.dragScroll.startX      = x
+        game.dragScroll.startOffset = p.scrollOffset or 0
+    end
+end
+
+function game.touchmoved(id, x, y, dx, dy, pressure)
+    if not (game.dragScroll.active and game.dragScroll.touchId == id) then return end
+    local myId = net.localId or 1
+    local p = player.players[myId]; if not p then return end
+    local _, maxScroll = _compute_scroll_bounds_for_local()
+    local delta = x - game.dragScroll.startX
+    p.scrollOffset = _clamp(game.dragScroll.startOffset - delta, 0, maxScroll)
+end
+
+function game.touchreleased(id, x, y, pressure)
+    if game.dragScroll.touchId == id then
+        game.dragScroll.active  = false
+        game.dragScroll.touchId = nil
+    end
+end
+
+
+-- zelfde geometrie als ui.get_card_positions()
+local function _compute_scroll_bounds_for_local()
+    local p = player.players[net.localId or 1]
+    if not p then return 0, 0 end
+
+    local wScr = love.graphics.getWidth()
+    local CARD_H_SRC, CARD_W_SRC = 500, 300
+    local CARD_H      = 160
+    local SCALE       = CARD_H / CARD_H_SRC
+    local CARD_W      = CARD_W_SRC * SCALE
+    local PADDING     = 15
+    local cardSpace   = CARD_W + PADDING
+
+    local boxW        = wScr - 80
+    local minVis      = 6
+    local fitVis      = math.floor((boxW - 2 * PADDING) / cardSpace)
+    local visible     = math.max(minVis, fitVis)
+
+    local total       = #(p.hand or {})
+    local maxScroll   = math.max(0, (total - visible) * cardSpace)
+    return cardSpace, maxScroll
+end
+
+local function _clamp(v, a, b)
+    if v < a then return a elseif v > b then return b else return v end
+end
+
 -- NIEUW: generieke rotatie
 local function next_seat(i, max) return (i % max) + 1 end
 
@@ -342,7 +409,35 @@ function game.mousepressed(x, y, button)
             end
             return
         end
-    
+        -- PLAY (open-fase)
+        do
+        local bpo = btns.play  -- zelfde play-knop
+        if bpo and utils.inside(x, y, bpo.x, bpo.y, bpo.w, bpo.h)
+            and myPhase == "playingOpen"
+            and game.currentPlayer == myId then
+
+            -- verzamel indices van Geselecteerde open-kaarten (achteruit tellen!)
+            local fp  = player.players[myId].faceUp or {}
+            local idx = {}
+            for i = #fp, 1, -1 do
+            if fp[i].selected then table.insert(idx, i) end
+            end
+            if #idx == 0 then return end
+
+            if net.isClient() then
+                -- client stuurt naar host; host speelt en broadcast STATE terug
+                net.play_open_from_client(idx)
+                -- optioneel lokaal deselecteren (host-state maakt het definitief)
+                for _,k in ipairs(fp) do k.selected = false end
+            else
+                -- host/solo: direct afhandelen
+                local ok = rules.play_selected_open(game, myId)
+                if not ok then ongeldigeZetTimer = 1.0 end
+            end
+            return
+         end
+        end    
+        --
             -- PASS
             local bpass = btns.pass
             if bpass and utils.inside(x, y, bpass.x, bpass.y, bpass.w, bpass.h) then
