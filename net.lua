@@ -344,14 +344,15 @@ end
 ----------------------------------------------------------------------
 local function handle_host(msg)
     if msg.cmd == "HELLO" then
-        -- optioneel: table.insert(net.newClients, "Client")
         print("[net] client connected")
         return
     end
 
+    ------------------------------------------------------------------
     -- 1) Client legt één face-up kaart (OPEN_ADD)
+    ------------------------------------------------------------------
     if msg.cmd == "OPEN_ADD" then
-        local p   = player.players[msg.id]
+        local p   = player.players[msg.id]; if not p then return end
         local new = inflate_card(msg.card)
         table.insert(p.faceUp, new)
 
@@ -367,25 +368,70 @@ local function handle_host(msg)
         return
     end
 
-    -- 2) Client speelt geselecteerde face-up kaart (OPEN_PLAY)
+    ------------------------------------------------------------------
+    -- 2) Client speelt geselecteerde face-up kaart(en) (OPEN_PLAY)
+    --    - accepteert: msg.indices (table, aanbevolen), of msg.index (number),
+    --                  of msg.cards ({ {kleur,waarde,naam}, ... } fallback)
+    --    - gate op 'zijn beurt' en 'fase=playingOpen'
+    ------------------------------------------------------------------
     if msg.cmd == "OPEN_PLAY" then
-    local p = player.players[msg.id]; if not p then return end
-    local function play_one(i)
-        local card = table.remove(p.faceUp, i); if not card then return end
-        rules.handle_card_effects(net.game, msg.id, card)
-    end
-    if type(msg.index) == "table" then
-        table.sort(msg.index, function(a,b) return a > b end) -- dalend!
-        for _,i in ipairs(msg.index) do play_one(i) end
-    else
-        play_one(msg.index)
-    end
-    utils.update_phase_for_player(net.game, msg.id)
-    net.send_state()
-    return
+        local pid = msg.id
+        local p   = player.players[pid]; if not p then return end
+
+        -- gates: alleen verwerken als het echt zíjn beurt is en hij in open-fase zit
+        if net.game.currentPlayer ~= pid then
+            print(("[OPEN_PLAY] ignore: not player %d's turn (cur=%d)"):format(pid, net.game.currentPlayer))
+            return
+        end
+        if utils.phase_for_player(pid) ~= "playingOpen" then
+            print(("[OPEN_PLAY] ignore: phase not playingOpen for %d"):format(pid))
+            return
+        end
+
+        local played = 0
+        local function play_index(i)
+            local card = table.remove(p.faceUp, i)
+            if not card then return false end
+            rules.handle_card_effects(net.game, pid, card)
+            played = played + 1
+            return true
+        end
+
+        if type(msg.indices) == "table" and #msg.indices > 0 then
+            -- verwijder in dalende volgorde
+            table.sort(msg.indices, function(a,b) return a > b end)
+            for _, i in ipairs(msg.indices) do play_index(i) end
+
+        elseif type(msg.index) == "number" then
+            play_index(msg.index)
+
+        elseif type(msg.cards) == "table" and #msg.cards > 0 then
+            -- fallback: match op (kleur, waarde)
+            for _, rc in ipairs(msg.cards) do
+                local found
+                for i = #p.faceUp, 1, -1 do
+                    local fc = p.faceUp[i]
+                    if fc.kleur == rc.kleur and fc.waarde == rc.waarde then
+                        found = i
+                        break
+                    end
+                end
+                if found then play_index(found) end
+            end
+        else
+            print("[OPEN_PLAY] ignore: no indices/index/cards provided")
+            return
+        end
+
+        print(("[OPEN_PLAY] pid=%d played=%d"):format(pid, played))
+        utils.update_phase_for_player(net.game, pid)
+        net.send_state()
+        return
     end
 
+    ------------------------------------------------------------------
     -- 3) Client klaar met open kaarten
+    ------------------------------------------------------------------
     if msg.cmd == "OPEN_DONE" then
         net.openDone = (net.openDone or 0) + 1
         if net.openDone == 1 then
@@ -395,15 +441,17 @@ local function handle_host(msg)
         return
     end
 
+    ------------------------------------------------------------------
     -- 4) Hand-play / pickup / pass
+    ------------------------------------------------------------------
     if msg.cmd == "PLAY" then
         local p = player.players[msg.id]
         if p then
-            for _,c in ipairs(p.hand) do c.selected=false end
-            for _,rc in ipairs(msg.cards or {}) do
-                for _,hc in ipairs(p.hand) do
-                    if hc.waarde==rc.waarde and hc.kleur==rc.kleur then
-                        hc.selected=true
+            for _, c in ipairs(p.hand) do c.selected = false end
+            for _, rc in ipairs(msg.cards or {}) do
+                for _, hc in ipairs(p.hand) do
+                    if hc.waarde == rc.waarde and hc.kleur == rc.kleur then
+                        hc.selected = true
                     end
                 end
             end
@@ -415,7 +463,7 @@ local function handle_host(msg)
         return
 
     elseif msg.cmd == "PICKUP" then
-        local p = player.players[msg.id]
+        local p = player.players[msg.id]; if not p then return end
         utils.transfer_all_cards(p.hand, net.game.pot)
         utils.deselect_all(p.hand)
         net.game.nextMustBeUnder7 = false
@@ -432,6 +480,7 @@ local function handle_host(msg)
         return
     end
 end
+
 
 local function handle_client(msg)
     if msg.cmd == "STATE" then
@@ -515,13 +564,13 @@ function net.poll_new_client_name()
     return table.remove(net.newClients, 1)
 end
 
--- één face-up kaart spelen (client → host)
-function net.play_open_from_client(indices)
-    net.send({
-        cmd   = "OPEN_PLAY",
-        id    = net.localId,
-        index = indices
-    })
+function net.play_open_from_client(indices, cards)
+  net.send({
+    cmd     = "OPEN_PLAY",
+    id      = net.localId,
+    indices = indices,   -- {3,2,1} (descending gewenst, maar host sorteert ook)
+    cards   = cards      -- {{kleur=..,waarde=..,naam=..}, ...}
+  })
 end
 
 return net

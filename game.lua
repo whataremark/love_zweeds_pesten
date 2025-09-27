@@ -411,32 +411,34 @@ function game.mousepressed(x, y, button)
         end
         -- PLAY (open-fase)
         do
-        local bpo = btns.play  -- zelfde play-knop
+        local bpo = btns and btns.play
         if bpo and utils.inside(x, y, bpo.x, bpo.y, bpo.w, bpo.h)
             and myPhase == "playingOpen"
             and game.currentPlayer == myId then
 
-            -- verzamel indices van Geselecteerde open-kaarten (achteruit tellen!)
-            local fp  = player.players[myId].faceUp or {}
-            local idx = {}
+            local fp = player.players[myId].faceUp or {}
+            -- verzamel indices (achteruit) EN kaartinfo (fail-safe)
+            local indices, cards = {}, {}
             for i = #fp, 1, -1 do
-            if fp[i].selected then table.insert(idx, i) end
+            local k = fp[i]
+            if k.selected then
+                table.insert(indices, i)
+                table.insert(cards, { kleur = k.kleur, waarde = k.waarde, naam = k.naam })
             end
-            if #idx == 0 then return end
+            end
+            if #indices == 0 then return end
 
             if net.isClient() then
-                -- client stuurt naar host; host speelt en broadcast STATE terug
-                net.play_open_from_client(idx)
-                -- optioneel lokaal deselecteren (host-state maakt het definitief)
-                for _,k in ipairs(fp) do k.selected = false end
+            -- stuur beide: host kan met indices of met cards werken
+            net.play_open_from_client(indices, cards)
+            -- GEEN lokaal deselecteren; host snapshot ruimt dit netjes op
             else
-                -- host/solo: direct afhandelen
-                local ok = rules.play_selected_open(game, myId)
-                if not ok then ongeldigeZetTimer = 1.0 end
+            local ok = rules.play_selected_open(game, myId)
+            if not ok then ongeldigeZetTimer = 1.0 end
             end
             return
-         end
-        end    
+        end
+        end
         --
             -- PASS
             local bpass = btns.pass
