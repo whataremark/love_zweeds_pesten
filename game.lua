@@ -38,13 +38,13 @@ game.extraTurn         = false
 game.winner            = nil
 game.reveal            = { timer = 0, player = nil, card = nil }
 
+game.effects = {}     -- banners
+game.fxSeq   = 0      -- event id t.b.v. MP
+game.fxEmit  = nil    -- laatst uit te zenden fx event (wordt door net opgepikt)
+
 -- Touch-drag scroll state (alleen mobiel)
 game.dragScroll = { active = false, startX = 0, startOffset = 0, touchId = nil }
 
-  -- ⬇️  pak deckCount uit het menu / lobby
-  if cfg and cfg.deckCount then
-    game.deckCount = tonumber(cfg.deckCount) or 1
-  end
 
 function game.touchpressed(id, x, y, pressure)
     local myId = net.localId or 1
@@ -181,6 +181,9 @@ function game.load(cfg)
 
     bgCanvas = utils.generate_green_felt_background(
                    love.graphics.getWidth(), love.graphics.getHeight())
+    
+    game.deckCount = (cfg and cfg.deckCount) or game.deckCount or 1
+
 
     -- ⬇︎ voeg aiCount doorgeefluik toe (val terug op 1)
     game.start(cfg and cfg.mode or "ai", cfg and cfg.aiCount or 1)
@@ -198,6 +201,7 @@ end
 ----------------------------------------------------------------------
 function game.update(dt)
     if scene ~= "playing" then return end
+    utils.update_banners(dt, game)
 
     -- Netwerk-sync
     if net.isMultiplayer() then
@@ -271,18 +275,14 @@ function game.draw()
         return
     end
 
+    ui.draw_banners(game.effects)
+
     love.graphics.setColor(1, 1, 1)
     love.graphics.draw(bgCanvas, 0, 0)
 
     ui.draw_pot(game.pot, ongeldigeZetTimer > 0, toonPotOverlay)
     ui.draw_deck(drawPile)
     ui.draw_all_players(player.players)
-
-    love.graphics.setColor(0, 0, 0)
-    love.graphics.print("Ronde: "           .. ronde,                  20, 20)
-    love.graphics.print("Kaarten in pot: "  .. #game.pot,             20, 40)
-    love.graphics.print("Speler aan zet: "  .. game.currentPlayer,    20, 60)
-    love.graphics.print("AI-timer: "        .. string.format("%.2f", game.aiTimer), 20, 80)
 
     if game.state ~= "setupSelectOpen" and game.state ~= "setupAISelect" then
         buttons = ui.draw_action_buttons()
@@ -617,6 +617,17 @@ function game.start(mode, aiCount)
             end
         end
 
+        local profile = require("profile")
+        -- seat 1 = local player name
+        player.players[1].name = profile.get_name()
+
+        -- fill names for the rest
+        for i = 2, #player.players do
+            local p = player.players[i]
+            if not p.name or p.name == "" then
+                p.name = p.isAI and ("AI " .. (i - 1)) or ("Speler " .. i)
+            end
+        end
         game.maxPlayers = #player.players
     else
         -- client wacht op eerste STATE, weet maxPlayers nog niet

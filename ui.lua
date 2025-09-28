@@ -308,16 +308,13 @@ function ui.draw_player_area(playerData, index, totalPlayers)
         end
     end
 
-    local function draw_name(labelX, labelY, alignRight)
-        love.graphics.setColor(0,0,0)
-        love.graphics.print(
-            ("Speler %d%s"):format(index, isMe and " (YOU)" or ""),
-            alignRight and (labelX - 120) or labelX,
-            labelY
-        )
-        love.graphics.setColor(1,1,1)
+    local function draw_name(labelX, labelY, alignRight, index, isMe, playerData)
+        local naam = (playerData and playerData.name) or ("Speler " .. tostring(index))
+        local label = naam .. (isMe and " (YOU)" or "")
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.print(label, alignRight and (labelX - 160) or labelX, labelY)
+        love.graphics.setColor(1, 1, 1)
     end
-
     ------------------------------------------------------------------
     -- SEAT: BOTTOM (local) – scrollbare hand + rijen erboven
     ------------------------------------------------------------------
@@ -375,7 +372,8 @@ function ui.draw_player_area(playerData, index, totalPlayers)
             love.graphics.pop()
         end
 
-        draw_name(20, boxY - 25, false)
+        draw_name(20, boxY - 25, false, index, isMe, playerData)
+
 
         -- FACE-DOWN rij
         local faceDown = playerData.faceDown or {}
@@ -457,7 +455,8 @@ function ui.draw_player_area(playerData, index, totalPlayers)
             love.graphics.draw(cardBack, x, yCards, 0, scaleOpp, scaleOpp)
         end
 
-        draw_name(20, boxY - 25, false)
+        draw_name(20, boxY +10, false, index, isMe, playerData)
+
 
         -- FACE-DOWN en FACE-UP
         local faceDown = playerData.faceDown or {}
@@ -564,7 +563,7 @@ function ui.draw_player_area(playerData, index, totalPlayers)
         -- label
         local nameX = (seat=="left") and xCol or (xCol - 10)
         local nameY = yTop - 24
-        draw_name(nameX, nameY, seat=="right")
+        draw_name(nameX, nameY, seat=="right", index, isMe, playerData)
 
         ------------------------------------------------------------------
         -- Open & Blind als VERTICALE kolom naast de hand
@@ -765,6 +764,71 @@ function ui.draw_end_screen(winnerId, players)
   love.graphics.setColor(1,1,1,0.85)
   love.graphics.printf("Druk op Enter om terug te gaan naar het menu", w*0.15, h*0.72, w*0.70, "center")
 end
+
+
+function ui.draw_banners(effects)
+    if not effects or #effects == 0 then return end
+
+    local w, h = love.graphics.getWidth(), love.graphics.getHeight()
+    ui._bannerFont = ui._bannerFont or love.graphics.newFont(46)
+
+    -- state bewaren → na tekenen herstellen (voorkomt “grote” UI erna)
+    local prevFont      = love.graphics.getFont()
+    local prevLineWidth = love.graphics.getLineWidth()
+    local _unpack       = table.unpack or unpack
+
+    for _, e in ipairs(effects) do
+        local dur   = e.dur or 1.8                -- iets langer dan eerst
+        local t     = math.min(e.t or 0, dur)
+        local k     = t / dur
+        local alpha = 1 - (k * k)                 -- zacht uitfaden
+        local scale = 0.98 + 0.08 * math.sin(k * math.pi)
+
+        local text = e.text or ""
+        local f    = ui._bannerFont
+        love.graphics.setFont(f)
+
+        local tw = f:getWidth(text)
+        local th = f:getHeight()
+        local padX, padY = 28, 14
+
+        -- vaste badge-afmeting (rect zelf schaalt niet, alleen tekst pulse’t)
+        local bw = tw + 2 * padX
+        local bh = th + 2 * padY
+
+        -- mooi net-boven-het-midden (iets hoger dan center)
+        local cx = w * 0.50
+        local cy = h * 0.36
+        local bx = cx - bw / 2
+        local by = cy - bh / 2 - 8 * (1 - k)     -- mini slide-in up
+
+        -- schaduw
+        love.graphics.setColor(0, 0, 0, 0.55 * alpha)
+        love.graphics.rectangle("fill", bx + 4, by + 6, bw, bh, 16, 16)
+
+        -- badge
+        local cr, cg, cb = _unpack(e.color or {1, 1, 1})
+        love.graphics.setColor(cr, cg, cb, 0.24 * alpha)
+        love.graphics.rectangle("fill", bx, by, bw, bh, 16, 16)
+
+        love.graphics.setColor(1, 1, 1, 0.9 * alpha)
+        love.graphics.setLineWidth(2)
+        love.graphics.rectangle("line", bx, by, bw, bh, 16, 16)
+
+        -- tekst exact gecentreerd en geschaald rond het midden
+        love.graphics.push()
+        love.graphics.translate(cx, cy)
+        love.graphics.scale(scale, scale)
+        love.graphics.setColor(1, 1, 1, alpha)
+        love.graphics.printf(text, -tw/2, -th/2, tw, "center")
+        love.graphics.pop()
+    end
+
+    -- herstel teken-state (belangrijk!)
+    love.graphics.setFont(prevFont)
+    love.graphics.setLineWidth(prevLineWidth)
+end
+
 
 
 

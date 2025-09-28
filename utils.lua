@@ -76,6 +76,44 @@ function utils.count_selected(cards)
     return c
 end
 
+-- 1) Tekenbare banner aan game.effects toevoegen
+function utils.add_banner(game, text, color)
+    game.effects = game.effects or {}
+    table.insert(game.effects, {
+        kind  = "banner",
+        text  = text,
+        color = color or {1,1,1},
+        t     = 0,        -- elapsed
+        dur   = 1.15,     -- totale duur
+    })
+end
+
+-- 2) Alleen lokaal afspelen (geen MP-replicatie)
+function utils.dispatch_fx(game, name)
+    if name == "TEN" then
+        utils.add_banner(game, "10 – pot geleegd!", {1.00, 0.85, 0.20})
+    elseif name == "BRUNZYN" then
+        utils.add_banner(game, "BRUNZYN!", {1.00, 0.35, 0.40})
+    end
+end
+
+-- 3) Lokaal + snapshot triggeren (voor MP-clients)
+function utils.trigger_fx(game, name)
+    utils.dispatch_fx(game, name)                 -- lokaal tonen
+    game.fxSeq = (game.fxSeq or 0) + 1            -- event id
+    game.fxEmit = { name = name, seq = game.fxSeq } -- door net.export_state
+end
+
+-- 4) Updaten/verwijderen van verlopen banners
+function utils.update_banners(dt, game)
+    if not (game and game.effects) then return end
+    for i = #game.effects, 1, -1 do
+        local e = game.effects[i]
+        e.t = e.t + dt
+        if e.t >= e.dur then table.remove(game.effects, i) end
+    end
+end
+
 
 --------------------------------------------------------------------
 --  Hulpfunctie: bepaal nieuwe fase voor een speler

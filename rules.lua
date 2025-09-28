@@ -46,6 +46,7 @@ function rules.handle_card_effects(game, playerIndex, kaart, advanceTurn)
         game.lastCardWas10 = true
         game.extraTurn = true
         game.nextMustBeUnder7 = false
+        require("utils").trigger_fx(game, "TEN")
             -- ←-- Zet AI-timer alléén als de AI nu echt weer aan zet is
         if game.mode == "ai" and game.currentPlayer == 2 then
             game.waitingForAI = true
@@ -173,6 +174,7 @@ function rules.play_selected_cards(game, playerIndex)
         utils.transfer_all_cards({}, game.pot)         -- pot legen
         game.extraTurn = true                          -- gratis beurt
         print("[RULES] BRUNZYN! Pot geleegd en extra beurt")
+        require("utils").trigger_fx(game, "BRUNZYN")
     end
 
     ----------------------------------------------------------------

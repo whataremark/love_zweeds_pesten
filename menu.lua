@@ -2,6 +2,8 @@
 local state      = require("state")
 local menu       = {}
 local aiCount = 1   -- standaard 1 AI
+local profile = require("profile")
+local utf8 = require("utf8") --voor tekst typen
 
 local menu = {
   useTwoDecks = false,   -- ⬅️ nieuwe toggle
@@ -14,6 +16,11 @@ local subtitleFont
 local optionFont
 local hintFont
 local cardFont
+
+
+menu.nameInput   = profile.get_name()
+menu.editingName = not profile.has_custom_name()   -- bij 1e keer direct editen
+menu._nameRect   = { x=0,y=0,w=0,h=0 }
 
 local function ensureFonts()
     if titleFont then return end
@@ -220,9 +227,34 @@ function menu.draw()
   love.graphics.setColor(1, 1, 1, 0.72)
   love.graphics.printf("Potje Zweeds??", panelX, titleY + 60, panelW, "center")
 
+    -- Naamveld
+    local nameLabel = "Naam:"
+    local nx = panelX + 40
+    local ny = panelY + 130
+    local nw = panelW - 80
+    local nh = 40
+
+    -- label
+    love.graphics.setColor(1,1,1,0.9)
+    love.graphics.setFont(optionFont)
+    love.graphics.print(nameLabel, nx, ny - 26)
+
+    -- input box
+    love.graphics.setColor(0,0,0,0.35); love.graphics.rectangle("fill", nx, ny, nw, nh, 10,10)
+    love.graphics.setColor(1,1,1, menu.editingName and 1 or 0.6); love.graphics.rectangle("line", nx, ny, nw, nh, 10,10)
+
+    -- tekst in de box
+    local shown = (menu.nameInput == "" and "Typ je naam..." or menu.nameInput)
+    love.graphics.setColor(1,1,1, menu.nameInput=="" and 0.6 or 1)
+    love.graphics.printf(shown, nx+10, ny+10, nw-20, "left")
+
+    -- rect onthouden voor clicks
+    menu._nameRect = { x = nx, y = ny, w = nw, h = nh }
+
+
   -- Opties
   love.graphics.setFont(optionFont)
-  local listY = titleY + 100
+  local listY = titleY + 150
   local rowH  = 64
   local padX  = 40
 
@@ -287,6 +319,20 @@ end
 function menu.mousepressed(x, y, btn)
   if btn ~= 1 then return end
 
+  if btn == 1 then
+  local r = menu._nameRect
+  if r and x>=r.x and x<=r.x+r.w and y>=r.y and y<=r.y+r.h then
+    menu.editingName = true
+    return
+  else
+    -- klik buiten het veld → opslaan (als er iets is aangepast)
+    if menu.editingName then
+      profile.set_name(menu.nameInput)
+      menu.editingName = false
+    end
+  end
+end
+
   -- Checkbox togglen?
   local r = menu._checkRect
   if r and x>=r.x and x<=r.x+r.w and y>=r.y and y<=r.y+r.h then
@@ -309,7 +355,20 @@ end
 
 
 function menu.keypressed(key)
-  if key == "down" then
+  if menu.editingName then
+    if key == "backspace" then
+      local byteoffset = utf8.offset(menu.nameInput, -1)
+      if byteoffset then
+        menu.nameInput = string.sub(menu.nameInput, 1, byteoffset - 1)
+      end
+    elseif key == "return" or key == "kpenter" then
+      profile.set_name(menu.nameInput)
+      menu.editingName = false
+    end
+    return
+  end
+  
+    if key == "down" then
     menu.hoverIndex = math.min(#options, menu.hoverIndex + 1)
   elseif key == "up" then
     menu.hoverIndex = math.max(1, menu.hoverIndex - 1)
@@ -344,6 +403,17 @@ function menu.mousemoved(x, y)
             return
         end
     end
+end
+
+
+-- menu.textinput(txt)
+function menu.textinput(t)
+  if menu.editingName then
+    -- begrens lengte een beetje
+    if #menu.nameInput < 24 then
+      menu.nameInput = menu.nameInput .. t
+    end
+  end
 end
 
 

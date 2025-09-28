@@ -33,6 +33,17 @@ local lastBeaconTime = 0
 -- Scanner (client) – permanente luister-socket
 local scanSocket    = nil
 
+-- net.lua (na locals)
+do
+  local ok, data = pcall(love.filesystem.read, "profile.json")
+  if ok and data then
+    local t = nil
+    pcall(function() t = json.decode(data) end)
+    if t and t.name then net.playerName = t.name end
+  end
+end
+
+
 -- Bepaal broadcast-doelen: universeel + /24 van je actieve NIC
 local function compute_broadcast_targets()
     local list = { "255.255.255.255" }
@@ -162,6 +173,7 @@ function net.connect(ip)
     net.mode    = "client"
     net.client  = c
     net.localId = 2
+    net.identify(net.playerName or ("Speler "..(net.localId or 1)))
     return "multiplayer-client"
 end
 
@@ -192,6 +204,7 @@ end
 
 local function inflate_player(sp)
     local t = { hand = {}, faceUp = {}, faceDown = {} }
+    t.name = sp.name
     for _,c in ipairs(sp.hand     or {}) do table.insert(t.hand,     inflate_card(c)) end
     for _,c in ipairs(sp.faceUp   or {}) do table.insert(t.faceUp,   inflate_card(c)) end
     for _,c in ipairs(sp.faceDown or {}) do table.insert(t.faceDown, inflate_card(c)) end
@@ -223,7 +236,8 @@ local function export_state()
     end
 
     for i,sp in ipairs(player.players) do
-        local t = { hand = {}, faceUp = {}, faceDown = {} }
+        local t = { hand = {}, faceUp = {}, faceDown = {}, name = (sp.name or ("Speler "..i)) }
+        t.name = sp.name
         for _,k in ipairs(sp.hand)     do table.insert(t.hand,     slim_card(k)) end
         for _,k in ipairs(sp.faceUp)   do table.insert(t.faceUp,   slim_card(k)) end
         for _,k in ipairs(sp.faceDown) do table.insert(t.faceDown, slim_card(k)) end
@@ -238,6 +252,12 @@ local function export_state()
             player = net.game.reveal.player,
             card   = slim_card(net.game.reveal.card),
         }
+    end
+    
+    -- FX event (éénmalig doorgeven met oplopende seq)
+    if net.game and net.game.fxEmit then
+        snap.fx = { name = net.game.fxEmit.name, seq = net.game.fxEmit.seq }
+        -- NIET resetten hier; export_state wordt vaak aangeroepen. Client dedupliceert via seq.
     end
 
     return snap
@@ -336,6 +356,13 @@ local function import_state(snap)
         net.game.reveal.timer, net.game.reveal.player, net.game.reveal.card = 0, nil, nil
     end
 
+        -- FX overnemen (dedupe via seq)
+    if snap.fx and snap.fx.seq and ( (net.game.fxSeenSeq or 0) < snap.fx.seq ) then
+        net.game.fxSeenSeq = snap.fx.seq
+        require("utils").dispatch_fx(net.game, snap.fx.name)  -- alleen lokaal afspelen (géén re-emit)
+    end
+
+
 end
 
 function net.set_game(g)
@@ -372,7 +399,19 @@ local function handle_host(msg)
         print("[net] client connected")
         return
     end
-
+        -- net.lua → in handle_host(msg)
+    if msg.cmd == "JOIN" then
+    local pid = tonumber(msg.id)
+    if not pid or not player.players[pid] then
+        print("[net][JOIN] ongeldig id:", tostring(msg.id))
+        return
+    end
+    local name = tostring(msg.name or ("Speler "..pid))
+    player.players[pid].name = name
+    print(("[net] naam voor seat %d = %s"):format(pid, name))
+    net.send_state()  -- push namen naar alle clients
+    return
+    end
     ------------------------------------------------------------------
     -- 1) Client legt één face-up kaart (OPEN_ADD)
     ------------------------------------------------------------------
@@ -545,17 +584,44 @@ end
 
 
 
+-- Client-side message handler (host -> client)
 local function handle_client(msg)
-    if msg.cmd == "STATE" then
-        if not net.game then
-            net.pendingState = msg.game
-            net.started      = true
-        else
-            import_state(msg.game)
-        end
+  -- 0) Eerste handshake van de host
+  if msg.cmd == "HELLO" then
+    -- markeer dat we verbonden zijn
+    net.started = true
+    -- host kan alvast deckCount doorgeven (komt ook in STATE mee)
+    if net.game and msg.deckCount then
+      net.game.deckCount = msg.deckCount
     end
-end
+    return
+  end
 
+  -- 1) Volledige snapshot (autoritatief)
+  if msg.cmd == "STATE" then
+    if not net.game then
+      -- game-object nog niet gekoppeld: parkeer snapshot even
+      net.pendingState = msg.game
+      net.started      = true
+    else
+      -- normale weg: importeer direct
+      import_state(msg.game)
+    end
+    return
+  end
+
+  -- 2) (Optioneel) eenvoudige ‘banner’ push vanaf host
+  if msg.cmd == "BANNER" then
+    -- verwacht: { cmd="BANNER", text="...", color={r,g,b}, dur=... }
+    if net.game and net.game.push_banner then
+      net.game.push_banner(msg.text or "", msg.color, msg.dur)
+    end
+    return
+  end
+
+  -- 3) Debug / fallback
+    print("[client] onbekend bericht:", tostring(msg.cmd))
+end
 ----------------------------------------------------------------------
 --  Netwerk-update – host- en client-pad strikt gescheiden
 ----------------------------------------------------------------------
@@ -638,6 +704,21 @@ end
 
 function net.play_blind_from_client()
     net.send({ cmd = "BLIND_REVEAL", id = net.localId })
+end
+
+-- net.lua (ergens onderaan)
+function net.identify(name)
+  net.playerName = name
+  if net.isClient() and net.client then
+    net.send({ cmd="JOIN", id=net.localId, name=name })
+  elseif net.isHost() then
+    -- host zet z'n eigen naam lokaal (seat 1) en broadcast
+    if player.players[1] then player.players[1].name = name end
+    net.send_state()
+  end
+  -- cache naar schijf
+  local ok, blob = pcall(json.encode, { name = name })
+  if ok and blob then love.filesystem.write("profile.json", blob) end
 end
 
 
