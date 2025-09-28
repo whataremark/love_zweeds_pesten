@@ -2,6 +2,7 @@
 local state = { current = nil }
 
 function state.enter(new_state, ...)
+
     if state.current and state.current.leave then
         state.current.leave()
     end

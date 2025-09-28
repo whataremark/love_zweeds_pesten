@@ -697,16 +697,44 @@ function ui.draw_all_players(players)
 end
 
 
-function ui.draw_end_screen(winner, players)
-    local w,h = love.graphics.getWidth(), love.graphics.getHeight()
-    love.graphics.setColor(0,0,0,0.7)
-    love.graphics.rectangle('fill',0,0,w,h)
-    love.graphics.setColor(1,1,1)
-    local text = "Speler "..winner.." wint!"
-    love.graphics.printf(text,0,h/2-40,w,'center')
-    local other = winner==1 and 2 or 1
-    local rest = #players[other].hand
-    love.graphics.printf("Tegenstander heeft "..rest.." kaarten over",0,h/2,w,'center')
+function ui.draw_end_screen(winner, players, finishedOrder)
+  local w,h = love.graphics.getWidth(), love.graphics.getHeight()
+  love.graphics.setColor(0,0,0,0.75)
+  love.graphics.rectangle('fill',0,0,w,h)
+  love.graphics.setColor(1,1,1)
+
+  local title = winner and ("Winnaar: Speler "..tostring(winner)) or "Einde van het spel"
+  love.graphics.printf(title, 0, h/2 - 120, w, 'center')
+
+  -- Eindvolgorde tonen (als beschikbaar)
+  finishedOrder = finishedOrder or {}
+  if #finishedOrder > 0 then
+    love.graphics.printf("Eindvolgorde:", 0, h/2 - 80, w, 'center')
+    local y = h/2 - 50
+    for pos, pid in ipairs(finishedOrder) do
+      love.graphics.printf(("%d) Speler %d"):format(pos, pid), 0, y, w, 'center')
+      y = y + 24
+    end
+
+    -- Laatste (verliezer) = de enige die nog kaarten heeft
+    local finishedSet = {}
+    for _,pid in ipairs(finishedOrder) do finishedSet[pid] = true end
+    local lastSeat
+    for i,p in ipairs(players) do
+      if not finishedSet[i] and ( #p.hand + #p.faceUp + #p.faceDown > 0 ) then
+        lastSeat = i; break
+      end
+    end
+    if lastSeat then
+      love.graphics.printf(("Laatste: Speler %d"):format(lastSeat), 0, y + 8, w, 'center')
+    end
+  else
+    -- fallback voor 2 spelers
+    local other = winner == 1 and 2 or 1
+    local rest  = #players[other].hand + #players[other].faceUp + #players[other].faceDown
+    love.graphics.printf("Tegenstander heeft "..rest.." kaarten over", 0, h/2 - 40, w, 'center')
+  end
 end
+
 
 return ui

@@ -212,6 +212,7 @@ local function export_state()
         nextMustBeUnder7 = net.game.nextMustBeUnder7,
         extraTurn        = net.game.extraTurn,
         winner           = net.game.winner,
+        finishedOrder = net.game.finishedOrder,   -- deze is niuew
         state            = net.game.state,
         deckCount        = net.game.deckCount,
         drawCount        = #drawPile.cards,
@@ -313,6 +314,9 @@ local function import_state(snap)
     g.state            = snap.state
     g.ronde            = snap.ronde
     g.maxPlayers       = #new
+    g.winner           = snap.winner                 -- ⬅️ NIEUW
+    g.finishedOrder    = snap.finishedOrder or {}    -- ⬅️ NIEUW
+
 
     ------------------------------------------------------------------
     -- ❻ Trekstapel-maat (voor UI) bijwerken
@@ -388,7 +392,7 @@ local function handle_host(msg)
         net.send_state()
         return
     end
-    
+
         -- Client wil een blind-reveal (alleen host mag uitvoeren)
     if msg.cmd == "BLIND_REVEAL" then
         local pid = msg.id
@@ -421,64 +425,70 @@ local function handle_host(msg)
     --      - msg.cards   : { {kleur,waarde,naam?}, ... } (fallback)
     ------------------------------------------------------------------
     if msg.cmd == "OPEN_PLAY" then
-    local pid = msg.id
-    local p   = player.players[pid]; if not p then return end
+        local pid = msg.id
+        local p   = player.players[pid]; if not p then return end
 
-    -- gate: juiste beurt + juiste fase
-    local phase = utils.phase_for_player(pid)
-    if net.game.currentPlayer ~= pid or phase ~= "playingOpen" then
-        print(("[HOST][OPEN_PLAY] geweigerd: turn=%s phase=%s"):format(net.game.currentPlayer, phase))
-        return
-    end
-
-    -- normaliseer naar dalende indices (voorkeur: msg.indices; fallback: msg.index; fallback2: msg.cards)
-    local toRemove = {}
-    if type(msg.indices) == "table" and #msg.indices > 0 then
-        for _,i in ipairs(msg.indices) do table.insert(toRemove, i) end
-        table.sort(toRemove, function(a,b) return a > b end)
-    elseif type(msg.index) == "number" then
-        table.insert(toRemove, msg.index)
-    elseif type(msg.cards) == "table" and #msg.cards > 0 then
-        local need = {}
-        for _,rc in ipairs(msg.cards) do
-        table.insert(need, (rc.kleur or "").."|"..tostring(rc.waarde or ""))
+        -- gate: juiste beurt + juiste fase
+        local phase = utils.phase_for_player(pid)
+        if net.game.currentPlayer ~= pid or phase ~= "playingOpen" then
+            print(("[HOST][OPEN_PLAY] geweigerd: turn=%s phase=%s"):format(net.game.currentPlayer, phase))
+            return
         end
-        for i = #p.faceUp, 1, -1 do
-        local k   = p.faceUp[i]
-        local key = (k.kleur or "").."|"..tostring(k.waarde or "")
-        for j = #need, 1, -1 do
-            if need[j] == key then
-            table.remove(need, j)
-            table.insert(toRemove, i)
-            break
+
+        -- normaliseer naar dalende indices (voorkeur: msg.indices; fallback: msg.index; fallback2: msg.cards)
+        local toRemove = {}
+        if type(msg.indices) == "table" and #msg.indices > 0 then
+            for _,i in ipairs(msg.indices) do table.insert(toRemove, i) end
+            table.sort(toRemove, function(a,b) return a > b end)
+        elseif type(msg.index) == "number" then
+            table.insert(toRemove, msg.index)
+        elseif type(msg.cards) == "table" and #msg.cards > 0 then
+            local need = {}
+            for _,rc in ipairs(msg.cards) do
+            table.insert(need, (rc.kleur or "").."|"..tostring(rc.waarde or ""))
+            end
+            for i = #p.faceUp, 1, -1 do
+            local k   = p.faceUp[i]
+            local key = (k.kleur or "").."|"..tostring(k.waarde or "")
+            for j = #need, 1, -1 do
+                if need[j] == key then
+                table.remove(need, j)
+                table.insert(toRemove, i)
+                break
+                end
+            end
+            end
+            table.sort(toRemove, function(a,b) return a > b end)
+        else
+            print("[HOST][OPEN_PLAY] geen indices/index/cards meegegeven")
+            return
+        end
+        if #toRemove == 0 then
+            print("[HOST][OPEN_PLAY] niets te spelen")
+            return
+        end
+
+        -- speel kaarten (host-side authoritative)
+        local played = 0
+        for _, idx in ipairs(toRemove) do
+            local card = table.remove(p.faceUp, idx)
+            if card then
+            rules.handle_card_effects(net.game, pid, card)
+            played = played + 1
             end
         end
-        end
-        table.sort(toRemove, function(a,b) return a > b end)
-    else
-        print("[HOST][OPEN_PLAY] geen indices/index/cards meegegeven")
-        return
-    end
-    if #toRemove == 0 then
-        print("[HOST][OPEN_PLAY] niets te spelen")
-        return
-    end
+        print(("[HOST][OPEN_PLAY] pid=%d played=%d"):format(pid, played))
 
-    -- speel kaarten (host-side authoritative)
-    local played = 0
-    for _, idx in ipairs(toRemove) do
-        local card = table.remove(p.faceUp, idx)
-        if card then
-        rules.handle_card_effects(net.game, pid, card)
-        played = played + 1
+        utils.update_phase_for_player(net.game, pid)
+        -- ✅ meteen winner-check + push naar client
+        if net.game.check_winner and net.game:check_winner() then
+        net.send_state()
+        return
         end
-    end
-    print(("[HOST][OPEN_PLAY] pid=%d played=%d"):format(pid, played))
 
-    utils.update_phase_for_player(net.game, pid)
-    net.send_state()
-    return
-    end
+        net.send_state()
+        return
+        end
 
 
     ------------------------------------------------------------------

@@ -41,6 +41,10 @@ game.reveal            = { timer = 0, player = nil, card = nil }
 -- Touch-drag scroll state (alleen mobiel)
 game.dragScroll = { active = false, startX = 0, startOffset = 0, touchId = nil }
 
+  -- ⬇️  pak deckCount uit het menu / lobby
+  if cfg and cfg.deckCount then
+    game.deckCount = tonumber(cfg.deckCount) or 1
+  end
 
 function game.touchpressed(id, x, y, pressure)
     local myId = net.localId or 1
@@ -77,6 +81,58 @@ function game.touchreleased(id, x, y, pressure)
     end
 end
 
+--voor win scherm---
+local function is_empty(p)
+  return #p.hand == 0 and #p.faceUp == 0 and #p.faceDown == 0
+end
+
+-- markeer seat 'id' als finished als hij écht leeg is
+function game._mark_finished_if_empty(id)
+    local p = player.players[id]
+    if not p or p.finished then return end
+    if #p.hand == 0 and #p.faceUp == 0 and #p.faceDown == 0 then
+        p.finished = true
+        table.insert(game.finishedOrder, id)
+        -- optioneel: print(("[OUT] speler %d ligt eruit"):format(id))
+    end
+end
+
+-- tel actieve spelers en onthoud de laatste actieve seat
+local function active_players()
+    local cnt, last = 0, nil
+    for i = 1, game.maxPlayers do
+        local p = player.players[i]
+        if p and not p.finished then
+            cnt  = cnt + 1
+            last = i
+        end
+    end
+    return cnt, last
+end
+
+
+-- wie is “uitgespeeld”?
+local function is_finished(p)
+  return #p.hand == 0 and #p.faceUp == 0 and #p.faceDown == 0
+end
+
+-- update finished / winner; return true als spel echt voorbij is
+function game._update_finished_and_maybe_end()
+    local alive = {}
+    for i = 1, game.maxPlayers do
+        if not _is_finished(i) then table.insert(alive, i) end
+    end
+
+    -- spel klaar als er 0 of 1 spelers over zijn
+    if #alive <= 1 then
+        game.winner = alive[1] or 0  -- (0 bij niemand over: theoretisch niet haalbaar)
+        -- host pusht meteen de state zodat clients het eindscherm zien
+        if net.isHost and net.isHost() and net.send_state then net.send_state() end
+        return true
+    end
+    return false
+end
+------
 
 -- zelfde geometrie als ui.get_card_positions()
 local function _compute_scroll_bounds_for_local()
@@ -128,6 +184,7 @@ function game.load(cfg)
 
     -- ⬇︎ voeg aiCount doorgeefluik toe (val terug op 1)
     game.start(cfg and cfg.mode or "ai", cfg and cfg.aiCount or 1)
+
 
     scene             = "playing"
     ronde             = 0
@@ -210,7 +267,7 @@ function game.draw()
     love.graphics.setBackgroundColor(0.1, 0.4, 0.1)
 
     if scene == "gameover" then
-        ui.draw_end_screen(game.winner, player.players)
+        ui.draw_end_screen(game.winner, player.players, game.finishedOrder)  -- ⬅️ geef volgorde mee
         return
     end
 
@@ -517,7 +574,10 @@ end
 --------------------------------------------------------------------
 function game.start(mode, aiCount)
     game.aiTimer = 0
-
+    game.finishedOrder = {}
+    for i = 1, #player.players do
+        player.players[i].finished = false
+    end
     -------------------------------------------------------------- 0
     -- Trekstapel maken en schudden  ➜  **alleen de host doet dit**
     --------------------------------------------------------------
@@ -652,15 +712,28 @@ end
 -- game.next_turn()  – speler-wissel + AI-timer + fase-update
 --------------------------------------------------------------------
 function game.next_turn()
-  -- als iemand al ‘finished’ is: winner check in check_winner()
+    -- Iemand net uit? Check eerst of we al mogen eindigen
+  if game.check_winner() then
+    if net.isHost() then net.send_state() end
+    return
+  end
+
+-- roteer naar volgende NIET-finished speler
+  local spins = 0
   repeat
-    game.currentPlayer = next_seat(game.currentPlayer, game.maxPlayers)
-  until true  -- (eventueel overslaan van 'finished' seats)
+    game.currentPlayer = (game.currentPlayer % game.maxPlayers) + 1
+    spins = spins + 1
+    if spins > game.maxPlayers then break end
+  until not is_finished(player.players[game.currentPlayer])
 
   utils.update_phase_for_player(game, game.currentPlayer)
 
-  -- AI wachttijd (seconden) bij turn-wissel
-  if game.mode == "ai" and player.players[game.currentPlayer].isAI then
+
+  ------------------------------------------------------------------
+  -- 4) AI-wachttijd (optioneel)
+  ------------------------------------------------------------------
+  local curP = player.players[game.currentPlayer]
+  if game.mode == "ai" and curP and curP.isAI then
     local minDelay, maxDelay = 0.5, 2.3
     local r = love.math.random() -- 0..1 float
     game.aiTimer      = minDelay + (maxDelay - minDelay) * r
@@ -670,8 +743,11 @@ function game.next_turn()
     game.waitingForAI = false
     game.aiTimer      = 0
   end
+  ------------------------------------------------------------------
+  -- 5) Host broadcast (MP)
+  ------------------------------------------------------------------
+  if net.isMultiplayer() and net.isHost() then net.send_state() end
 end
-
 
 
 
@@ -680,14 +756,20 @@ end
 -- game.check_winner()  – einde-spel controle
 --------------------------------------------------------------------
 function game.check_winner()
-  for i=1, game.maxPlayers do
+  local survivors = {}
+  for i = 1, game.maxPlayers do
     local p = player.players[i]
-    if #p.hand==0 and #p.faceUp==0 and #p.faceDown==0 then
-      game.winner = i
-      return true
+    if p and not is_finished(p) then
+      table.insert(survivors, i)
     end
+  end
+
+  if #survivors <= 1 then
+    game.winner = survivors[1] or game.currentPlayer
+    return true
   end
   return false
 end
+
 
 return game

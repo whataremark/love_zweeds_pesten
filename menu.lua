@@ -3,6 +3,11 @@ local state      = require("state")
 local menu       = {}
 local aiCount = 1   -- standaard 1 AI
 
+local menu = {
+  useTwoDecks = false,   -- ⬅️ nieuwe toggle
+  hoverIndex  = 1,
+}
+
 ------------------------------ fonts één keer maken
 local titleFont
 local subtitleFont
@@ -33,24 +38,44 @@ local cardBack = love.graphics.newImage("png/back.png")
 
 local cards = {}
 
+
+------------------------------ menu-opties
+local function startAI(n)
+  state.enter(require("game"), {
+    mode      = "ai",
+    aiCount   = n,
+    deckCount = (menu.useTwoDecks and 2 or 1),
+  })
+end
+
+local function startHost()
+  state.enter(require("host_lobby"), {
+    name      = "My Lobby",
+    deckCount = (menu.useTwoDecks and 2 or 1),  -- doorgeven aan host lobby
+  })
+end
+
+local function startJoin()
+  state.enter(require("browser")) -- host bepaalt aantal decks
+end
+
 ------------------------------ menu-opties
 local options = {
-  { key="1", label="Play vs 1 AI", next=function()
-      state.enter(require("game"), { mode="ai", aiCount = 1 })
-    end },
-  { key="2", label="Play vs 2 AI", next=function()
-      state.enter(require("game"), { mode="ai", aiCount = 2 })
-    end },
-  { key="3", label="Play vs 3 AI", next=function()
-      state.enter(require("game"), { mode="ai", aiCount = 3 })
-    end },
-  { key="h", label="Host game", next=function()
-      state.enter(require("host_lobby"), { name="My Lobby" })
-    end },
-  { key="j", label="Join game", next=function()
-      state.enter(require("browser"))
-    end },
+  { key="1", label="Play vs 1 AI", next=function() startAI(1) end },
+  { key="2", label="Play vs 2 AI", next=function() startAI(2) end },
+  { key="3", label="Play vs 3 AI", next=function() startAI(3) end },
+  { key="h", label="Host game",    next=function() startHost() end },
+  { key="j", label="Join game",    next=function() startJoin() end },
 }
+
+
+-- hulpfunctie: teken een vinkje
+local function draw_checkmark(x, y, s)
+  love.graphics.setLineWidth(3)
+  love.graphics.line(x, y + s*0.55, x + s*0.35, y + s, x + s, y)
+  love.graphics.setLineWidth(1)
+end
+
 
 local function activateSelected()
     local index = menu.selected or 1
@@ -166,90 +191,138 @@ end
 
 
 function menu.draw()
-    local w, h = love.graphics.getWidth(), love.graphics.getHeight()
-    ensureFonts()
-    drawBackground(w, h)
-    drawFloatingCards(w, h)
+  local w, h = love.graphics.getWidth(), love.graphics.getHeight()
+  ensureFonts()
+  if drawBackground then drawBackground(w, h) end
+  if drawFloatingCards then drawFloatingCards(w, h) end
 
-    local panelW   = math.min(560, w * 0.64)
-    local panelH   = math.min(440, h * 0.7)
-    local panelX   = (w - panelW) / 2
-    local panelY   = (h - panelH) / 2
-    local pulse    = 0.5 + 0.5 * math.sin(menu.time * 2.6)
+  -- Paneel-afmetingen (groter, zodat "Join game" niet botst met hints)
+  local panelW = math.min(820, w * 0.80)
+  local panelH = math.min(620, h * 0.78)
+  local panelX = (w - panelW) / 2
+  local panelY = (h - panelH) / 2
 
-    love.graphics.setColor(0, 0, 0, 0.3)
-    love.graphics.rectangle("fill", panelX + 10, panelY + 14, panelW, panelH, 24, 24)
+  -- Paneel
+  love.graphics.setColor(0, 0, 0, 0.45)
+  love.graphics.rectangle("fill", panelX + 10, panelY + 14, panelW, panelH, 24, 24)
+  love.graphics.setColor(0.07, 0.14, 0.11, 0.94)
+  love.graphics.rectangle("fill", panelX, panelY, panelW, panelH, 24, 24)
+  love.graphics.setColor(1, 1, 1, 0.08)
+  love.graphics.rectangle("line", panelX, panelY, panelW, panelH, 24, 24)
 
-    love.graphics.setColor(0.07, 0.14, 0.11, 0.94)
-    love.graphics.rectangle("fill", panelX, panelY, panelW, panelH, 24, 24)
+  -- Titel + subtitel
+  love.graphics.setColor(1, 1, 1, 1)
+  love.graphics.setFont(titleFont)
+  local titleY = panelY + 36
+  love.graphics.printf("Zweeds Pesten", panelX, titleY, panelW, "center")
 
-    love.graphics.setColor(1, 1, 1, 0.08)
-    love.graphics.rectangle("line", panelX, panelY, panelW, panelH, 24, 24)
+  love.graphics.setFont(subtitleFont)
+  love.graphics.setColor(1, 1, 1, 0.72)
+  love.graphics.printf("Potje Zweeds??", panelX, titleY + 60, panelW, "center")
+
+  -- Opties
+  love.graphics.setFont(optionFont)
+  local listY = titleY + 100
+  local rowH  = 64
+  local padX  = 40
+
+  for i, opt in ipairs(options) do
+    local y = listY + (i - 1) * rowH
+    local isHover = (menu.hoverIndex == i)
+
+    love.graphics.setColor(isHover and 0.32 or 0.12, 0.6, 0.28, isHover and 1 or 0.9)
+    love.graphics.rectangle("fill", panelX + padX, y, panelW - 2 * padX, 44, 14, 14)
 
     love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.setFont(titleFont)
-    love.graphics.printf("Zweeds Pesten", panelX, panelY + 36, panelW, "center")
+    love.graphics.printf(opt.label, panelX + padX + 16, y + 10, panelW - 2 * padX - 32, "left")
+    love.graphics.printf(("Press %s"):format(opt.key:upper()), panelX + padX, y + 10, panelW - 2 * padX - 16, "right")
 
-    love.graphics.setFont(subtitleFont)
-    love.graphics.setColor(1, 1, 1, 0.72)
-    love.graphics.printf("Potje Zweeds??", panelX, panelY + 96, panelW, "center")
+    if not menu._rowRects then menu._rowRects = {} end
+    menu._rowRects[i] = {
+    x = panelX + padX,
+    y = y,
+    w = panelW - 2*padX,
+    h = 44
+        }
+  end
 
-    local optionY = panelY + 150
-    local optionH = 48
-    love.graphics.setFont(optionFont)
+  -- Checkbox “Speel met 2 decks”
+  local checkY    = listY + #options * rowH + 24
+  local checkX    = panelX + padX
+  local checkSize = 26
 
-    for i, opt in ipairs(options) do
-        local isSelected = i == menu.selected
-        local y          = optionY + (i - 1) * (optionH + 12)
+  -- box rand
+  love.graphics.setColor(1, 1, 1, 0.9)
+  love.graphics.rectangle("line", checkX, checkY, checkSize, checkSize, 6, 6)
 
-        if isSelected then
-            local glow = 0.18 + pulse * 0.22
-            love.graphics.setColor(0.16 + glow * 0.4, 0.38 + glow, 0.21 + glow * 0.35, 0.94)
-            love.graphics.rectangle("fill", panelX + 40, y - 6, panelW - 80, optionH + 12, 16, 16)
-        end
+  -- indien aan: groen vlak + vinkje
+  if menu.useTwoDecks then
+    love.graphics.setColor(0.2, 0.7, 0.3, 0.9)
+    love.graphics.rectangle("fill", checkX + 2, checkY + 2, checkSize - 4, checkSize - 4, 5, 5)
+    love.graphics.setColor(1, 1, 1, 1)
+    -- simpel vinkje
+    love.graphics.setLineWidth(3)
+    love.graphics.line(checkX + 4, checkY + checkSize * 0.55,
+                       checkX + checkSize * 0.35, checkY + checkSize - 4,
+                       checkX + checkSize - 4, checkY + 4)
+    love.graphics.setLineWidth(1)
+  end
 
-        love.graphics.setColor(1, 1, 1, isSelected and 1 or 0.8)
-        love.graphics.printf(opt.label, panelX + 60, y + 4, panelW - 120, "left")
+  love.graphics.setColor(1, 1, 1, 0.9)
+  love.graphics.setFont(optionFont)
+  love.graphics.print("Speel met 2 decks", checkX + checkSize + 12, checkY + 2)
 
-        love.graphics.setColor(1, 1, 1, isSelected and 0.9 or 0.5)
-        love.graphics.printf("Press " .. opt.key:upper(), panelX + 60, y + 4, panelW - 120, "right")
+  -- Hints onderaan het paneel
+  love.graphics.setFont(hintFont)
+  love.graphics.setColor(1, 1, 1, 0.6)
+  love.graphics.printf("• Gebrurik pijltjes of je muis •  Gebruik Enter om te starten •  D om decks te toggelen.",
+    panelX + padX, checkY + checkSize + 20, panelW - 2 * padX, "left")
 
-    end
-    
-    love.graphics.setFont(hintFont)
-    love.graphics.setColor(1, 1, 1, 0.6)
-    love.graphics.printf("Use ↑ ↓ or your mouse • Press Enter to launch", panelX, panelY + panelH - 44, panelW, "center")
+  -- klikgebieden bewaren (voor mousepressed)
+  menu._checkRect = { x = checkX, y = checkY, w = checkSize, h = checkSize }
+  menu._panelRect = { x = panelX, y = panelY, w = panelW, h = panelH }
 end
 
-function menu.keypressed(key)
-  if key == "up"   then menu.selected = math.max(1, (menu.selected or 1)-1) return end
-  if key == "down" then menu.selected = math.min(#options, (menu.selected or 1)+1) return end
-  if key == "return" then options[menu.selected].next(); return end
-  if key == "1" or key == "2" or key == "3" then
-      options[ ({["1"]=1,["2"]=2,["3"]=3})[key] ].next()
+
+function menu.mousepressed(x, y, btn)
+  if btn ~= 1 then return end
+
+  -- Checkbox togglen?
+  local r = menu._checkRect
+  if r and x>=r.x and x<=r.x+r.w and y>=r.y and y<=r.y+r.h then
+    menu.useTwoDecks = not menu.useTwoDecks
+    return
+  end
+
+  -- Klik op optie (gebruik de precieze rects uit draw)
+  local rows = menu._rowRects or {}
+  for i, rc in ipairs(rows) do
+    if x>=rc.x and x<=rc.x+rc.w and y>=rc.y and y<=rc.y+rc.h then
+      menu.hoverIndex = i
+      if options and options[i] and options[i].next then
+        options[i].next()
+      end
       return
+    end
   end
 end
 
-function menu.mousepressed(x, y, button)
-    if button ~= 1 then return end
-    local w, h = love.graphics.getWidth(), love.graphics.getHeight()
-    
-    local panelW = math.min(560, w * 0.64)
-    local panelH = math.min(440, h * 0.7)
-    local panelX = (w - panelW) / 2
-    local panelY = (h - panelH) / 2
-    local optionY = panelY + 150
-    local optionH = 48
 
-    for i, _ in ipairs(options) do
-        local yOpt = optionY + (i - 1) * (optionH + 12)
-        if x >= panelX + 40 and x <= panelX + panelW - 40 and y >= yOpt - 6 and y <= yOpt + optionH + 6 then
-            menu.selected = i
-            activateSelected()   -- activeer direct
-            return
-        end
-    end
+function menu.keypressed(key)
+  if key == "down" then
+    menu.hoverIndex = math.min(#options, menu.hoverIndex + 1)
+  elseif key == "up" then
+    menu.hoverIndex = math.max(1, menu.hoverIndex - 1)
+  elseif key == "return" or key == "kpenter" then
+    options[menu.hoverIndex].next()
+  elseif key == "1" then options[1].next()
+  elseif key == "2" then options[2].next()
+  elseif key == "3" then options[3].next()
+  elseif key == "h" then options[4].next()
+  elseif key == "j" then options[5].next()
+  elseif key == "d" then
+    menu.useTwoDecks = not menu.useTwoDecks
+  end
 end
 function menu.mousemoved(x, y)
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()

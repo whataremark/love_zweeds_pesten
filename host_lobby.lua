@@ -135,7 +135,10 @@ end
 
 function host.keypressed(key)
     if key == "s" and #host.players >= 2 then
-        state.enter(require("game"), {mode="multiplayer-host"})
+        state.enter(require("game"), {
+        mode      = "multiplayer-host",
+        deckCount = (args and args.deckCount) or 1,   -- ⬅️ uit menu
+        })
     elseif key == "escape" then
         state.enter(require("menu"))
     end
