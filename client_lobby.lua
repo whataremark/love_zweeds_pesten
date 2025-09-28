@@ -124,12 +124,14 @@ end
 function lobby.update(dt)
     lobby.time = (lobby.time or 0) + dt
 
-    net.update()                    -- blijf netwerk pompen
-    if not lobby.connected and net.started then
-        lobby.connected = true      -- eerste STATE binnen
-    end
-    if lobby.connected then
+    -- belangrijk: geef dt door
+    net.update(dt)
+
+    -- Alleen doorgaan naar het spel wanneer de host echt is gestart
+    -- (= zodra we een STATE snapshot hebben ontvangen)
+    if net.pendingState or (net.game and net.game.state ~= nil) then
         state.enter(require("game"), { mode = "multiplayer-client" })
+        return
     end
 end
 
