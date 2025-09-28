@@ -303,7 +303,28 @@ function game.mousepressed(x, y, button)
     local myPhase = utils.phase_of(game, myId)
     local btns    = buttons or game._uiButtons
 
+    --start race
+    if game.startRace and game.startRace.active and button == 1 then
+        local myId = require("net").localId or 1
+        local hand = require("player").players[myId].hand
+        local positions = require("ui").get_card_positions(hand)
 
+        -- klik in je hand? dan bied je met die kaart als deze 4..A is
+        for i = #positions, 1, -1 do
+            local p = positions[i]
+            if require("utils").inside(x, y, p.x, p.y, p.w, p.h) then
+                if require("net").isClient() then
+                    require("net").send({ cmd = "START_BID", id = myId, handIndex = i })
+                else
+                    game.handle_start_bid(myId, i)
+                end
+                return
+            end
+        end
+
+        -- klikte je buiten je hand? negeer tijdens de race
+        return
+    end
 
 
     ------------------------------------------------------------------
