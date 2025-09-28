@@ -164,6 +164,15 @@ function host.mousepressed(x, y, btn)
     host.deckCount = (host.deckCount == 1) and 2 or 1
     return
   end
+  local s = host._startRect
+  local canStart = #host.players >= 2
+  if canStart and s and x>=s.x and x<=s.x+s.w and y>=s.y and y<=s.y+s.h then
+    state.enter(require("game"), {
+      mode      = "multiplayer-host",
+      deckCount = host.deckCount,
+    })
+    return
+  end
 end
 
 function host.draw()
@@ -253,13 +262,18 @@ function host.draw()
 
   love.graphics.setColor(1, 1, 1, canStart and 0.95 or 0.5)
   love.graphics.setFont(bodyFont)
-  love.graphics.printf("Press S to start", buttonX, buttonY + 16, buttonW, "center")
+    love.graphics.printf(
+    canStart and "Game Starten" or "Wacht op minstens 1 extra speler…",
+    buttonX, buttonY + 16, buttonW, "center"
+  )
+  host._startRect = { x = buttonX, y = buttonY, w = buttonW, h = buttonH }
+
 
   local hintY = buttonY + buttonH + 40
   love.graphics.setFont(smallFont)
   love.graphics.setColor(1, 1, 1, 0.62)
-  local hint = canStart and "Game launches once you press S." or "Waiting for at least one more player…"
-  love.graphics.printf(hint .. "\nEsc to return to menu", panelX, hintY, panelW, "center")
+  local hint = canStart and "Game start als je S drukt" or "Waiting for at least one more player…"
+  love.graphics.printf(hint .. "\nEsc om terug te gaan naar het menu", panelX, hintY, panelW, "center")
 end
 
 return host
