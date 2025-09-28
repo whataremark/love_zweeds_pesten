@@ -208,6 +208,8 @@ function game.update(dt)
         net.update()
         if net.isHost() then net.send_state() end
     end
+    
+    game.update_start_race(dt)
 
     -- A) Ongeldige-zet-timer
     if ongeldigeZetTimer > 0 then
@@ -575,6 +577,7 @@ end
 function game.start(mode, aiCount)
     game.aiTimer = 0
     game.finishedOrder = {}
+    game.startRace = { active=false, bids={}, best=nil, windowEnd=nil }
     for i = 1, #player.players do
         player.players[i].finished = false
     end
@@ -676,29 +679,173 @@ local function all_open_selected()
     return true
 end
 
+-- =========================
+-- START-FLOW NA OPEN-SELECT
+-- =========================
+
+-- Vervangt je huidige finalize_setup: start geen speler direct,
+-- maar begint eerst de "start-race" met handkaarten (4 → 5 → 6 → ...).
 function game.finalize_setup()
-    if not all_open_selected() then return end   -- nog niet klaar
-
-    -- bepaal wie mag beginnen: eerste 4, dan 5, 6, …
-    local order = {"4","5","6","7","8","9","10","jack","queen","king","ace"}
-    local found
-    for _,v in ipairs(order) do
-        for pid = 1, game.maxPlayers do
-            for _,c in ipairs(player.players[pid].faceUp) do
-                if c.waarde==v then
-                    game.currentPlayer = pid
-                    found = v
-                    break
-                end
-            end
-            if found then break end
+    -- 1) Check of iedereen zijn 3 open kaarten heeft gekozen
+    local all_done = true
+    for pid = 1, game.maxPlayers do
+        local p = player.players[pid]
+        if #p.faceUp < (config.faceUpCount or 3) then
+            all_done = false
+            break
         end
-        if found then break end
     end
-    print(found and
-          string.format("[INIT] P%d starts with %s", game.currentPlayer, found)
-          or "[INIT] no 4/5/… found")
+    if not all_done then
+        return -- nog niet klaar met setup
+    end
 
+    -- 2) Begin de start-race (handkaarten)
+    game.begin_start_race()
+end
+
+-- ===========
+-- HELPERS
+-- ===========
+
+-- Rang voor de start-race; 4 is beste (1), dan 5 (2), ..., ace (11).
+local function __start_rank(value)
+    local order = {"4","5","6","7","8","9","10","jack","queen","king","ace"}
+    for i, v in ipairs(order) do
+        if v == value then return i end
+    end
+    return nil
+end
+
+-- Monotone timestamp
+local function __now()
+    return love.timer.getTime()
+end
+
+-- Start de race: iedereen mag tegelijk één (geschikte) handkaart "bieden".
+function game.begin_start_race()
+    game.startRace = {
+        active    = true,
+        bids      = {},    -- { {pid, card, rank, t}, ... }
+        best      = nil,   -- {pid, rank, t}
+        windowEnd = nil,   -- sluitmoment voor beslissen (als niemand 4 legt)
+        windowSec = 0.8    -- korte window om "snelheid" eerlijk te laten tellen
+    }
+    -- (optioneel) banner/overlay
+    if ui and ui.add_banner then
+        ui.add_banner("Speel 4/5/6 om te beginnen!")
+    end
+    -- Zorg dat de huidige speler-fase correct staat; er is nog geen "aan zet"
+    game.currentPlayer = nil
+    game.scene = "playing"
+end
+
+-- Wordt aangeroepen als iemand op een handkaart klikt tijdens de race.
+-- pid: speler-id (seat), handIndex: index in p.hand
+function game.handle_start_bid(pid, handIndex)
+    local sr = game.startRace
+    if not (sr and sr.active) then return end
+
+    local p = player.players[pid]
+    local card = p and p.hand and p.hand[handIndex]
+    if not card then return end
+
+    local r = __start_rank(card.waarde)
+    if not r then
+        -- Niet geschikt voor de start-race (geen 4..A) -> negeer
+        return
+    end
+
+    local t = __now()
+
+    -- Verplaats tijdelijk uit de hand (visuele "neerleg")
+    table.remove(p.hand, handIndex)
+
+    local bid = { pid = pid, card = card, rank = r, t = t }
+    table.insert(sr.bids, bid)
+
+    -- Beste tot nu toe? (lagere rank beter; bij gelijke rank: vroegste tijd)
+    local best = sr.best
+    if (not best) or (r < best.rank) or (r == best.rank and t < best.t) then
+        sr.best = { pid = pid, rank = r, t = t }
+    end
+
+    -- Als iemand een 4 speelt, beslis meteen
+    if r == 1 then
+        game.resolve_start_race()
+        return
+    end
+
+    -- Start een korte window vanaf eerste geldige bid
+    if not sr.windowEnd then
+        sr.windowEnd = t + (sr.windowSec or 0.8)
+    end
+end
+
+-- Call dit 1x per frame vanuit je game.update(dt)
+function game.update_start_race(dt)
+    local sr = game.startRace
+    if not (sr and sr.active) then return end
+    if sr.windowEnd and __now() >= sr.windowEnd then
+        game.resolve_start_race()
+    end
+end
+
+-- Rondt de race af: bepaalt winnaar, legt alleen diens kaart op de pot,
+-- zet alle andere “bids” terug naar de juiste hand, en kiest de starter.
+function game.resolve_start_race()
+    local sr = game.startRace
+    if not (sr and sr.active and sr.best) then
+        -- Geen geldige bids? Kies desnoods fallback (random of oude logica)
+        -- (Hier kiezen we veilig random; pas aan naar wens)
+        local fallback = love.math.random(1, game.maxPlayers)
+        game.currentPlayer = fallback
+        if ui and ui.add_banner then
+            ui.add_banner(("Geen 4/5/6 gespeeld — P%d start"):format(fallback))
+        end
+        sr.active    = false
+        sr.bids      = {}
+        sr.best      = nil
+        sr.windowEnd = nil
+        utils.update_phase_for_player(game, game.currentPlayer)
+        return
+    end
+
+    local winnerPid = sr.best.pid
+    local bestRank  = sr.best.rank
+    local bestT     = sr.best.t
+    local winningCard = nil
+
+    -- Vind winnende bid & haal die uit sr.bids
+    for i = #sr.bids, 1, -1 do
+        local b = sr.bids[i]
+        if not winningCard and b.pid == winnerPid and b.rank == bestRank and b.t == bestT then
+            winningCard = b.card
+            table.remove(sr.bids, i)
+            break
+        end
+    end
+
+    -- Alle andere bids terug naar de hand
+    for _, b in ipairs(sr.bids) do
+        table.insert(player.players[b.pid].hand, b.card)
+    end
+
+    -- Reset race-state
+    sr.active    = false
+    sr.bids      = {}
+    sr.best      = nil
+    sr.windowEnd = nil
+
+    -- Zet startspeler en leg de winnende kaart op de pot
+    game.currentPlayer = winnerPid
+    if winningCard then
+        table.insert(game.pot, winningCard)
+        if ui and ui.add_banner then
+            ui.add_banner(("P%d start met %s"):format(winnerPid, winningCard.waarde))
+        end
+    end
+
+    print(("[INIT] Start: P%d"):format(winnerPid))
     utils.update_phase_for_player(game, game.currentPlayer)
 end
 

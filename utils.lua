@@ -165,4 +165,16 @@ function utils.update_reveal_logic(dt, game)
     end
 end
 
+-- Voor Start Game---
+function utils.start_rank(value)
+  local order = {"4","5","6","7","8","9","10","jack","queen","king","ace"}
+  for i,v in ipairs(order) do if v==value then return i end end
+  return nil
+end
+
+function utils.now()  -- simpele monotone timestamp (frames/seconds)
+  return love.timer.getTime()
+end
+
+
 return utils

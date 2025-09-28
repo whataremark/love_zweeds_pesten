@@ -648,8 +648,8 @@ function ui.draw_action_buttons()
         i = i + 1
     end
 
-    draw("Pak pot",    "pickup", 0.2,0.6,0.2)
-    draw("Speel",      "play",   0.2,0.4,0.8)
+    draw("Pak pot", "pickup", 0.8, 0.2, 0.2)
+    draw("Speel",      "play",   0.2,0.6,0.2)
     if allowPass then  draw("Pas", "pass", 0.6,0.4,0.2) end
     draw("Bekijk Pot", "pot",    0.2,0.2,0.2)
 
