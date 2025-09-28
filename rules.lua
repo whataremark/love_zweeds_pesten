@@ -179,11 +179,10 @@ function rules.play_selected_cards(game, playerIndex)
     -- 5.  Beurtafhandeling
     ----------------------------------------------------------------
     if game.extraTurn then
-        -- speler blijft aan zet; reset vlag na gebruik
-        game.extraTurn = false
+        -- Laat extraTurn AAN staan zodat PASS kan en je nog een kaart mag leggen.
         utils.update_phase_for_player(game, playerIndex)
 
-        -- AI moet opnieuw denken als hij de extra beurt kreeg
+        -- Als de AI degene is met de extra beurt: kort denkmomentje
         if game.mode == "ai" and playerIndex == 2 then
             game.waitingForAI = true
             game.aiTimer      = 0.5
