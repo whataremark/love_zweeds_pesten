@@ -437,15 +437,6 @@ local function handle_host(msg)
         return
     end
 
-        -- [HOST] client doet een start-bid met een handIndex
-    if msg.cmd == "START_BID" then
-        -- alleen host beslist en houdt state bij
-        if net.game and net.isHost() then
-            net.game.handle_start_bid(msg.id, msg.handIndex)
-            net.send_state()  -- push temp wijzigingen (kaart even uit hand)
-        end
-        return
-    end
 
         -- Client wil een blind-reveal (alleen host mag uitvoeren)
     if msg.cmd == "BLIND_REVEAL" then
