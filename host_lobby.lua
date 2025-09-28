@@ -2,6 +2,7 @@
 local state  = require("state")
 local net    = require("net")
 local player = require("player")
+local profile = require("profile")
 
 local host = {}
 
@@ -102,7 +103,8 @@ end
 function host.load(params)
   ensureFonts()
 
-  host.name       = (params and params.name) or "My Lobby"
+  host.name    = params.name or (profile.get_name() .. "'s Lobby")
+  host.players = { profile.get_name() .. " (host)" }
   host.deckCount  = (params and params.deckCount) or 1     -- ⬅️ togglebaar
   host.cards      = createCards()
   host.time       = 0

@@ -1,5 +1,6 @@
 local state = require("state")
 local net   = require("net")
+local profile = require("profile")
 
 local lobby = {}
 
@@ -109,12 +110,20 @@ end
 function lobby.load(info)           -- info.ip wordt meegegeven
     ensureFonts()
 
-    lobby.ip        = info.ip
-    lobby.tick      = 0
-    lobby.connected = false
-    lobby.time      = 0
-    lobby.cards     = createCards()
-end
+        lobby.ip        = info.ip
+        lobby.tick      = 0
+        lobby.connected = false
+        lobby.time      = 0
+        lobby.cards     = createCards()
+
+        -- ✉️  Stuur 1x jouw naam naar de host
+        -- (profile is al bovenin 'require'd)
+        net.send({
+            cmd  = "JOIN",
+            id   = net.localId,            -- client = 2
+            name = profile.get_name()
+        })
+    end
 
 function lobby.update(dt)
     lobby.time = (lobby.time or 0) + dt

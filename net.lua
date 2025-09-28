@@ -5,6 +5,8 @@ local player   = require("player")
 local utils    = require("utils")
 local config   = require("config")
 local socket   = require("socket")
+local profile = require("profile")
+
 
 local net = {}
 
@@ -203,8 +205,7 @@ local function inflate_card(c)
 end
 
 local function inflate_player(sp)
-    local t = { hand = {}, faceUp = {}, faceDown = {} }
-    t.name = sp.name
+    local t = { name = sp.name, hand = {}, faceUp = {}, faceDown = {} }
     for _,c in ipairs(sp.hand     or {}) do table.insert(t.hand,     inflate_card(c)) end
     for _,c in ipairs(sp.faceUp   or {}) do table.insert(t.faceUp,   inflate_card(c)) end
     for _,c in ipairs(sp.faceDown or {}) do table.insert(t.faceDown, inflate_card(c)) end
@@ -236,7 +237,7 @@ local function export_state()
     end
 
     for i,sp in ipairs(player.players) do
-        local t = { hand = {}, faceUp = {}, faceDown = {}, name = (sp.name or ("Speler "..i)) }
+        local t = { name = sp.name, hand = {}, faceUp = {}, faceDown = {} }
         t.name = sp.name
         for _,k in ipairs(sp.hand)     do table.insert(t.hand,     slim_card(k)) end
         for _,k in ipairs(sp.faceUp)   do table.insert(t.faceUp,   slim_card(k)) end
@@ -395,27 +396,23 @@ end
 -- Handlers
 ----------------------------------------------------------------------
 local function handle_host(msg)
-    if msg.cmd == "HELLO" then
-        print("[net] client connected")
-        return
-    end
-    
-    -- net.lua (in handle_host)
     if msg.cmd == "JOIN" then
-    local pid  = tonumber(msg.id)
-    local name = tostring(msg.name or ("Speler "..(pid or 2)))
+    local pid  = tonumber(msg.id) or 2
+    local name = tostring(msg.name or ("Speler " .. pid))
 
-    if pid and player.players and player.players[pid] then
-        player.players[pid].name = name         -- als game al bestaat
+    -- als de game al bestaat: schrijf naam in de spelerslijst
+    if player.players and player.players[pid] then
+        player.players[pid].name = name
     end
 
-    -- altijd in wachtrij voor lobby-UI
+    -- altijd in wachtrij voor host_lobby UI
     table.insert(net.newClients, name)
 
     -- alleen snapshotten als er al een game loopt
     if net.game and net.conn then
         net.send_state()
     end
+
     print(("[net] JOIN seat=%s name=%s"):format(tostring(pid), name))
     return
     end
@@ -598,6 +595,7 @@ local function handle_client(msg)
   if msg.cmd == "HELLO" then
     -- markeer dat we verbonden zijn
     net.started = true
+    net.send({ cmd = "JOIN", id = net.localId, name = profile.get_name() })
     -- host kan alvast deckCount doorgeven (komt ook in STATE mee)
     if net.game and msg.deckCount then
       net.game.deckCount = msg.deckCount
