@@ -210,48 +210,73 @@ function ui.draw_pot(pot, ongeldigeZetActief, toonOverlay)
 
     end
 
--- Overlay met alle kaarten (compact, tussen boven- en onderkant)
+-- Overlay met alle kaarten (compact, iets links en lager qua S I Z E)
 if toonOverlay then
     local screenW = love.graphics.getWidth()
     local screenH = love.graphics.getHeight()
 
     local overlayW = 300
-    local overlayH = screenH - 300  -- genoeg ruimte boven en onder
-    local overlayX = screenW - overlayW - 20
-    local overlayY = 130  -- onder de bovenste kaarten
+    -- Maak 'm duidelijk minder hoog dan voorheen:
+    -- kies max 360px hoog, en laat nog wat marge naar de randen
+    local overlayH = math.min(360, screenH - 220)
 
-    -- Achtergrond van de overlay
-    love.graphics.setColor(0.2, 0.5, 0.3, 0.97)  -- zachtere groen
+    -- ⬇️ alleen iets naar links, NIET naar beneden shiften
+    local SHIFT_X       = 0 -- OP NUL GGEZET WANT TOCH GEWOON  IN HET MIDDEN  HAHAHAH
+    local SHADOW_ALPHA  = 0.50 -- donkerder schaduw (minder transparant)
+    local PANEL_ALPHA   = 0.98 -- bijna opaak panel
+
+    local overlayX = (screenW - overlayW) / 2 + SHIFT_X
+    local overlayY = (screenH - overlayH) / 2
+
+    -- schaduw
+    love.graphics.setColor(0, 0, 0, SHADOW_ALPHA)
+    love.graphics.rectangle("fill", overlayX + 8, overlayY + 10, overlayW, overlayH, 12)
+
+    -- panel
+    love.graphics.setColor(0.20, 0.50, 0.30, PANEL_ALPHA)
     love.graphics.rectangle("fill", overlayX, overlayY, overlayW, overlayH, 12)
 
-    -- Header
-    love.graphics.setColor(1, 1, 1)
+    -- subtiele rand
+    love.graphics.setColor(1, 1, 1, 0.10)
+    love.graphics.rectangle("line", overlayX, overlayY, overlayW, overlayH, 12)
+
+    -- header
+    love.graphics.setColor(1, 1, 1, 1)
     love.graphics.printf(" Pot kaarten", overlayX, overlayY + 10, overlayW, "center")
 
-    -- Kaarten tekenen
-    local startX = overlayX + 20
-    local startY = overlayY + 40
-    local maxPerRow = 3
-    local padding = 15
-    local kaart_hoogte = 70
+    -- kaarten (geclipt binnen het panel)
+    local contentPadTop  = 40
+    local contentPadSide = 20
+    local startX         = overlayX + contentPadSide
+    local startY         = overlayY + contentPadTop
+
+    -- Iets kleinere kaartjes zodat er meer passen in lagere hoogte
+    local maxPerRow      = 5
+    local padding        = 2
+    local kaart_hoogte   = 64
+
+    -- Clip alles binnen het paneel
+    love.graphics.setScissor(overlayX, overlayY, overlayW, overlayH)
 
     for i, kaart in ipairs(pot) do
-        local rij = math.floor((i - 1) / maxPerRow)
-        local kolom = (i - 1) % maxPerRow
+        local rij    = math.floor((i - 1) / maxPerRow)
+        local kolom  = (i - 1) % maxPerRow
         local schaal = kaart_hoogte / kaart.afbeelding:getHeight()
-        local x = startX + kolom * (90 + padding)
-        local y = startY + rij * (kaart_hoogte + padding)
-        love.graphics.setColor(1, 1, 1)
+        local x      = startX + kolom * (50 + padding)
+        local y      = startY + rij   * (kaart_hoogte + padding)
+        love.graphics.setColor(1, 1, 1, 1)
         love.graphics.draw(kaart.afbeelding, x, y, 0, schaal, schaal)
     end
 
-    -- Footer
-    love.graphics.setColor(1, 1, 1)
-    love.graphics.printf("Klik op de knop om te sluiten", overlayX, overlayY + overlayH - 25, overlayW, "center")
-end
+    love.graphics.setScissor()
+
+    -- footer
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.printf("Klik op de knop om te sluiten",
+        overlayX, overlayY + overlayH - 25, overlayW, "center")
 end
 
-
+end
 ------------------------------TEKEN KAARTEN  -----------------------------------
 function ui.draw_player_area(playerData, index, totalPlayers)
     ------------------------------------------------------------------
@@ -697,44 +722,50 @@ function ui.draw_all_players(players)
 end
 
 
-function ui.draw_end_screen(winner, players, finishedOrder)
-  local w,h = love.graphics.getWidth(), love.graphics.getHeight()
-  love.graphics.setColor(0,0,0,0.75)
-  love.graphics.rectangle('fill',0,0,w,h)
-  love.graphics.setColor(1,1,1)
+-- Toon een correct eindscherm voor 2–4 spelers
+function ui.draw_end_screen(winnerId, players)
+  local w, h = love.graphics.getWidth(), love.graphics.getHeight()
+  local function total_cards(p) return #(p.hand or {}) + #(p.faceUp or {}) + #(p.faceDown or {}) end
 
-  local title = winner and ("Winnaar: Speler "..tostring(winner)) or "Einde van het spel"
-  love.graphics.printf(title, 0, h/2 - 120, w, 'center')
+  -- achtergrond
+  love.graphics.setColor(0, 0, 0, 0.65)
+  love.graphics.rectangle("fill", w*0.15, h*0.2, w*0.70, h*0.60, 20, 20)
+  love.graphics.setColor(1, 1, 1, 1)
 
-  -- Eindvolgorde tonen (als beschikbaar)
-  finishedOrder = finishedOrder or {}
-  if #finishedOrder > 0 then
-    love.graphics.printf("Eindvolgorde:", 0, h/2 - 80, w, 'center')
-    local y = h/2 - 50
-    for pos, pid in ipairs(finishedOrder) do
-      love.graphics.printf(("%d) Speler %d"):format(pos, pid), 0, y, w, 'center')
-      y = y + 24
-    end
+  -- titel
+  local you = (net and net.localId) and (winnerId == net.localId) and " (YOU)" or ""
+  local title = ("Winnaar: Speler %d%s"):format(winnerId, you)
+  love.graphics.printf(title, w*0.15, h*0.23, w*0.70, "center")
 
-    -- Laatste (verliezer) = de enige die nog kaarten heeft
-    local finishedSet = {}
-    for _,pid in ipairs(finishedOrder) do finishedSet[pid] = true end
-    local lastSeat
-    for i,p in ipairs(players) do
-      if not finishedSet[i] and ( #p.hand + #p.faceUp + #p.faceDown > 0 ) then
-        lastSeat = i; break
-      end
-    end
-    if lastSeat then
-      love.graphics.printf(("Laatste: Speler %d"):format(lastSeat), 0, y + 8, w, 'center')
-    end
-  else
-    -- fallback voor 2 spelers
-    local other = winner == 1 and 2 or 1
-    local rest  = #players[other].hand + #players[other].faceUp + #players[other].faceDown
-    love.graphics.printf("Tegenstander heeft "..rest.." kaarten over", 0, h/2 - 40, w, 'center')
+  -- ranglijst / resterende kaarten
+  -- sorteer overige spelers op aantal resterende kaarten (aflopend), winnaar bovenaan met 0
+  local rows = {}
+  for i, p in ipairs(players or {}) do
+    local left = total_cards(p)
+    table.insert(rows, { id = i, left = left })
   end
+  table.sort(rows, function(a, b)
+    -- winnaar eerst, daarna meeste kaarten eerst
+    if a.id == winnerId then return true end
+    if b.id == winnerId then return false end
+    return a.left > b.left
+  end)
+
+  local y = h*0.30
+  local lineH = 32
+  for _, r in ipairs(rows) do
+    local tag = (r.id == winnerId) and "🏆 " or "• "
+    local youTag = (net and net.localId == r.id) and " (YOU)" or ""
+    local txt = ("%sSpeler %d%s — %d kaarten over"):format(tag, r.id, youTag, r.left)
+    love.graphics.printf(txt, w*0.20, y, w*0.60, "left")
+    y = y + lineH
+  end
+
+  -- hint
+  love.graphics.setColor(1,1,1,0.85)
+  love.graphics.printf("Druk op Enter om terug te gaan naar het menu", w*0.15, h*0.72, w*0.70, "center")
 end
+
 
 
 return ui
