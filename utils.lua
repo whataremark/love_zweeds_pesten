@@ -1,0 +1,180 @@
+-- Collection of small reusable helper functions
+local utils = {}
+-- Convert card value names to a numeric ranking.
+function utils.numeric_value(value)
+    local map = {
+        ["4"]=4, ["5"]=5, ["6"]=6, ["7"]=7,
+        ["8"]=8, ["9"]=9, ["10"]=10,
+        jack = 11, queen = 12, king = 13, ace = 14,
+        joker = 15         
+    }
+    return tonumber(value) or map[value] or -1
+end
+
+-- Check if a point lies inside a rectangular area.
+function utils.inside(mx, my, x, y, w, h)
+    return mx > x and mx < x + w and my > y and my < y + h
+end
+
+-- Generate a simple green felt background used by the table.
+function utils.generate_green_felt_background(w, h)
+    local canvas = love.graphics.newCanvas(w, h)
+    love.graphics.setCanvas(canvas)
+    local centerX, centerY = w / 2, h / 2
+    local radius = math.max(w, h) * 0.6
+    for i = 1, 100 do
+        local alpha = 0.02
+        local size = radius * (1 - (i / 100))
+        love.graphics.setColor(0.05, 0.3, 0.1, alpha)
+        love.graphics.circle("fill", centerX, centerY, size)
+    end
+    love.graphics.setCanvas()
+    return canvas
+end
+
+-- Move all items from src to dest in reverse order so indices remain stable
+function utils.transfer_all_cards(dest, src)
+    for i = #src, 1, -1 do
+        table.insert(dest, table.remove(src, i))
+    end
+end
+
+function utils.effective_top_card(pot)
+    for i = #pot, 1, -1 do
+        if pot[i].waarde ~= "3" then
+            print("[UTILS] effective_top_card: " .. pot[i].waarde)
+            return pot[i]
+        else
+            print("[UTILS] 3 GEDTECTEERDE")
+            -- Special case for 3: skip it")
+        end
+    end
+    return nil
+end
+
+--codex-- Ensure a hand always has at least `X` cards by drawing from the deck module.
+function utils.refill_hand(hand, deck, count)
+    count = count or 3
+    while #hand < count and deck.count() > 0 do
+        table.insert(hand, deck.draw())
+        print("[UTILS] Hand aangevuld met kaart: " .. hand[#hand].waarde)
+    end
+end
+
+function utils.deselect_all(t)
+    for _, k in ipairs(t) do k.selected = false end
+end
+
+-- Count how many cards are currently selected in a list
+function utils.count_selected(cards)
+    local c = 0
+    for _, k in ipairs(cards) do
+        if k.selected then
+            c = c + 1
+        end
+    end
+    return c
+end
+
+-- 1) Tekenbare banner aan game.effects toevoegen
+function utils.add_banner(game, text, color)
+    game.effects = game.effects or {}
+    table.insert(game.effects, {
+        kind  = "banner",
+        text  = text,
+        color = color or {1,1,1},
+        t     = 0,        -- elapsed
+        dur   = 1.15,     -- totale duur
+    })
+end
+
+-- 2) Alleen lokaal afspelen (geen MP-replicatie)
+function utils.dispatch_fx(game, name)
+    if name == "TEN" then
+        utils.add_banner(game, "10 – pot geleegd!", {1.00, 0.85, 0.20})
+    elseif name == "BRUNZYN" then
+        utils.add_banner(game, "BRUNZYN!", {1.00, 0.35, 0.40})
+    end
+end
+
+-- 3) Lokaal + snapshot triggeren (voor MP-clients)
+function utils.trigger_fx(game, name)
+    utils.dispatch_fx(game, name)                 -- lokaal tonen
+    game.fxSeq = (game.fxSeq or 0) + 1            -- event id
+    game.fxEmit = { name = name, seq = game.fxSeq } -- door net.export_state
+end
+
+-- 4) Updaten/verwijderen van verlopen banners
+function utils.update_banners(dt, game)
+    if not (game and game.effects) then return end
+    for i = #game.effects, 1, -1 do
+        local e = game.effects[i]
+        e.t = e.t + dt
+        if e.t >= e.dur then table.remove(game.effects, i) end
+    end
+end
+
+
+--------------------------------------------------------------------
+--  Hulpfunctie: bepaal nieuwe fase voor een speler
+--------------------------------------------------------------------
+local function phase_for_player_obj(p)
+    if not p then return "unknown" end
+    if #p.hand     > 0 then return "playingHand"
+    elseif #p.faceUp   > 0 then return "playingOpen"
+    elseif #p.faceDown > 0 then return "playingBlind"
+    else                      return "finished" end
+end
+
+function utils.phase_for_player(id)
+    local playerMod = require("player")
+    return phase_for_player_obj(playerMod.players[id])
+end
+
+-- ⚠️ schrijf de fase op de speler zelf; alleen currentPlayer spiegelt naar game.state
+function utils.update_phase_for_player(game, id)
+    local playerMod = require("player")
+    local p = playerMod.players[id]
+    if not p then return "unknown" end
+    p.phase = phase_for_player_obj(p)
+    if id == game.currentPlayer then
+        game.state = p.phase
+    end
+    return p.phase
+end
+
+-- handig: cached phase ophalen; zo nodig eerst berekenen
+function utils.phase_of(game, id)
+    local playerMod = require("player")
+    local p = playerMod.players[id]
+    if not p then return "unknown" end
+    -- GEEN state-mutatie hier: puur afleiden uit de actuele stapels
+    if #p.hand     > 0 then return "playingHand"
+    elseif #p.faceUp   > 0 then return "playingOpen"
+    elseif #p.faceDown > 0 then return "playingBlind"
+    else                      return "finished" end
+end
+
+function utils.update_reveal_logic(dt, game)
+    if game.reveal.timer > 0 then
+        game.reveal.timer = game.reveal.timer - dt
+        if game.reveal.timer <= 0 then
+            game.reveal.card = nil
+            game.reveal.player = nil
+        end
+    end
+end
+
+-- Voor Start Game---
+function utils.start_rank(value)
+  local order = {"4","5","6","7","8","9","10","jack","queen","king","ace"}
+  for i,v in ipairs(order) do if v==value then return i end end
+  return nil
+end
+
+function utils.now()  -- simpele monotone timestamp (frames/seconds)
+  return love.timer.getTime()
+end
+
+
+return utils

@@ -1,0 +1,106 @@
+# Zweeds Pesten – Agent Guide  
+*(Love2D / Lua — July 2025 multiplayer refactor)*
+
+Deze gids is geschreven voor **OpenAI Codex** (en alle menselijke
+ontwikkelaars) om snel de architectuur, de spelregels en de
+multiplayer‑flow te begrijpen – ‑én om straks zonder pijn naar 3+ spelers
+te kunnen schalen.
+
+---
+
+## 📦 Project­structuur (snapshot)
+
+| File | Rol |
+|------|-----|
+| `main.lua` | Love2D‐entry; routed callbacks → `state.*`, `net.update` |
+| `state.lua` |  Mini‑router naar actieve scene (menu, lobby, game) |
+| `net.lua` |  TCP/UDP‑laag, lobby‑beacons, snapshot‑sync |
+| `host_lobby.lua` / `client_lobby.lua` | Wachtkamers vóór het spel |
+| `game.lua` | Kern‑state & beurt‑logica (géén AI meer in MP) |
+| `player.lua` | Structuur & helpers voor `player.players[id]` |
+| `rules.lua` | Regels + kaart‑effecten |
+| `ui.lua` | Alle rendering (kaarten, pot, knoppen, seats) |
+| `ai.lua` | Simple AI, **alleen** actief in single‑player |
+
+*(afgekort; zie repo voor rest)*
+
+---
+
+## 🌐 Multiplayer‑architectuur
+
+| Variabele | Betekenis |
+|-----------|-----------|
+| `net.mode` | `"host"` / `"client"` / `"ai"` |
+| `net.localId` | Mijn eigen speler‑id (1 = host, 2‑n = clients) |
+| `net.conns` | `[id] = socket` — alleen gevuld bij host |
+| `game.maxPlayers` | Aantal echte mensen in deze match |
+| `player.players[id]` | Hand, faceUp, faceDown, scrollOffset, … |
+
+### ▸ Berichtformaat (JSON + newline)
+
+```jsonc
+{ "cmd":"HELLO", "seed":169211, "deckCount":2 }
+{ "cmd":"JOIN" , "id":3, "name":"Bob" }
+{ "cmd":"PLAY" , "id":2, "cards":[{"kleur":"♣","waarde":"K"}] }
+{ "cmd":"STATE", "game": { … platte snapshot … } }
+
+
+## ♠️ Spelregels
+
+### Basisregels
+
+- Spelers spelen om beurten een kaart op de aflegstapel (`pot`).
+- Een kaart mag alleen gespeeld worden als deze aan de regels voldoet ten opzichte van de huidige bovenste kaart op de stapel.
+- De bovenste kaart wordt bepaald via `utils.effective_top_card`, waarbij **"3" wordt genegeerd**.
+- Doel: Als eerste speler geen kaarten meer over hebben.
+
+---
+
+## 🎴 Speciale Kaarten en Hun Effecten
+
+| Kaartwaarde | Effect                                                             |
+|-------------|--------------------------------------------------------------------|
+  | `2`         | Mag altijd gespeeld worden, ongeacht de vorige kaart              |
+  | `3`         | Mag altijd gespeeld worden; Maar is doorzichtig dus bij regels wordt gekeken naar kaart hiervoor   |
+  | `7`         | Dwingt volgende speler om een kaart ≤ 7 te spelen                 |
+  | `8`         | Speler krijgt een extra beurt                                     |
+  | `10`        | Leegt de aflegstapel (`pot`) en geeft een extra beurt            |
+
+---
+
+## 🔄 Spelverloop en Beurtlogica
+
+- Kaarten worden gedeeld uit het deck bij `startGame`.
+- De speler speelt een kaart als deze **legaal** is volgens `rules.is_speelbaar`.
+- Speciale effecten worden afgehandeld via `rules.handle_card_effects`.
+
+---
+
+## 📥 Trekstapel / Draw Pile
+
+- Kaarten die overblijven na het uitdelen worden in een trekstapel gestopt (bijv. `drawPile` of `deck`).
+- Als een speler minder dan **5 kaarten** heeft na een beurt, worden kaarten bijgetrokken totdat hij weer 5 heeft.
+- Als de stapel leeg is, wordt **niet** meer bijgevuld.
+- De trekstapel wordt **visueel weergegeven** als een stapel achterkanten, met een teller erbij.
+
+---
+
+## 👀 Visuele Afhandeling
+
+- Speelstapel (`pot`) wordt zichtbaar als kaarten op elkaar gestapeld.
+- Trekstapel wordt weergegeven met meerdere overlappende kaarten (verschillende rotaties & opaciteit).
+- UI toont knoppen, handen, en kaartselectie.
+
+---
+
+## 🧠 AI Logica
+
+- moet alleen in Singleplayer (ai mode)
+-De AI analyseert zijn hand en kiest de **legaal speelbare kaart** met de hoogste voorkeur.
+- Bij het kiezen houdt de AI ook rekening met of de vorige kaart een `7` was (dan moet hij ≤ 7 spelen).
+- De AI gebruikt `utils.effective_top_card` om te kijken wat écht de laatste relevante kaart is.
+- Als geen legale kaart beschikbaar is:
+  - Bij normale beurt → AI pakt de hele pot op.
+  - Bij extra beurt → AI past.
+
+---
