@@ -72,7 +72,7 @@ do
   bold(manual._fonts.body, "Let op:", tx, ty)
   love.graphics.setFont(manual._fonts.body)
   love.graphics.print(
-    " Multiplayer werkt in principe alleen lokaal. Voor online spelen gebruik Tailscale of Hamachi (of alternatief).",
+    " Multiplayer werkt in principe alleen lokaal. Voor online spelen gebruik RadminVPN (zat bij instalatiee van de game).",
     tx + manual._fonts.body:getWidth("Let op:"), ty
   )
 

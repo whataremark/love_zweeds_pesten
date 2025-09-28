@@ -2,6 +2,7 @@
 local player = {}
 local rules = require("rules")
 local config = require("config")
+local utils = require("utils")
 
 
 --voor het scrollen van de hand
@@ -24,6 +25,11 @@ function player.init(deck, count)
       table.insert(player.players[s].hand, deck.draw())
     end
   end
+  
+  for s = 1, count do
+    utils.sort_hand(player.players[s].hand)
+  end
+
   for i = 1, BLIND do
     for s = 1, count do
       table.insert(player.players[s].faceDown, deck.draw())

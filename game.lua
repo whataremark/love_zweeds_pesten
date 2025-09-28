@@ -49,6 +49,7 @@ game.dragScroll = { active = false, startX = 0, startOffset = 0, touchId = nil }
 
 
 function game.touchpressed(id, x, y, pressure)
+    utils.sort_hand(hand)
     local myId = net.localId or 1
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
     -- bbox van de eigen hand (onderaan), gelijk aan ui.get_card_positions
@@ -210,7 +211,7 @@ function game.update(dt)
         net.update()
         if net.isHost() then net.send_state() end
     end
-    
+    utils.sort_hand(hand)
     -- A) Ongeldige-zet-timer
     if ongeldigeZetTimer > 0 then
         ongeldigeZetTimer = ongeldigeZetTimer - dt
@@ -426,7 +427,8 @@ function game.mousepressed(x, y, button)
             elseif game.currentPlayer == myId then
                 utils.transfer_all_cards(player.players[myId].hand, game.pot)
                 utils.deselect_all(player.players[myId].hand)
-                game.nextMustBeUnder7 = false
+                game.nextMustBeUnder7 = false  
+                utils.sort_hand(hand)
                 game.next_turn()
             end
             return
@@ -520,6 +522,17 @@ function game.mousepressed(x, y, button)
                 return
             end
 
+        -- pot aanklikken
+        if button == 1 and game and game.pot and #game.pot > 0 then
+            -- pak bounding box van de pot (meestal midden van tafel)
+            local potX, potY = love.graphics.getWidth()/2 - 40, love.graphics.getHeight()/2 - 60
+            local potW, potH = 80, 120  -- aanpassen aan jouw kaartformaat
+
+            if x >= potX and x <= potX + potW and y >= potY and y <= potY + potH then
+                toonPotOverlay = not toonPotOverlay
+            end
+        end
+
             -- DESELECT
             local bd = btns.deselect
             if bd and utils.inside(x, y, bd.x, bd.y, bd.w, bd.h) then
@@ -609,7 +622,6 @@ function game.start(mode, aiCount)
         -- - We roepen jouw bestaande player.init(drawPile) aan (zoals nu),
         --   en vullen daarna extra AI-spelers aan tot gewenst aantal.
         ------------------------------------------------------------------
-        player.init(drawPile)                -- jouw bestaande uitdelen
 
         -- Alleen in AI-modus willen we 1..3 extra AI's kunnen hebben
         if mode ~= "multiplayer-host" and mode ~= "multiplayer-client" then
@@ -788,6 +800,7 @@ function game.play_card(playerIndex, kaart)
             return
         end
     end
+     utils.sort_hand(hand)
 end
 
 
@@ -810,6 +823,8 @@ function game.next_turn()
   until not is_finished(player.players[game.currentPlayer])
 
   utils.update_phase_for_player(game, game.currentPlayer)
+  utils.sort_hand(hand)
+
 
 
   ------------------------------------------------------------------

@@ -59,6 +59,7 @@ function utils.refill_hand(hand, deck, count)
         table.insert(hand, deck.draw())
         print("[UTILS] Hand aangevuld met kaart: " .. hand[#hand].waarde)
     end
+    utils.sort_hand(hand)
 end
 
 function utils.deselect_all(t)
@@ -184,6 +185,18 @@ end
 
 function utils.now()  -- simpele monotone timestamp (frames/seconds)
   return love.timer.getTime()
+end
+
+-- Sorteer hand op waarde (laag→hoog); kleur negeren
+function utils.sort_hand(hand)
+  if not hand or #hand < 2 then return end
+  table.sort(hand, function(a, b)
+    local va = utils.numeric_value(a.waarde)
+    local vb = utils.numeric_value(b.waarde)
+    if va ~= vb then return va < vb end
+    -- gelijk? laat de volgorde verder zoals 'ie komt (geen kleur-sortering)
+    return (a.naam or "") < (b.naam or "")
+  end)
 end
 
 

@@ -595,6 +595,7 @@ local function handle_host(msg)
             end
             rules.play_selected_cards(net.game, msg.id)
             utils.refill_hand(p.hand, drawPile, config.CARDS_INHAND)
+            utils.sort_hand(p.hand)
             utils.update_phase_for_player(net.game, msg.id)
         end
         net.send_state()
@@ -603,7 +604,9 @@ local function handle_host(msg)
     elseif msg.cmd == "PICKUP" then
         local p = player.players[msg.id]; if not p then return end
         utils.transfer_all_cards(p.hand, net.game.pot)
+        utils.sort_hand(p.hand)
         utils.deselect_all(p.hand)
+        utils.sort_hand(p.hand)
         net.game.nextMustBeUnder7 = false
         net.game.next_turn()
         net.send_state()
