@@ -71,7 +71,12 @@ local options = {
   { key="1", label="Play vs 1 AI", next=function() startAI(1) end },
   { key="2", label="Play vs 2 AI", next=function() startAI(2) end },
   { key="3", label="Play vs 3 AI", next=function() startAI(3) end },
-  { key="h", label="Host game",    next=function() startHost() end },
+  { key="h", label="Host game", next=function()
+    state.enter(require("host_lobby"), {
+      name      = (profile.get_name() or "Host") .. "'s Lobby",
+      deckCount = (menu.useTwoDecks and 2 or 1),
+    })
+  end },
   { key="j", label="Join game",    next=function() startJoin() end },
 }
 

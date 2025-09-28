@@ -107,23 +107,19 @@ end
 
 -------------------------------- lifecycle --------------------------------
 
-function lobby.load(info)           -- info.ip wordt meegegeven
-    ensureFonts()
+function lobby.load(info)
+  ensureFonts()
+  lobby.ip = info.ip
+  lobby.time = 0
+  lobby.cards = createCards()
+  lobby.connected = false
 
-        lobby.ip        = info.ip
-        lobby.tick      = 0
-        lobby.connected = false
-        lobby.time      = 0
-        lobby.cards     = createCards()
-
-        -- ✉️  Stuur 1x jouw naam naar de host
-        -- (profile is al bovenin 'require'd)
-        net.send({
-            cmd  = "JOIN",
-            id   = net.localId,            -- client = 2
-            name = profile.get_name()
-        })
-    end
+  net.send({
+    cmd  = "JOIN",
+    id   = net.localId,             -- client = 2
+    name = require("profile").get_name()
+  })
+end
 
 function lobby.update(dt)
     lobby.time = (lobby.time or 0) + dt

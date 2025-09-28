@@ -642,7 +642,6 @@ function net.update(dt)
                 net.conn = c
                 local dc = (net.game and net.game.deckCount) or 1
                 net.send({ cmd="HELLO", seed=os.time(), deckCount = dc })
-                table.insert(net.newClients, "Client")
             end
         end
 
