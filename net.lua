@@ -409,18 +409,32 @@ end
 ----------------------------------------------------------------------
 -- Transport
 ----------------------------------------------------------------------
+-- Stuur willekeurig bericht (client → host of host → 1 oude conn)
 function net.send(msg)
-    local line = json.encode(msg) .. "\n"
-    if net.isHost() and net.conn then
-        net.conn:send(line)
-    elseif net.isClient() and net.client then
-        net.client:send(line)
-    end
+  local line = json.encode(msg) .. "\n"
+  if net.isClient() and net.client then
+    net.client:send(line)
+  elseif net.isHost() and net.conn then
+    -- alleen voor legacy-paden die nog net.conn gebruiken
+    net.conn:send(line)
+  end
 end
 
+-- Broadcast de volledige game-state naar alle clients
 function net.send_state()
-    if not net.conn or not net.game then return end
-    net.send({ cmd = "STATE", game = export_state() })
+  if not net.game then return end
+  local line = json.encode({ cmd = "STATE", game = export_state() }) .. "\n"
+
+  if net.isHost() then
+    -- nieuwe multi-client sockets
+    if net.conns then
+      for _, conn in pairs(net.conns) do
+        if conn then conn:send(line) end
+      end
+    end
+    -- backward compat: oude single-conn nog mee sturen
+    if net.conn then net.conn:send(line) end
+  end
 end
 
 ----------------------------------------------------------------------
