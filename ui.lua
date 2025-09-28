@@ -310,7 +310,10 @@ function ui.draw_player_area(playerData, index, totalPlayers)
 
     local function draw_name(labelX, labelY, alignRight, index, isMe, playerData)
         local naam = (playerData and playerData.name) or ("Speler " .. tostring(index))
-        local label = naam .. (isMe and " (YOU)" or "")
+        local label = (playerData.name and #playerData.name > 0)
+              and playerData.name
+              or ("Speler "..index)
+        love.graphics.print(label .. (isMe and " (YOU)" or ""), x, y)
         love.graphics.setColor(1, 1, 1)
         love.graphics.print(label, alignRight and (labelX - 160) or labelX, labelY)
         love.graphics.setColor(1, 1, 1)

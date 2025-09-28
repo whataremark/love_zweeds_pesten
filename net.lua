@@ -399,19 +399,27 @@ local function handle_host(msg)
         print("[net] client connected")
         return
     end
-        -- net.lua → in handle_host(msg)
+    
+    -- net.lua (in handle_host)
     if msg.cmd == "JOIN" then
-    local pid = tonumber(msg.id)
-    if not pid or not player.players[pid] then
-        print("[net][JOIN] ongeldig id:", tostring(msg.id))
-        return
+    local pid  = tonumber(msg.id)
+    local name = tostring(msg.name or ("Speler "..(pid or 2)))
+
+    if pid and player.players and player.players[pid] then
+        player.players[pid].name = name         -- als game al bestaat
     end
-    local name = tostring(msg.name or ("Speler "..pid))
-    player.players[pid].name = name
-    print(("[net] naam voor seat %d = %s"):format(pid, name))
-    net.send_state()  -- push namen naar alle clients
+
+    -- altijd in wachtrij voor lobby-UI
+    table.insert(net.newClients, name)
+
+    -- alleen snapshotten als er al een game loopt
+    if net.game and net.conn then
+        net.send_state()
+    end
+    print(("[net] JOIN seat=%s name=%s"):format(tostring(pid), name))
     return
     end
+
     ------------------------------------------------------------------
     -- 1) Client legt één face-up kaart (OPEN_ADD)
     ------------------------------------------------------------------
