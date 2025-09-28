@@ -209,8 +209,8 @@ function menu.draw()
   if drawFloatingCards then drawFloatingCards(w, h) end
 
   -- Paneel-afmetingen (groter, zodat "Join game" niet botst met hints)
-  local panelW = math.min(820, w * 0.80)
-  local panelH = math.min(620, h * 0.78)
+  local panelW = math.min(720, w * 0.80)
+  local panelH = math.min(720, h * 0.78)
   local panelX = (w - panelW) / 2
   local panelY = (h - panelH) / 2
 
@@ -262,6 +262,9 @@ function menu.draw()
   local listY = titleY + 150
   local rowH  = 64
   local padX  = 40
+  local listLeft = panelX + padX
+  local buttonW  = panelW - 2 * padX
+
 
   for i, opt in ipairs(options) do
     local y = listY + (i - 1) * rowH
@@ -283,8 +286,25 @@ function menu.draw()
         }
   end
 
+    -- ==== Spelregels-knop (onder de lijst met opties) ====
+    local rulesGap = 14
+    local rulesW   = buttonW
+    local rulesH   = 48
+    local rulesX   = listLeft
+    local rulesY   = listY + (#options * rowH) + rulesGap
+
+    -- teken
+    love.graphics.setColor(1,1,1,0.10)
+    love.graphics.rectangle("fill", rulesX, rulesY, rulesW, rulesH, 10, 10)
+    love.graphics.setColor(1,1,1,0.9)
+    love.graphics.rectangle("line", rulesX, rulesY, rulesW, rulesH, 10, 10)
+    love.graphics.printf("Spelregels", rulesX, rulesY + 14, rulesW, "center")
+
+    -- hitbox opslaan
+    menu._rulesRect = { x = rulesX, y = rulesY, w = rulesW, h = rulesH }
+
   -- Checkbox “Speel met 2 decks”
-  local checkY    = listY + #options * rowH + 24
+  local checkY    = menu._rulesRect.y + menu._rulesRect.h + 20
   local checkX    = panelX + padX
   local checkSize = 26
 
@@ -309,10 +329,11 @@ function menu.draw()
   love.graphics.setFont(optionFont)
   love.graphics.print("Speel met 2 decks", checkX + checkSize + 12, checkY + 2)
 
+
   -- Hints onderaan het paneel
   love.graphics.setFont(hintFont)
   love.graphics.setColor(1, 1, 1, 0.6)
-  love.graphics.printf("• Gebrurik pijltjes of je muis •  Gebruik Enter om te starten •  D om decks te toggelen.",
+  love.graphics.printf("• Gebruik Enter om te starten •  D om decks te toggelen.",
     panelX + padX, checkY + checkSize + 20, panelW - 2 * padX, "left")
 
   -- klikgebieden bewaren (voor mousepressed)
@@ -320,6 +341,7 @@ function menu.draw()
   menu._panelRect = { x = panelX, y = panelY, w = panelW, h = panelH }
 end
 
+local function hit(x, y, r) return x>=r.x and x<=r.x+r.w and y>=r.y and y<=r.y+r.h end
 
 function menu.mousepressed(x, y, btn)
   if btn ~= 1 then return end
@@ -356,6 +378,14 @@ end
       return
     end
   end
+
+  -- Spelregels
+  local r = menu._rulesRect
+  if r and hit(x, y, r) then
+    state.enter(require("manual"))
+    return
+  end
+
 end
 
 

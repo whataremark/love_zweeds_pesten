@@ -74,8 +74,8 @@ function net.update_lan(_dt, lobbyName)
 
     if not beaconSocket then
         beaconSocket = socket.udp()
-        beaconSocket:setoption("broadcast", true)
         beaconSocket:setsockname("0.0.0.0", 0)
+        beaconSocket:setoption("broadcast", true)
     end
 
     -- gebruik klok i.p.v. dt
@@ -89,7 +89,7 @@ function net.update_lan(_dt, lobbyName)
     for _,bc in ipairs(targets) do
         local nbytes, err = beaconSocket:sendto(payload, bc, BCAST_PORT)
         if nbytes then
-            print("[beacon]", bc, nbytes)
+            print("")
         else
             -- veel OS'en weigeren 255.255.255.255 → onderdruk die melding
             local e = tostring(err or "")

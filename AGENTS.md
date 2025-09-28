@@ -60,11 +60,11 @@ te kunnen schalen.
 
 | Kaartwaarde | Effect                                                             |
 |-------------|--------------------------------------------------------------------|
-| `2`         | Mag altijd gespeeld worden, ongeacht de vorige kaart              |
-| `3`         | Mag altijd gespeeld worden; Maar is doorzichtig dus bij regels wordt gekeken naar kaart hiervoor   |
-| `7`         | Dwingt volgende speler om een kaart ≤ 7 te spelen                 |
-| `8`         | Speler krijgt een extra beurt                                     |
-| `10`        | Leegt de aflegstapel (`pot`) en geeft een extra beurt            |
+  | `2`         | Mag altijd gespeeld worden, ongeacht de vorige kaart              |
+  | `3`         | Mag altijd gespeeld worden; Maar is doorzichtig dus bij regels wordt gekeken naar kaart hiervoor   |
+  | `7`         | Dwingt volgende speler om een kaart ≤ 7 te spelen                 |
+  | `8`         | Speler krijgt een extra beurt                                     |
+  | `10`        | Leegt de aflegstapel (`pot`) en geeft een extra beurt            |
 
 ---
 

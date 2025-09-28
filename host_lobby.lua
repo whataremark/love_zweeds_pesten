@@ -272,7 +272,7 @@ function host.draw()
   local hintY = buttonY + buttonH + 40
   love.graphics.setFont(smallFont)
   love.graphics.setColor(1, 1, 1, 0.62)
-  local hint = canStart and "Game start als je S drukt" or "Waiting for at least one more player…"
+  local hint = canStart and "Game start als je S drukt" or "......."
   love.graphics.printf(hint .. "\nEsc om terug te gaan naar het menu", panelX, hintY, panelW, "center")
 end
 
