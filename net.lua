@@ -13,13 +13,31 @@ local net = {}
 net.localId     = 1
 net.mode        = nil   -- 'host' or 'client'
 net.server      = nil
-net.conn        = nil
+net.conns        = nil
 net.client      = nil
 net.netGame     = nil
 net.started     = false
 
 net.game        = nil     -- wordt later gekoppeld via net.set_game
-net.newClients  = {}      -- wachtrij met binnengekomen namen/IP's
+net.conns     = {}        -- [seatId] = tcp-socket
+net.clients   = {}        -- [seatId] = { sock=..., name=... }
+net.newClients = {}       -- voor host_lobby weergave
+
+local MAX_SEATS = (require("config").MAX_SEATS or 4)
+
+local function next_free_seat()
+  for i = 2, MAX_SEATS do
+    if not net.conns[i] then return i end
+  end
+  return nil
+end
+
+function net.client_count()
+  local n = 0
+  for i=2,MAX_SEATS do if net.conns[i] then n = n + 1 end end
+  return n
+end
+
 
 ----------------------------------------------------------------------
 -- Broadcast / discovery (LAN)
@@ -157,26 +175,39 @@ function net.start()
 end
 
 function net.host()
+    local socket = require("socket")
     local srv, err = socket.bind("*", 22122)
     if not srv then return nil, err end
     srv:settimeout(0)
     net.mode    = "host"
     net.server  = srv
     net.localId = 1
+    net.conns   = {}
+    net.clients = {}
+    net.newClients = {}
     return "multiplayer-host"
 end
 
 function net.connect(ip)
-    ip = ip or "localhost"
-    local c = socket.tcp()
-    c:settimeout(0)
-    local ok, err = c:connect(ip, 22122)
-    if not ok and err ~= "timeout" then return nil, err end
-    net.mode    = "client"
-    net.client  = c
-    net.localId = 2
-    net.identify(net.playerName or ("Speler "..(net.localId or 1)))
-    return "multiplayer-client"
+  ip = ip or "localhost"
+
+  local socket = require("socket")
+  local c, err = socket.tcp()
+  if not c then return nil, err end
+
+  c:settimeout(0)
+  local ok, cerr = c:connect(ip, 22122)
+  if not ok and cerr ~= "timeout" then
+    return nil, cerr
+  end
+
+  net.mode      = "client"
+  net.client    = c
+  net.localId   = nil        -- wordt gezet zodra HELLO binnenkomt (seatId)
+  net.serverIP  = ip
+  net.started   = true       -- je zit nu in "connecting"-staat
+
+  return "multiplayer-client"
 end
 
 ----------------------------------------------------------------------
@@ -336,8 +367,8 @@ local function import_state(snap)
     g.ronde            = snap.ronde
     g.maxPlayers       = #new
     g.winner           = snap.winner                 -- ⬅️ NIEUW
-    g.finishedOrder    = snap.finishedOrder or {}    -- ⬅️ NIEUW
-
+    g.finishedOrder    = snap.finishedOrder or {} 
+    g.extraTurn        = snap.extraTurn    -- ← toegevoegd
 
     ------------------------------------------------------------------
     -- ❻ Trekstapel-maat (voor UI) bijwerken
@@ -564,6 +595,7 @@ local function handle_host(msg)
             end
             rules.play_selected_cards(net.game, msg.id)
             utils.refill_hand(p.hand, drawPile, config.CARDS_INHAND)
+            utils.sort_hand(p.hand)
             utils.update_phase_for_player(net.game, msg.id)
         end
         net.send_state()
@@ -572,7 +604,9 @@ local function handle_host(msg)
     elseif msg.cmd == "PICKUP" then
         local p = player.players[msg.id]; if not p then return end
         utils.transfer_all_cards(p.hand, net.game.pot)
+        utils.sort_hand(p.hand)
         utils.deselect_all(p.hand)
+        utils.sort_hand(p.hand)
         net.game.nextMustBeUnder7 = false
         net.game.next_turn()
         net.send_state()
@@ -589,15 +623,15 @@ local function handle_host(msg)
 end
 
 
-
 -- Client-side message handler (host -> client)
 local function handle_client(msg)
   -- 0) Eerste handshake van de host
   if msg.cmd == "HELLO" then
-    -- markeer dat we verbonden zijn
     net.started = true
+    if tonumber(msg.seatId) then           -- ← NIEUW
+      net.localId = tonumber(msg.seatId)   -- ← NIEUW
+    end
     net.send({ cmd = "JOIN", id = net.localId, name = profile.get_name() })
-    -- host kan alvast deckCount doorgeven (komt ook in STATE mee)
     if net.game and msg.deckCount then
       net.game.deckCount = msg.deckCount
     end
@@ -633,54 +667,93 @@ end
 --  Netwerk-update – host- en client-pad strikt gescheiden
 ----------------------------------------------------------------------
 function net.update(dt)
+    -- =========================
     -- HOST
+    -- =========================
     if net.isHost() then
-        -- 1) Accept nieuwe client (max 1)
-        if net.server and not net.conn then
-            local c = net.server:accept()
-            if c then
-                c:settimeout(0)
-                net.conn = c
-                local dc = (net.game and net.game.deckCount) or 1
-                net.send({ cmd="HELLO", seed=os.time(), deckCount = dc })
-            end
-        end
+        -- 1) Nieuwe clients accepteren (meerdere)
+        if net.server then
+            local cli = net.server:accept()
+            while cli do
+                cli:settimeout(0)
 
-        -- 2) Inkomende berichten
-        if net.conn then
-            local line = net.conn:receive("*l")
-            while line do
-                local ok, msg = pcall(json.decode, line)
-                if ok and type(msg)=="table" then
-                    handle_host(msg)
+                local seat = next_free_seat and next_free_seat() or nil
+                if seat then
+                    net.conns[seat] = cli
+                    net.clients[seat] = net.clients[seat] or { sock = cli }
+
+                    -- Stuur HELLO met seatId en deckCount
+                    local dc = (net.game and net.game.deckCount) or 1
+                    local hello = json.encode({ cmd = "HELLO", seatId = seat, deckCount = dc }) .. "\n"
+                    cli:send(hello)
+                else
+                    -- Vol → netjes melden en sluiten
+                    cli:send(json.encode({ cmd = "FULL" }) .. "\n")
+                    cli:close()
                 end
-                line = net.conn:receive("*l")
+
+                cli = net.server:accept()
             end
         end
 
-        -- 3) Push state
-        if net.game and net.conn then
+        -- 2) Inkomende berichten van alle clients
+        for seat, conn in pairs(net.conns) do
+            while true do
+                local line, err = conn:receive("*l")
+                if not line then break end
+                if line:match("^[%s]*[%[{]") then
+                    local ok, msg = pcall(json.decode, line)
+                    if ok and type(msg) == "table" then
+                        -- host verwerkt elke client-actie
+                        handle_host(msg)
+                    end
+                end
+            end
+        end
+
+        -- 3) State broadcasten naar alle clients
+        if net.game then
             net.send_state()
         end
 
         -- 4) LAN-beacon
-        net.update_lan(dt, net.lobbyName or "Lobby")
+        if net.update_lan then
+            net.update_lan(dt, net.lobbyName or "Lobby")
+        end
     end
 
+    -- =========================
     -- CLIENT
+    -- =========================
     if net.isClient() and net.client then
-        local line, err = net.client:receive("*l")
-        while line do
-            if line:match("^[%s]*[{%[]") then
+        while true do
+            local line, err = net.client:receive("*l")
+            if not line then break end
+            if line:match("^[%s]*[%[{]") then
                 local ok, msg = pcall(json.decode, line)
-                if ok and type(msg)=="table" then
-                    handle_client(msg)
+                if ok and type(msg) == "table" then
+                    -- HELLO uitbreiden: seatId ontvangen en JOIN sturen met naam
+                    if msg.cmd == "HELLO" then
+                        if tonumber(msg.seatId) then
+                            net.localId = tonumber(msg.seatId)
+                        end
+                        if msg.deckCount and net.game then
+                            net.game.deckCount = msg.deckCount
+                        end
+                        -- stuur naam naar host zodra seat bekend is
+                        local profile = require("profile")
+                        local myName = (profile and profile.get_name and profile.get_name()) or ("Speler " .. tostring(net.localId or "?"))
+                        net.send({ cmd = "JOIN", id = net.localId, name = myName })
+                    else
+                        -- overige berichten via bestaande client-handler
+                        handle_client(msg)
+                    end
                 end
             end
-            line, err = net.client:receive("*l")
         end
     end
 end
+
 
 ----------------------------------------------------------------------
 -- Client→Host helpers

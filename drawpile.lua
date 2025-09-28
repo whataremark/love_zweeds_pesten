@@ -1,76 +1,81 @@
 local drawPile = {}
 
---codex-- Load and shuffle a deck with the configured amount of sets
+-- Load and shuffle a deck with the configured amount of sets
 function drawPile.init(count)
     count = count or 1
-    drawPile.cards = drawPile.cards or {}        -- ← voorkomt nil
+    drawPile.cards = {}  -- vers deck
 
-    local kaartmap = "png"
+    local kaartmap  = "png"
     local bestanden = love.filesystem.getDirectoryItems(kaartmap)
-    local basis = {}
+    local basis     = {}
+
+    -- map korte ranks naar lange naam
+    local function norm_rank(v)
+        if not v then return v end
+        v = v:lower()
+        if v == "a" then return "ace" end
+        if v == "k" then return "king" end
+        if v == "q" then return "queen" end
+        if v == "j" then return "jack" end
+        return v -- "2".."10" blijven zo
+    end
 
     for _, bestand in ipairs(bestanden) do
         if bestand:match("%.png$") then
             local naam = bestand:gsub("%.png$", "")
-            local waarde, kleur = naam:match("^(.-)_of_(.-)$")
+            local lower = naam:lower()
 
-            ------------------------------------------------------------
-            -- 1. Gewone kaarten “X_of_<suit>.png”
-            ------------------------------------------------------------
+            -- match "<value>_of_<suit>"
+            local waarde, kleur = lower:match("^(.-)_of_(.-)$")
+
             if waarde and kleur then
-                local afbeelding = love.graphics.newImage(kaartmap .. "/" .. bestand)
-
-                table.insert(basis, {
-                    kleur      = kleur,
-                    waarde     = waarde,
-                    afbeelding = afbeelding,
-                    naam       = naam
-                })
-
-            ------------------------------------------------------------
-            -- 2. Jokers: black_joker.png / red_joker.png
-            --    (geen "_of_", dus vang ze in een extra elseif)
-            ------------------------------------------------------------
-            elseif naam == "black_joker" or naam == "red_joker" then
-                local afbeelding = love.graphics.newImage(kaartmap .. "/" .. bestand)
-
-                table.insert(basis, {
-                    kleur      = (naam == "black_joker") and "black" or "red",
-                    waarde     = "joker",        -- speciale waarde-string
-                    afbeelding = afbeelding,
-                    naam       = naam
-                })
+                -- sla alleen echte speelkaarten op (geen back, etc.)
+                if naam ~= "back" then
+                    local afbeelding = love.graphics.newImage(kaartmap .. "/" .. bestand)
+                    table.insert(basis, {
+                        kleur      = kleur,               -- spades/hearts/diamonds/clubs
+                        waarde     = norm_rank(waarde),   -- ace/king/queen/jack/2..10
+                        afbeelding = afbeelding,
+                        naam       = naam                 -- bestandsnaam zonder .png
+                    })
+                end
             end
+            -- (geen jokers/extra gevallen nodig als je die niet gebruikt)
         end
     end
-    
-for _ = 1, count do
-    for _, card in ipairs(basis) do
-        -- kopieer velden → elke positie krijgt een unieke tabel
-        table.insert(drawPile.cards, {
-            kleur      = card.kleur,
-            waarde     = card.waarde,
-            afbeelding = card.afbeelding,
-            naam       = card.naam
-        })
-    end
-end
 
-    -- Schudden
-    math.randomseed(os.time())
-    for i = #drawPile.cards, 2, -1 do
-        local j = math.random(i)
-        drawPile.cards[i], drawPile.cards[j] = drawPile.cards[j], drawPile.cards[i]
+    -- vermenigvuldig met aantal decks + shuffle
+    local full = {}
+    for d = 1, count do
+        for i = 1, #basis do
+            local c = basis[i]
+            full[#full+1] = {
+                kleur      = c.kleur,
+                waarde     = c.waarde,
+                afbeelding = c.afbeelding,
+                naam       = c.naam
+            }
+        end
     end
+
+    -- Fisher–Yates met love.math.random (interne seed van LÖVE is ok)
+    for i = #full, 2, -1 do
+        local j = love.math.random(i)
+        full[i], full[j] = full[j], full[i]
+    end
+
+    drawPile.cards = full
 end
 
 function drawPile.draw()
     local c = table.remove(drawPile.cards)
     if not c then return nil end
-    c.selected = false       -- reset vlag per trek
+    c.selected = false
     return c
 end
 
-function drawPile.count()   return #(drawPile.cards or {}) end
+function drawPile.count()
+    return #(drawPile.cards or {})
+end
 
 return drawPile

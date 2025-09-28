@@ -1,33 +1,6 @@
-ZWEEDS PESTEN – LICENTIE (v1.0)
+----Zweeds Pesten ----
 
-Kort gezegd
------------
-Speel het. Deel het. Pest je vrienden (in het spel). 
-Wees aardig in het echt. Geen garanties. Kaart-10 verbrandt alleen in-game.
-
-Wat je mag
-----------
-✓ Gratis spelen, streamen en opnemen.
-✓ Het spelbestand (.love/.exe) doorsturen naar vrienden.
-✓ Screenshots/memes/trucs delen (credit is lief: “Zweeds Pesten – MaBo Media”).
-
-Wat je niet mag
----------------
-✗ De game doorverkopen of geld vragen voor toegang zonder schriftelijke toestemming.
-✗ Doen alsof jij de maker bent (shame!).
-✗ De bron/credits verwijderen als je iets repackt.
-
-Mods & forks
-------------
-– Kleine mods of forks zijn oké voor niet-commercieel gebruik.  
-– Publiceer je iets, noem dan even: “Based on Zweeds Pesten by MaBo Media”.  
-– Voor commerciële plannen: stuur een berichtje, dan kijken we samen.
-
-Aansprakelijkheid (de serieuze alinea)
---------------------------------------
-Deze software wordt geleverd “zoals hij is”, zonder enige vorm van garantie, 
-expliciet of impliciet. Gebruik op eigen risico. De makers zijn niet aansprakelijk 
-voor verbrande potten, verloren potjes, of vriendschappen die tijdelijk op pauze staan.
+__MaBo Game studios.__
 
 
 Licensing information
