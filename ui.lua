@@ -723,7 +723,7 @@ function ui.draw_all_players(players)
 end
 
 
--- Toon een correct eindscherm voor 2–4 spelers
+-- Toon een correct eindscherm voor 2–4 spelers (met namen)
 function ui.draw_end_screen(winnerId, players)
   local w, h = love.graphics.getWidth(), love.graphics.getHeight()
   local function total_cards(p) return #(p.hand or {}) + #(p.faceUp or {}) + #(p.faceDown or {}) end
@@ -733,31 +733,42 @@ function ui.draw_end_screen(winnerId, players)
   love.graphics.rectangle("fill", w*0.15, h*0.2, w*0.70, h*0.60, 20, 20)
   love.graphics.setColor(1, 1, 1, 1)
 
+  -- winnaar-naam bepalen
+  local function disp_name(id)
+    local p = players and players[id]
+    local n = p and p.name
+    if n and n ~= "" then return n end
+    return "Speler " .. tostring(id or "?")
+  end
+
   -- titel
   local you = (net and net.localId) and (winnerId == net.localId) and " (YOU)" or ""
-  local title = ("Winnaar: Speler %d%s"):format(winnerId, you)
+  local title = ("Winnaar: %s%s"):format(disp_name(winnerId), you)
   love.graphics.printf(title, w*0.15, h*0.23, w*0.70, "center")
 
   -- ranglijst / resterende kaarten
-  -- sorteer overige spelers op aantal resterende kaarten (aflopend), winnaar bovenaan met 0
   local rows = {}
   for i, p in ipairs(players or {}) do
-    local left = total_cards(p)
-    table.insert(rows, { id = i, left = left })
+    table.insert(rows, { id = i, left = total_cards(p) })
   end
+
   table.sort(rows, function(a, b)
-    -- winnaar eerst, daarna meeste kaarten eerst
-    if a.id == winnerId then return true end
-    if b.id == winnerId then return false end
+    -- winnaar eerst, daarna meeste kaarten eerst; bij gelijk: lagere id eerst
+    if a.id == winnerId and b.id ~= winnerId then return true end
+    if b.id == winnerId and a.id ~= winnerId then return false end
+    if a.left == b.left then return a.id < b.id end
     return a.left > b.left
   end)
 
   local y = h*0.30
   local lineH = 32
   for _, r in ipairs(rows) do
-    local tag = (r.id == winnerId) and "🏆 " or "• "
+    local isWin = (r.id == winnerId)
+    local tag = isWin and "🏆 " or "• "
     local youTag = (net and net.localId == r.id) and " (YOU)" or ""
-    local txt = ("%sSpeler %d%s — %d kaarten over"):format(tag, r.id, youTag, r.left)
+    local txt = ("%s%s%s — %d kaarten over"):format(tag, disp_name(r.id), youTag, r.left)
+
+    if isWin then love.graphics.setColor(1,1,1,1) else love.graphics.setColor(1,1,1,0.90) end
     love.graphics.printf(txt, w*0.20, y, w*0.60, "left")
     y = y + lineH
   end

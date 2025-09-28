@@ -584,6 +584,26 @@ function game.start(mode, aiCount)
     if mode ~= "multiplayer-client" then
         drawPile.init(game.deckCount)        -- host: deck & shuffle
 
+                -- Host bepaalt aantal seats op basis van aantal TCP-clients
+        local seats = 1 + (net.client_count and net.client_count() or 0)
+        local MAX = (config.MAX_SEATS or 4)
+        if seats < 2 then seats = 2 end
+        if seats > MAX then seats = MAX end
+
+        -- deck opzetten en delen
+        drawPile.init(game.deckCount)
+        player.init(drawPile, seats)
+
+        -- namen vullen
+        local profile = require("profile")
+        player.players[1].name = profile.get_name()
+        for i = 2, seats do
+        local nm = (net.clients[i] and net.clients[i].name) or ("Speler " .. i)
+        player.players[i].name = nm
+        end
+
+        game.maxPlayers = seats
+
         ------------------------------------------------------------------
         -- NIEUW: AI-seats uitbreiden zonder MP te breken
         -- - We roepen jouw bestaande player.init(drawPile) aan (zoals nu),
@@ -813,26 +833,28 @@ function game.next_turn()
 end
 
 
-
-
 --------------------------------------------------------------------
 -- game.check_winner()  – einde-spel controle
 --------------------------------------------------------------------
 function game.check_winner()
   local survivors = {}
   for i = 1, game.maxPlayers do
-    local p = player.players[i]
-    if p and not is_finished(p) then
+    local p = require("player").players[i]
+    if p and not (#p.hand==0 and #p.faceUp==0 and #p.faceDown==0) then
       table.insert(survivors, i)
     end
   end
 
   if #survivors <= 1 then
-    game.winner = survivors[1] or game.currentPlayer
+    -- ⬇️ NIEUW: winnaar = eerste die klaar was (fallback: last survivor / current)
+    if game.finishedOrder and #game.finishedOrder > 0 then
+      game.winner = game.finishedOrder[1]
+    else
+      game.winner = survivors[1] or game.currentPlayer
+    end
     return true
   end
   return false
 end
-
 
 return game

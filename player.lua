@@ -6,41 +6,30 @@ local config = require("config")
 
 --voor het scrollen van de hand
 player.scrollOffset = 0  -- pixels
+player.players = {}
 
-player.players = {
-    {
-        hand = {},
-        faceUp = {},
-        faceDown = {}
-    },
-    {
-        hand = {},
-        faceUp = {},
-        faceDown = {}
-    }
-}
 
-function player.init(deck)
-    -- velden aanmaken
-    for i = 1, 2 do
-        player.players[i].hand     = {}
-        player.players[i].faceUp   = {}
-        player.players[i].faceDown = {}
+function player.init(deck, count)
+  count = tonumber(count) or 2
+  player.players = {}
+  for i = 1, count do
+    player.players[i] = { hand = {}, faceUp = {}, faceDown = {}, scrollOffset = 0 }
+  end
+
+  local HAND  = (config.HAND_SIZE  or 6)
+  local BLIND = (config.BLIND_SIZE or 3)
+
+  for i = 1, HAND do
+    for s = 1, count do
+      table.insert(player.players[s].hand, deck.draw())
     end
-
-    -- hand-kaarten
-    for i = 1, config.HAND_SIZE do
-        table.insert(player.players[1].hand, deck.draw())
-        table.insert(player.players[2].hand, deck.draw())
+  end
+  for i = 1, BLIND do
+    for s = 1, count do
+      table.insert(player.players[s].faceDown, deck.draw())
     end
-
-    -- blinde kaarten
-    for i = 1, config.BLIND_SIZE do
-        table.insert(player.players[1].faceDown, deck.draw())
-        table.insert(player.players[2].faceDown, deck.draw())
-    end
+  end
 end
-
 -- tel hoeveel kaarten momenteel geselecteerd zijn
 
 function player.toggle_select(hand, index, phase)

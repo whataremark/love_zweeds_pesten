@@ -136,7 +136,17 @@ function utils.update_phase_for_player(game, id)
     local playerMod = require("player")
     local p = playerMod.players[id]
     if not p then return "unknown" end
+
+    local prev = p.phase
     p.phase = phase_for_player_obj(p)
+
+    -- Nieuw: als deze speler nu voor het eerst 'finished' is, log in volgorde
+    if p.phase == "finished" and not p.finished then
+        p.finished = true
+        game.finishedOrder = game.finishedOrder or {}
+        table.insert(game.finishedOrder, id)
+    end
+
     if id == game.currentPlayer then
         game.state = p.phase
     end
