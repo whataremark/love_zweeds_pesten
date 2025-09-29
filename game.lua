@@ -119,34 +119,45 @@ local function is_finished_seat(id)
 end
 
 -- update finished / winner; return true als spel voorbij is
+-- update finished / winner; return true als spel voorbij is
 function game._update_finished_and_maybe_end()
-  -- tel 'finished' spelers
+  -- Clients bepalen geen winnaar zelf; ze wachten op snapshot van de host
+  if net.isClient and net.isClient() then
+    return game.winner ~= nil
+  end
+
+  -- tel hoeveel spelers 'finished' zijn
   local finished = 0
   for i = 1, game.maxPlayers do
     if is_finished_seat(i) then finished = finished + 1 end
   end
 
-  -- eindig zodra n-1 spelers klaar zijn
-  if finished >= game.maxPlayers - 1 then
-    -- ✅ winnaar is de EERSTE uitvaller
-    local w = (game.finishedOrder and game.finishedOrder[1]) or nil
+  -- spel eindigt zodra n-1 spelers klaar zijn
+  if finished >= (game.maxPlayers - 1) then
+    -- ✅ winnaar = eerste die uit was
+    local fin = game.finishedOrder or {}
+    local w = fin[1]
+
+    -- fallback (alleen als finishedOrder door een bug leeg is):
     if not w then
-      -- fallback (zou zelden nodig moeten zijn)
       for i = 1, game.maxPlayers do
         if is_finished_seat(i) then w = i; break end
       end
       w = w or 1
     end
+
     game.winner = w
     scene = "gameover"
 
-    if net.isHost and net.isHost() and net.send_state then net.send_state() end
+    -- host pusht eindstaat
+    if net.isHost and net.isHost() and net.send_state then
+      net.send_state()
+    end
     return true
   end
 
   return false
 end
-
 ------
 
 -- zelfde geometrie als ui.get_card_positions()
