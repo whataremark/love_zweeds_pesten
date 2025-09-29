@@ -801,7 +801,7 @@ function ui.draw_end_screen(winnerId, players, finishedOrder)
   local lineH = 32
   for _, r in ipairs(rows) do
     local isWin  = (r.id == winnerId)
-    local tag    = isWin and "🏆 " or "• "
+    local tag    = isWin and "• "
     local youTag = (net and net.localId == r.id) and " (YOU)" or ""
     local txt    = ("%s%s%s — %d kaarten over"):format(tag, disp_name(r.id), youTag, r.left)
 
