@@ -858,23 +858,22 @@ end
 -- game.check_winner()  – einde-spel controle
 --------------------------------------------------------------------
 function game.check_winner()
-  local survivors = {}
+  local finished = 0
   for i = 1, game.maxPlayers do
-    local p = require("player").players[i]
-    if p and not (#p.hand==0 and #p.faceUp==0 and #p.faceDown==0) then
-      table.insert(survivors, i)
-    end
+    local p = player.players[i]
+    if p and p.finished then finished = finished + 1 end
   end
 
-  if #survivors <= 1 then
-    -- ⬇️ NIEUW: winnaar = eerste die klaar was (fallback: last survivor / current)
-    if game.finishedOrder and #game.finishedOrder > 0 then
+  if finished >= game.maxPlayers - 1 then
+    if game.finishedOrder and game.finishedOrder[1] then
       game.winner = game.finishedOrder[1]
     else
-      game.winner = survivors[1] or game.currentPlayer
+      -- fallback (zou zelden nodig moeten zijn)
+      game.winner = game.winner or 1
     end
     return true
   end
+
   return false
 end
 

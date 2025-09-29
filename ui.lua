@@ -314,14 +314,21 @@ function ui.draw_player_area(playerData, index, totalPlayers)
         end
     end
 
-    local function draw_name(labelX, labelY, alignRight)
-        local p = player.players[index]
-        love.graphics.print(disp_name(i), x, y)
-        local txt  = isMe and (base .. " (YOU)") or base
-        love.graphics.setColor(1,1,1)
-        love.graphics.print(txt, alignRight and (labelX - 160) or labelX, labelY)
-        love.graphics.setColor(1,1,1)
-    end
+-- draw_name(x, y, alignRight, id, isMe, p)
+local function draw_name(labelX, labelY, alignRight, id, isMe, p)
+  local base = (p and type(p.name) == "string" and p.name ~= "")
+      and p.name
+      or ("Speler " .. tostring(id or "?"))
+
+  local txt = isMe and (base .. " (YOU)") or base
+
+  love.graphics.setColor(1, 1, 1, 1)
+  local x = alignRight and (labelX - 160) or labelX
+  love.graphics.print(tostring(txt), x, labelY)
+end
+
+
+
 
     ------------------------------------------------------------------
     -- SEAT: BOTTOM (local) – scrollbare hand + rijen erboven
@@ -744,12 +751,14 @@ function ui.draw_end_screen(winnerId, players, finishedOrder)
     return "Speler " .. tostring(id or "?")
   end
 
-  -- Als winnerId ontbreekt/ongeldig maar er is finishedOrder, gebruik die
-  if (not winnerId or not (players and players[winnerId])) and finishedOrder and finishedOrder[1] and players[finishedOrder[1]] then
+  -- Als winnerId ontbreekt/ongeldig maar er is finishedOrder → gebruik die
+  if (not winnerId or not (players and players[winnerId]))
+     and finishedOrder and finishedOrder[1]
+     and players[finishedOrder[1]] then
     winnerId = finishedOrder[1]
   end
 
-  -- maak een pos-map uit finishedOrder (1 = winnaar)
+  -- Positie-map uit finishedOrder (1 = winnaar)
   local pos = nil
   if type(finishedOrder) == "table" and #finishedOrder > 0 then
     pos = {}
@@ -762,11 +771,11 @@ function ui.draw_end_screen(winnerId, players, finishedOrder)
   love.graphics.setColor(1, 1, 1, 1)
 
   -- titel
-  local you = (net and net.localId) and (winnerId == net.localId) and " (YOU)" or ""
+  local you   = (net and net.localId) and (winnerId == net.localId) and " (YOU)" or ""
   local title = ("Winnaar: %s%s"):format(disp_name(winnerId), you)
   love.graphics.printf(title, w*0.15, h*0.23, w*0.70, "center")
 
-  -- rows verzamelen (robust: gebruik pairs ipv ipairs i.g.v. gaten)
+  -- rows verzamelen (pairs is veilig bij “gaten”)
   local rows = {}
   for id, p in pairs(players or {}) do
     if type(id) == "number" and p then
@@ -774,11 +783,7 @@ function ui.draw_end_screen(winnerId, players, finishedOrder)
     end
   end
 
-  -- sorteren:
-  -- 1) als finishedOrder bekend: positie (laagst = eerst)
-  -- 2) anders: winnaar eerst
-  -- 3) dan op meeste kaarten over (desc)
-  -- 4) stabiel op id
+  -- sorteren
   table.sort(rows, function(a, b)
     if pos then
       local pa = pos[a.id] or 9999
@@ -792,7 +797,7 @@ function ui.draw_end_screen(winnerId, players, finishedOrder)
     return a.id < b.id
   end)
 
-  -- lijst
+  -- lijst tekenen
   local y = h*0.30
   local lineH = 32
   for _, r in ipairs(rows) do
@@ -806,9 +811,9 @@ function ui.draw_end_screen(winnerId, players, finishedOrder)
     y = y + lineH
   end
 
-  -- hint
   love.graphics.setColor(1,1,1,0.85)
-  love.graphics.printf("Druk op Enter om terug te gaan naar het menu", w*0.15, h*0.72, w*0.70, "center")
+  love.graphics.printf("Druk op Enter om terug te gaan naar het menu",
+                       w*0.15, h*0.72, w*0.70, "center")
 end
 
 

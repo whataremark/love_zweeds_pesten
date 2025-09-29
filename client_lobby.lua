@@ -64,46 +64,53 @@ local function drawBackground(w, h)
 end
 
 local function drawFloatingCards(w, h, cards, time)
-    if not cards then return end
+  if not cards then return end
+  if not lobby._backImg then
+    lobby._backImg = love.graphics.newImage("png/back.png")
+  end
+  local backImg = lobby._backImg
+  local backW, backH = backImg:getWidth(), backImg:getHeight()
 
-    local cx, cy = w * 0.5, h * 0.52
-    local radius = math.min(w, h) * 0.42
-    local prevFont = love.graphics.getFont()
-    love.graphics.setFont(cardFont)
+  local cx, cy = w * 0.5, h * 0.52
+  local radius = math.min(w, h) * 0.42
+  local prevFont = love.graphics.getFont()
+  love.graphics.setFont(cardFont)
 
-    for _, card in ipairs(cards) do
-        local wave  = math.sin(time * card.speed + card.phase)
-        local baseX = cx + math.cos(card.angle) * radius * 0.8
-        local baseY = cy + math.sin(card.angle) * radius * 0.5
-        local x     = baseX + wave * card.wobble
-        local y     = baseY + math.cos(time * (card.speed * 0.8) + card.phase) * card.wobble * 0.6
-        local rot   = card.baseRotation + wave * 0.25
-        local cardW = card.size
-        local cardH = card.size * 1.45
+  for _, card in ipairs(cards) do
+    local wave  = math.sin(time * card.speed + card.phase)
+    local baseX = cx + math.cos(card.angle) * radius * 0.8
+    local baseY = cy + math.sin(card.angle) * radius * 0.5
+    local x     = baseX + wave * card.wobble
+    local y     = baseY + math.cos(time * (card.speed * 0.8) + card.phase) * card.wobble * 0.6
+    local rot   = card.baseRotation + wave * 0.25
 
-        love.graphics.push()
-        love.graphics.translate(x, y)
-        love.graphics.rotate(rot)
+    local cardW = card.size
+    local cardH = card.size * 1.45
+    local sx = cardW / backW
+    local sy = cardH / backH
 
-        love.graphics.setColor(0, 0, 0, 0.18)
-        love.graphics.rectangle("fill", -cardW / 2 + 8, -cardH / 2 + 10, cardW, cardH, 20, 20)
+    love.graphics.push()
+    love.graphics.translate(x, y)
+    love.graphics.rotate(rot)
 
-        love.graphics.setColor(card.color[1], card.color[2], card.color[3], 0.85)
-        love.graphics.rectangle("fill", -cardW / 2, -cardH / 2, cardW, cardH, 20, 20)
+    love.graphics.setColor(0, 0, 0, 0.20)
+    love.graphics.draw(backImg, 8, 10, 0, sx, sy, backW/2, backH/2)
 
-        love.graphics.setColor(1, 1, 1, 0.8)
-        love.graphics.setLineWidth(4)
-        love.graphics.rectangle("line", -cardW / 2, -cardH / 2, cardW, cardH, 20, 20)
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.draw(backImg, 0, 0, 0, sx, sy, backW/2, backH/2)
 
-        love.graphics.setColor(1, 1, 1, 0.85)
-        love.graphics.printf("Zweeds\nPesten", -cardW / 2 + 14, -cardH / 2 + 26, cardW - 28, "center")
+    love.graphics.setColor(1, 1, 1, 0.85)
+    love.graphics.setLineWidth(4)
+    love.graphics.rectangle("line", -cardW/2, -cardH/2, cardW, cardH, 20, 20)
 
-        love.graphics.pop()
-    end
+    love.graphics.pop()
+  end
 
-    love.graphics.setFont(prevFont)
-    love.graphics.setLineWidth(1)
+  love.graphics.setFont(prevFont)
+  love.graphics.setLineWidth(1)
+  love.graphics.setColor(1, 1, 1, 1)
 end
+
 
 -------------------------------- lifecycle --------------------------------
 
