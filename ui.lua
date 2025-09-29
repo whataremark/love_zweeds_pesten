@@ -172,9 +172,8 @@ function ui.draw_deck(deck)
     for i = 0, zichtbaar - 1 do
         love.graphics.draw(cardBack, x + i * 2, y - i * 2, math.rad(-i * 2), schaal, schaal)
     end
-    love.graphics.setColor(0, 0, 0)
-    love.graphics.printf("Deck: " .. count, x - 30, y + kaart_hoogte + 10, 120, "center")
     love.graphics.setColor(1,1,1,1)
+    love.graphics.printf("Deck: " .. count, x - 30, y + kaart_hoogte + 10, 120, "center")
 end
 
 --codex-- Draw the pile of played cards and optional overlay

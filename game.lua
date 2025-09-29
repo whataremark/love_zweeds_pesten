@@ -112,28 +112,49 @@ local function active_players()
     return cnt, last
 end
 
-
--- wie is “uitgespeeld”?
+-- helper: is seat klaar?
 local function is_finished_seat(id)
   local p = player.players[id]
   return (not p) or (#p.hand==0 and #p.faceUp==0 and #p.faceDown==0)
 end
 
--- update finished / winner; return true als spel echt voorbij is
+-- update finished / winner; return true als spel voorbij is
 function game._update_finished_and_maybe_end()
-    local alive = {}
-    for i = 1, game.maxPlayers do
-        if not _is_finished(i) then table.insert(alive, i) end
+  -- tel hoeveel spelers 'finished' zijn (geen kaarten meer)
+  local finished = 0
+  for i = 1, game.maxPlayers do
+    if is_finished_seat(i) then
+      finished = finished + 1
+    end
+  end
+
+  -- spel eindigt pas als n-1 spelers finished zijn (laatste mag nog kaarten hebben)
+  if finished >= game.maxPlayers - 1 then
+    -- ✅ winnaar = eerste die uit was
+    local w = (game.finishedOrder and game.finishedOrder[1]) or nil
+    if not w then
+      -- fallback: kies een 'finished' seat (mocht finishedOrder leeg zijn)
+      for i = 1, game.maxPlayers do
+        local p = player.players[i]
+        if p and #p.hand == 0 and #p.faceUp == 0 and #p.faceDown == 0 then
+          w = i
+          break
+        end
+      end
+      w = w or 1
     end
 
-    -- spel klaar als er 0 of 1 spelers over zijn
-    if #alive <= 1 then
-        game.winner = alive[1] or 0  -- (0 bij niemand over: theoretisch niet haalbaar)
-        -- host pusht meteen de state zodat clients het eindscherm zien
-        if net.isHost and net.isHost() and net.send_state then net.send_state() end
-        return true
+    game.winner = w
+    scene = "gameover"
+
+    -- host pusht eindstaat naar alle clients
+    if net.isHost and net.isHost() and net.send_state then
+      net.send_state()
     end
-    return false
+    return true
+  end
+
+  return false
 end
 ------
 
@@ -558,20 +579,31 @@ end
 
 
 function game.wheelmoved(x, y)
-    if player.players[net.localId] then
-        local CARD_H_SRC, CARD_W_SRC = 500, 300
-        local CARD_H      = 160
-        local SCALE       = CARD_H / CARD_H_SRC
-        local CARD_W      = CARD_W_SRC * SCALE
-        local PADDING     = 15
-        local cardSpace   = CARD_W + PADDING
+  -- fallback naar seat 1 als net.localId (nog) nil is
+  local myId = (net and net.localId) or 1
+  local p = player.players[myId]
+  if not p then return end
 
-        local p = player.players[net.localId]
-        p.scrollOffset = math.max(0, (p.scrollOffset or 0) - y * cardSpace)
-    end
+  local CARD_H_SRC, CARD_W_SRC = 500, 300
+  local CARD_H      = 160
+  local SCALE       = CARD_H / CARD_H_SRC
+  local CARD_W      = CARD_W_SRC * SCALE
+  local PADDING     = 15
+  local cardSpace   = CARD_W + PADDING
+
+  -- wiel omlaag = naar rechts; omdraaien? wissel '-' naar '+'
+  p.scrollOffset = math.max(0, (p.scrollOffset or 0) - y * cardSpace)
 end
 
 function game.keypressed(key)
+  -- Eindscherm → terug naar menu
+  if scene == "gameover" and (key == "return" or key == "kpenter" or key == "escape") then
+    local state = require("state")
+    local menu  = require("menu")
+    state.enter(menu)
+    return
+  end
+  
   if key ~= "space" then return end
 
   -- niet reageren op het eindscherm
@@ -582,7 +614,7 @@ function game.keypressed(key)
   local isMyTurn = (game.currentPlayer == myId)
 
   -- Alleen in hand-fase en als jij aan de beurt bent
-  if not (isMyTurn and myPhase == "playingHand") then return end
+  if not (isMyTurn) then return end
 
   -- Pak de play-knop uit de laatst getekende UI-knoppen
   local btns = game._uiButtons
@@ -858,23 +890,7 @@ end
 -- game.check_winner()  – einde-spel controle
 --------------------------------------------------------------------
 function game.check_winner()
-  local finished = 0
-  for i = 1, game.maxPlayers do
-    local p = player.players[i]
-    if p and p.finished then finished = finished + 1 end
-  end
-
-  if finished >= game.maxPlayers - 1 then
-    if game.finishedOrder and game.finishedOrder[1] then
-      game.winner = game.finishedOrder[1]
-    else
-      -- fallback (zou zelden nodig moeten zijn)
-      game.winner = game.winner or 1
-    end
-    return true
-  end
-
-  return false
+  return game._update_finished_and_maybe_end()
 end
 
 return game
