@@ -622,8 +622,8 @@ function game.start(mode, aiCount)
         local profile = require("profile")
         player.players[1].name = profile.get_name()
         for i = 2, seats do
-        local nm = (net.clients[i] and net.clients[i].name) or ("Speler " .. i)
-        player.players[i].name = nm
+            local nm = (net.clients[i] and net.clients[i].name) or ("Speler " .. i)
+            player.players[i].name = nm
         end
 
         game.maxPlayers = seats

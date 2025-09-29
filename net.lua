@@ -449,6 +449,10 @@ local function handle_host(msg)
     local pid  = tonumber(msg.id) or 2
     local name = tostring(msg.name or ("Speler " .. pid))
 
+    -- ❶ Bewaar de naam op de host (los van of de game al draait)
+    net.clients[pid]        = net.clients[pid] or {}
+    net.clients[pid].name   = name
+    
     -- als de game al bestaat: schrijf naam in de spelerslijst
     if player.players and player.players[pid] then
         player.players[pid].name = name
