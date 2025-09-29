@@ -28,6 +28,13 @@ local function draw_turn_glow(x, y, w, h, radius)
     love.graphics.setColor(1,1,1)
 end
 
+
+--helper voor name  displayen
+local function disp_name(id)
+  local p = require("player").players[id]
+  return (p and p.name and p.name ~= "") and p.name or ("Speler " .. tostring(id or "?"))
+end
+
 --------------------------------------------------------------------
 -- Hulpfuncties om de Y-posities van de rijen terug te geven
 --------------------------------------------------------------------
@@ -54,8 +61,6 @@ end
 -- helpers voor de Y‑positie van de face‑down / face‑up rijen
 -- TARGET_H staat al elders op 140 px
 local EXTRA_GAP  = 70
-local net        = require("net")
-
 local function row_faceDown_Y(boxY, index)
     -- host‑only (ai) → localId is nil, dus fallback naar speler 1
     local isMe = (index == (net.localId or 1))
@@ -169,6 +174,7 @@ function ui.draw_deck(deck)
     end
     love.graphics.setColor(0, 0, 0)
     love.graphics.printf("Deck: " .. count, x - 30, y + kaart_hoogte + 10, 120, "center")
+    love.graphics.setColor(1,1,1,1)
 end
 
 --codex-- Draw the pile of played cards and optional overlay
@@ -310,7 +316,7 @@ function ui.draw_player_area(playerData, index, totalPlayers)
 
     local function draw_name(labelX, labelY, alignRight)
         local p = player.players[index]
-        local base = (p and p.name and p.name ~= "") and p.name or ("Speler " .. index)
+        love.graphics.print(disp_name(i), x, y)
         local txt  = isMe and (base .. " (YOU)") or base
         love.graphics.setColor(1,1,1)
         love.graphics.print(txt, alignRight and (labelX - 160) or labelX, labelY)
@@ -710,16 +716,16 @@ function ui.get_card_positions(hand)
 end
 
 function ui.draw_all_players(players)
-  local w,h = love.graphics.getWidth(), love.graphics.getHeight()
-
-  local seatForIndex = { [1]="bottom", [2]="top", [3]="left", [4]="right" }
   local count = #players
+  local me = (require("net").localId or 1)
 
-  -- eerst anderen, dan jij (zodat jouw hand bovenop ligt)
-  for i=2, math.min(count,4) do
-    ui.draw_player_area(players[i], i, count, seatForIndex[i])
+  local order = {}
+  for i = 1, count do if i ~= me then table.insert(order, i) end end
+  table.insert(order, me) -- jij als laatste → bovenop
+
+  for _, i in ipairs(order) do
+    ui.draw_player_area(players[i], i, count)
   end
-  ui.draw_player_area(players[1], 1, count, "bottom")
 end
 
 
