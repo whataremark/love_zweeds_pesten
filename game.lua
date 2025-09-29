@@ -49,7 +49,6 @@ game.dragScroll = { active = false, startX = 0, startOffset = 0, touchId = nil }
 
 
 function game.touchpressed(id, x, y, pressure)
-    utils.sort_hand(hand)
     local myId = net.localId or 1
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
     -- bbox van de eigen hand (onderaan), gelijk aan ui.get_card_positions
@@ -115,8 +114,9 @@ end
 
 
 -- wie is “uitgespeeld”?
-local function is_finished(p)
-  return #p.hand == 0 and #p.faceUp == 0 and #p.faceDown == 0
+local function is_finished_seat(id)
+  local p = player.players[id]
+  return (not p) or (#p.hand==0 and #p.faceUp==0 and #p.faceDown==0)
 end
 
 -- update finished / winner; return true als spel echt voorbij is
@@ -211,7 +211,6 @@ function game.update(dt)
         net.update()
         if net.isHost() then net.send_state() end
     end
-    utils.sort_hand(hand)
     -- A) Ongeldige-zet-timer
     if ongeldigeZetTimer > 0 then
         ongeldigeZetTimer = ongeldigeZetTimer - dt
@@ -573,13 +572,26 @@ function game.wheelmoved(x, y)
 end
 
 function game.keypressed(key)
-    if key == "space" and scene == "playing" and game.currentPlayer == net.localId then
-        local b = buttons and buttons.play
-        if b then
-            local cx, cy = b.x + b.w/2, b.y + b.h/2
-            game.mousepressed(cx, cy, 1)
-        end
-    end
+  if key ~= "space" then return end
+
+  -- niet reageren op het eindscherm
+  if scene == "gameover" then return end
+
+  local myId    = net.localId or 1
+  local myPhase = require("utils").phase_of(game, myId)
+  local isMyTurn = (game.currentPlayer == myId)
+
+  -- Alleen in hand-fase en als jij aan de beurt bent
+  if not (isMyTurn and myPhase == "playingHand") then return end
+
+  -- Pak de play-knop uit de laatst getekende UI-knoppen
+  local btns = game._uiButtons
+  local b = btns and btns.play
+  if not b then return end
+
+  -- Simuleer een muisklik op de 'Speel' knop
+  local cx, cy = b.x + b.w * 0.5, b.y + b.h * 0.5
+  game.mousepressed(cx, cy, 1)
 end
 
 --------------------------------------------------------------------
@@ -595,8 +607,7 @@ function game.start(mode, aiCount)
     -- Trekstapel maken en schudden  ➜  **alleen de host doet dit**
     --------------------------------------------------------------
     if mode ~= "multiplayer-client" then
-        drawPile.init(game.deckCount)        -- host: deck & shuffle
-
+    
                 -- Host bepaalt aantal seats op basis van aantal TCP-clients
         local seats = 1 + (net.client_count and net.client_count() or 0)
         local MAX = (config.MAX_SEATS or 4)
@@ -735,7 +746,7 @@ end
 -- ====== VERVANG je huidige finalize_setup door deze ======
 function game.finalize_setup()
     -- 1) Wacht tot iedereen z'n faceUp gekozen heeft
-    local needed = (config.faceUpCount or 3)
+    local needed = config.SETUP_OPEN or config.OPEN_SIZE or config.OPEN_COUNT or config.faceUpCount or 3
     for pid = 1, game.maxPlayers do
         if #player.players[pid].faceUp < needed then
             return -- nog niet klaar met setup
@@ -808,43 +819,38 @@ end
 -- game.next_turn()  – speler-wissel + AI-timer + fase-update
 --------------------------------------------------------------------
 function game.next_turn()
-    -- Iemand net uit? Check eerst of we al mogen eindigen
+  -- 1) Klaar? Dan eindigen.
+  -- (Gebruik game:check_winner() als jouw functie met dubbelepunt is gedefinieerd.)
   if game.check_winner() then
-    if net.isHost() then net.send_state() end
+    if net.isHost and net.isHost() then net.send_state() end
     return
   end
 
--- roteer naar volgende NIET-finished speler
-  local spins = 0
+  -- 2) Zoek volgende NIET-finished seat
+  local tries = 0
   repeat
     game.currentPlayer = (game.currentPlayer % game.maxPlayers) + 1
-    spins = spins + 1
-    if spins > game.maxPlayers then break end
-  until not is_finished(player.players[game.currentPlayer])
+    tries = tries + 1
+  until tries > game.maxPlayers or not is_finished_seat(game.currentPlayer)
 
+  -- 3) Fase sync
   utils.update_phase_for_player(game, game.currentPlayer)
-  utils.sort_hand(hand)
 
-
-
-  ------------------------------------------------------------------
-  -- 4) AI-wachttijd (optioneel)
-  ------------------------------------------------------------------
+  -- 4) AI-delay (alleen als AI aan zet)
   local curP = player.players[game.currentPlayer]
   if game.mode == "ai" and curP and curP.isAI then
     local minDelay, maxDelay = 0.5, 2.3
-    local r = love.math.random() -- 0..1 float
-    game.aiTimer      = minDelay + (maxDelay - minDelay) * r
+    game.aiTimer      = minDelay + (maxDelay - minDelay) * love.math.random()
     game.waitingForAI = true
-    print(("[AI] wacht %.2fs (seat %d)"):format(game.aiTimer, game.currentPlayer))
   else
     game.waitingForAI = false
     game.aiTimer      = 0
   end
-  ------------------------------------------------------------------
-  -- 5) Host broadcast (MP)
-  ------------------------------------------------------------------
-  if net.isMultiplayer() and net.isHost() then net.send_state() end
+
+  -- 5) Host broadcast
+  if net.isMultiplayer and net.isMultiplayer() and net.isHost and net.isHost() then
+    net.send_state()
+  end
 end
 
 

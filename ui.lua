@@ -723,17 +723,14 @@ function ui.draw_all_players(players)
 end
 
 
--- Toon een correct eindscherm voor 2–4 spelers (met namen)
-function ui.draw_end_screen(winnerId, players)
+-- Toon een correct eindscherm voor 2–4 spelers (met namen en finishedOrder)
+function ui.draw_end_screen(winnerId, players, finishedOrder)
   local w, h = love.graphics.getWidth(), love.graphics.getHeight()
-  local function total_cards(p) return #(p.hand or {}) + #(p.faceUp or {}) + #(p.faceDown or {}) end
 
-  -- achtergrond
-  love.graphics.setColor(0, 0, 0, 0.65)
-  love.graphics.rectangle("fill", w*0.15, h*0.2, w*0.70, h*0.60, 20, 20)
-  love.graphics.setColor(1, 1, 1, 1)
+  local function total_cards(p)
+    return #(p.hand or {}) + #(p.faceUp or {}) + #(p.faceDown or {})
+  end
 
-  -- winnaar-naam bepalen
   local function disp_name(id)
     local p = players and players[id]
     local n = p and p.name
@@ -741,34 +738,64 @@ function ui.draw_end_screen(winnerId, players)
     return "Speler " .. tostring(id or "?")
   end
 
+  -- Als winnerId ontbreekt/ongeldig maar er is finishedOrder, gebruik die
+  if (not winnerId or not (players and players[winnerId])) and finishedOrder and finishedOrder[1] and players[finishedOrder[1]] then
+    winnerId = finishedOrder[1]
+  end
+
+  -- maak een pos-map uit finishedOrder (1 = winnaar)
+  local pos = nil
+  if type(finishedOrder) == "table" and #finishedOrder > 0 then
+    pos = {}
+    for i, pid in ipairs(finishedOrder) do pos[pid] = i end
+  end
+
+  -- achtergrond
+  love.graphics.setColor(0, 0, 0, 0.65)
+  love.graphics.rectangle("fill", w*0.15, h*0.2, w*0.70, h*0.60, 20, 20)
+  love.graphics.setColor(1, 1, 1, 1)
+
   -- titel
   local you = (net and net.localId) and (winnerId == net.localId) and " (YOU)" or ""
   local title = ("Winnaar: %s%s"):format(disp_name(winnerId), you)
   love.graphics.printf(title, w*0.15, h*0.23, w*0.70, "center")
 
-  -- ranglijst / resterende kaarten
+  -- rows verzamelen (robust: gebruik pairs ipv ipairs i.g.v. gaten)
   local rows = {}
-  for i, p in ipairs(players or {}) do
-    table.insert(rows, { id = i, left = total_cards(p) })
+  for id, p in pairs(players or {}) do
+    if type(id) == "number" and p then
+      table.insert(rows, { id = id, left = total_cards(p) })
+    end
   end
 
+  -- sorteren:
+  -- 1) als finishedOrder bekend: positie (laagst = eerst)
+  -- 2) anders: winnaar eerst
+  -- 3) dan op meeste kaarten over (desc)
+  -- 4) stabiel op id
   table.sort(rows, function(a, b)
-    -- winnaar eerst, daarna meeste kaarten eerst; bij gelijk: lagere id eerst
-    if a.id == winnerId and b.id ~= winnerId then return true end
-    if b.id == winnerId and a.id ~= winnerId then return false end
-    if a.left == b.left then return a.id < b.id end
-    return a.left > b.left
+    if pos then
+      local pa = pos[a.id] or 9999
+      local pb = pos[b.id] or 9999
+      if pa ~= pb then return pa < pb end
+    else
+      if a.id == winnerId and b.id ~= winnerId then return true end
+      if b.id == winnerId and a.id ~= winnerId then return false end
+    end
+    if a.left ~= b.left then return a.left > b.left end
+    return a.id < b.id
   end)
 
+  -- lijst
   local y = h*0.30
   local lineH = 32
   for _, r in ipairs(rows) do
-    local isWin = (r.id == winnerId)
-    local tag = isWin and "🏆 " or "• "
+    local isWin  = (r.id == winnerId)
+    local tag    = isWin and "🏆 " or "• "
     local youTag = (net and net.localId == r.id) and " (YOU)" or ""
-    local txt = ("%s%s%s — %d kaarten over"):format(tag, disp_name(r.id), youTag, r.left)
+    local txt    = ("%s%s%s — %d kaarten over"):format(tag, disp_name(r.id), youTag, r.left)
 
-    if isWin then love.graphics.setColor(1,1,1,1) else love.graphics.setColor(1,1,1,0.90) end
+    love.graphics.setColor(1,1,1, isWin and 1 or 0.90)
     love.graphics.printf(txt, w*0.20, y, w*0.60, "left")
     y = y + lineH
   end
@@ -777,6 +804,7 @@ function ui.draw_end_screen(winnerId, players)
   love.graphics.setColor(1,1,1,0.85)
   love.graphics.printf("Druk op Enter om terug te gaan naar het menu", w*0.15, h*0.72, w*0.70, "center")
 end
+
 
 
 function ui.draw_banners(effects)
