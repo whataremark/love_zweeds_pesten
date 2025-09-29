@@ -735,7 +735,6 @@ function ui.draw_all_players(players)
 end
 
 
--- Toon een correct eindscherm voor 2–4 spelers (met namen en finishedOrder)
 function ui.draw_end_screen(winnerId, players, finishedOrder)
   local w, h = love.graphics.getWidth(), love.graphics.getHeight()
 
@@ -750,14 +749,12 @@ function ui.draw_end_screen(winnerId, players, finishedOrder)
     return "Speler " .. tostring(id or "?")
   end
 
-  -- Als winnerId ontbreekt/ongeldig maar er is finishedOrder → gebruik die
-  if (not winnerId or not (players and players[winnerId]))
-     and finishedOrder and finishedOrder[1]
-     and players[finishedOrder[1]] then
+  -- ✅ Vertrouw finishedOrder boven winnerId
+  if type(finishedOrder) == "table" and finishedOrder[1] and players[finishedOrder[1]] then
     winnerId = finishedOrder[1]
   end
 
-  -- Positie-map uit finishedOrder (1 = winnaar)
+  -- posities 1..N uit finishedOrder
   local pos = nil
   if type(finishedOrder) == "table" and #finishedOrder > 0 then
     pos = {}
@@ -770,23 +767,22 @@ function ui.draw_end_screen(winnerId, players, finishedOrder)
   love.graphics.setColor(1, 1, 1, 1)
 
   -- titel
-  local you   = (net and net.localId) and (winnerId == net.localId) and " (YOU)" or ""
+  local you   = (net and net.localId == winnerId) and " (YOU)" or ""
   local title = ("Winnaar: %s%s"):format(disp_name(winnerId), you)
   love.graphics.printf(title, w*0.15, h*0.23, w*0.70, "center")
 
-  -- rows verzamelen (pairs is veilig bij “gaten”)
+  -- rows
   local rows = {}
   for id, p in pairs(players or {}) do
     if type(id) == "number" and p then
-      table.insert(rows, { id = id, left = total_cards(p) })
+      rows[#rows+1] = { id = id, left = total_cards(p) }
     end
   end
 
-  -- sorteren
   table.sort(rows, function(a, b)
     if pos then
-      local pa = pos[a.id] or 9999
-      local pb = pos[b.id] or 9999
+      local pa = pos[a.id] or 1e9
+      local pb = pos[b.id] or 1e9
       if pa ~= pb then return pa < pb end
     else
       if a.id == winnerId and b.id ~= winnerId then return true end
@@ -796,24 +792,23 @@ function ui.draw_end_screen(winnerId, players, finishedOrder)
     return a.id < b.id
   end)
 
-  -- lijst tekenen
   local y = h*0.30
   local lineH = 32
   for _, r in ipairs(rows) do
     local isWin  = (r.id == winnerId)
-    local tag    = isWin and "• "
+    local tag    = isWin and "🏆 " or "• "           -- ✅ string i.p.v. boolean
     local youTag = (net and net.localId == r.id) and " (YOU)" or ""
-    local txt    = ("%s%s%s — %d kaarten over"):format(tag, disp_name(r.id), youTag, r.left)
+    local line   = string.format("%s%s%s — %d kaarten over", tag, disp_name(r.id), youTag, r.left)
 
     love.graphics.setColor(1,1,1, isWin and 1 or 0.90)
-    love.graphics.printf(txt, w*0.20, y, w*0.60, "left")
+    love.graphics.printf(line, w*0.20, y, w*0.60, "left")
     y = y + lineH
   end
 
   love.graphics.setColor(1,1,1,0.85)
-  love.graphics.printf("Druk op Enter om terug te gaan naar het menu",
-                       w*0.15, h*0.72, w*0.70, "center")
+  love.graphics.printf("Druk op Enter om terug te gaan naar het menu", w*0.15, h*0.72, w*0.70, "center")
 end
+
 
 
 

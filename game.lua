@@ -120,42 +120,33 @@ end
 
 -- update finished / winner; return true als spel voorbij is
 function game._update_finished_and_maybe_end()
-  -- tel hoeveel spelers 'finished' zijn (geen kaarten meer)
+  -- tel 'finished' spelers
   local finished = 0
   for i = 1, game.maxPlayers do
-    if is_finished_seat(i) then
-      finished = finished + 1
-    end
+    if is_finished_seat(i) then finished = finished + 1 end
   end
 
-  -- spel eindigt pas als n-1 spelers finished zijn (laatste mag nog kaarten hebben)
+  -- eindig zodra n-1 spelers klaar zijn
   if finished >= game.maxPlayers - 1 then
-    -- ✅ winnaar = eerste die uit was
+    -- ✅ winnaar is de EERSTE uitvaller
     local w = (game.finishedOrder and game.finishedOrder[1]) or nil
     if not w then
-      -- fallback: kies een 'finished' seat (mocht finishedOrder leeg zijn)
+      -- fallback (zou zelden nodig moeten zijn)
       for i = 1, game.maxPlayers do
-        local p = player.players[i]
-        if p and #p.hand == 0 and #p.faceUp == 0 and #p.faceDown == 0 then
-          w = i
-          break
-        end
+        if is_finished_seat(i) then w = i; break end
       end
       w = w or 1
     end
-
     game.winner = w
     scene = "gameover"
 
-    -- host pusht eindstaat naar alle clients
-    if net.isHost and net.isHost() and net.send_state then
-      net.send_state()
-    end
+    if net.isHost and net.isHost() and net.send_state then net.send_state() end
     return true
   end
 
   return false
 end
+
 ------
 
 -- zelfde geometrie als ui.get_card_positions()
