@@ -10,7 +10,7 @@ local profile = require("profile")
 
 local net = {}
 
-net.localId     = 1
+net.localId     = nil
 net.mode        = nil   -- 'host' or 'client'
 net.server      = nil
 net.conns        = nil
@@ -409,18 +409,36 @@ end
 ----------------------------------------------------------------------
 -- Transport
 ----------------------------------------------------------------------
+-- Stuur willekeurig bericht (client → host of host → 1 oude conn)
 function net.send(msg)
-    local line = json.encode(msg) .. "\n"
-    if net.isHost() and net.conn then
-        net.conn:send(line)
-    elseif net.isClient() and net.client then
-        net.client:send(line)
+  local line = json.encode(msg) .. "\n"
+  if net.isHost() then
+    if net.conns then
+      for _, conn in pairs(net.conns) do
+        if conn then pcall(function() conn:send(line) end) end
+      end
     end
+    if net.conn then pcall(function() net.conn:send(line) end) end -- legacy
+  elseif net.isClient() and net.client then
+    net.client:send(line)
+  end
 end
 
+-- Broadcast de volledige game-state naar alle clients
 function net.send_state()
-    if not net.conn or not net.game then return end
-    net.send({ cmd = "STATE", game = export_state() })
+  if not net.game then return end
+  local line = json.encode({ cmd = "STATE", game = export_state() }) .. "\n"
+
+  if net.isHost() then
+    -- nieuwe multi-client sockets
+    if net.conns then
+      for _, conn in pairs(net.conns) do
+        if conn then conn:send(line) end
+      end
+    end
+    -- backward compat: oude single-conn nog mee sturen
+    if net.conn then net.conn:send(line) end
+  end
 end
 
 ----------------------------------------------------------------------
@@ -431,6 +449,10 @@ local function handle_host(msg)
     local pid  = tonumber(msg.id) or 2
     local name = tostring(msg.name or ("Speler " .. pid))
 
+    -- ❶ Bewaar de naam op de host (los van of de game al draait)
+    net.clients[pid]        = net.clients[pid] or {}
+    net.clients[pid].name   = name
+    
     -- als de game al bestaat: schrijf naam in de spelerslijst
     if player.players and player.players[pid] then
         player.players[pid].name = name
@@ -439,9 +461,8 @@ local function handle_host(msg)
     -- altijd in wachtrij voor host_lobby UI
     table.insert(net.newClients, name)
 
-    -- alleen snapshotten als er al een game loopt
-    if net.game and net.conn then
-        net.send_state()
+    if net.game then
+    net.send_state()
     end
 
     print(("[net] JOIN seat=%s name=%s"):format(tostring(pid), name))
@@ -570,15 +591,15 @@ local function handle_host(msg)
     ------------------------------------------------------------------
     -- 3) Client klaar met open kaarten
     ------------------------------------------------------------------
+    -- 3) Client klaar met open kaarten
     if msg.cmd == "OPEN_DONE" then
-        net.openDone = (net.openDone or 0) + 1
-        if net.openDone == 1 then
-            net.game.finalize_setup()
-            net.send_state()
-        end
-        return
+    -- Roep elke keer aan; finalize_setup zelf checkt of iedereen klaar is
+    if net.game and net.game.finalize_setup then
+        net.game.finalize_setup()
     end
-
+    net.send_state()
+    return
+    end
     ------------------------------------------------------------------
     -- 4) Hand-play / pickup / pass
     ------------------------------------------------------------------
@@ -673,28 +694,44 @@ function net.update(dt)
     if net.isHost() then
         -- 1) Nieuwe clients accepteren (meerdere)
         if net.server then
-            local cli = net.server:accept()
-            while cli do
-                cli:settimeout(0)
+        local cli = net.server:accept()
+        while cli do
+            cli:settimeout(0)
 
-                local seat = next_free_seat and next_free_seat() or nil
-                if seat then
-                    net.conns[seat] = cli
-                    net.clients[seat] = net.clients[seat] or { sock = cli }
+            -- Blokkeer late joins zodra een pot bezig is
+            if net.game and net.game.state == "playing" then
+            pcall(function()
+                cli:send(json.encode({ cmd = "FULL", reason = "in_progress" }) .. "\n")
+                cli:close()
+            end)
 
-                    -- Stuur HELLO met seatId en deckCount
-                    local dc = (net.game and net.game.deckCount) or 1
-                    local hello = json.encode({ cmd = "HELLO", seatId = seat, deckCount = dc }) .. "\n"
-                    cli:send(hello)
-                else
-                    -- Vol → netjes melden en sluiten
-                    cli:send(json.encode({ cmd = "FULL" }) .. "\n")
-                    cli:close()
+            else
+            local seat = next_free_seat and next_free_seat() or nil
+            if seat then
+                net.conns[seat]   = cli
+                net.clients[seat] = net.clients[seat] or { sock = cli }
+
+                -- Stuur HELLO met seatId en deckCount
+                local dc = (net.game and net.game.deckCount) or 1
+                cli:send(json.encode({ cmd = "HELLO", seatId = seat, deckCount = dc }) .. "\n")
+
+                -- Stuur direct een snapshot zodat de client uit de lobby komt
+                if net.game then
+                local line = json.encode({ cmd = "STATE", game = export_state() }) .. "\n"
+                pcall(function() cli:send(line) end)
                 end
-
-                cli = net.server:accept()
+            else
+                pcall(function()
+                cli:send(json.encode({ cmd = "FULL", reason = "no_seat" }) .. "\n")
+                cli:close()
+                end)
             end
+            end
+
+            cli = net.server:accept()
         end
+        end
+
 
         -- 2) Inkomende berichten van alle clients
         for seat, conn in pairs(net.conns) do

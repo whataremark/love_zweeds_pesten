@@ -49,7 +49,6 @@ game.dragScroll = { active = false, startX = 0, startOffset = 0, touchId = nil }
 
 
 function game.touchpressed(id, x, y, pressure)
-    utils.sort_hand(hand)
     local myId = net.localId or 1
     local w, h = love.graphics.getWidth(), love.graphics.getHeight()
     -- bbox van de eigen hand (onderaan), gelijk aan ui.get_card_positions
@@ -113,27 +112,51 @@ local function active_players()
     return cnt, last
 end
 
-
--- wie is “uitgespeeld”?
-local function is_finished(p)
-  return #p.hand == 0 and #p.faceUp == 0 and #p.faceDown == 0
+-- helper: is seat klaar?
+local function is_finished_seat(id)
+  local p = player.players[id]
+  return (not p) or (#p.hand==0 and #p.faceUp==0 and #p.faceDown==0)
 end
 
--- update finished / winner; return true als spel echt voorbij is
+-- update finished / winner; return true als spel voorbij is
+-- update finished / winner; return true als spel voorbij is
 function game._update_finished_and_maybe_end()
-    local alive = {}
-    for i = 1, game.maxPlayers do
-        if not _is_finished(i) then table.insert(alive, i) end
+  -- Clients bepalen geen winnaar zelf; ze wachten op snapshot van de host
+  if net.isClient and net.isClient() then
+    return game.winner ~= nil
+  end
+
+  -- tel hoeveel spelers 'finished' zijn
+  local finished = 0
+  for i = 1, game.maxPlayers do
+    if is_finished_seat(i) then finished = finished + 1 end
+  end
+
+  -- spel eindigt zodra n-1 spelers klaar zijn
+  if finished >= (game.maxPlayers - 1) then
+    -- ✅ winnaar = eerste die uit was
+    local fin = game.finishedOrder or {}
+    local w = fin[1]
+
+    -- fallback (alleen als finishedOrder door een bug leeg is):
+    if not w then
+      for i = 1, game.maxPlayers do
+        if is_finished_seat(i) then w = i; break end
+      end
+      w = w or 1
     end
 
-    -- spel klaar als er 0 of 1 spelers over zijn
-    if #alive <= 1 then
-        game.winner = alive[1] or 0  -- (0 bij niemand over: theoretisch niet haalbaar)
-        -- host pusht meteen de state zodat clients het eindscherm zien
-        if net.isHost and net.isHost() and net.send_state then net.send_state() end
-        return true
+    game.winner = w
+    scene = "gameover"
+
+    -- host pusht eindstaat
+    if net.isHost and net.isHost() and net.send_state then
+      net.send_state()
     end
-    return false
+    return true
+  end
+
+  return false
 end
 ------
 
@@ -211,7 +234,6 @@ function game.update(dt)
         net.update()
         if net.isHost() then net.send_state() end
     end
-    utils.sort_hand(hand)
     -- A) Ongeldige-zet-timer
     if ongeldigeZetTimer > 0 then
         ongeldigeZetTimer = ongeldigeZetTimer - dt
@@ -559,27 +581,51 @@ end
 
 
 function game.wheelmoved(x, y)
-    if player.players[net.localId] then
-        local CARD_H_SRC, CARD_W_SRC = 500, 300
-        local CARD_H      = 160
-        local SCALE       = CARD_H / CARD_H_SRC
-        local CARD_W      = CARD_W_SRC * SCALE
-        local PADDING     = 15
-        local cardSpace   = CARD_W + PADDING
+  -- fallback naar seat 1 als net.localId (nog) nil is
+  local myId = (net and net.localId) or 1
+  local p = player.players[myId]
+  if not p then return end
 
-        local p = player.players[net.localId]
-        p.scrollOffset = math.max(0, (p.scrollOffset or 0) - y * cardSpace)
-    end
+  local CARD_H_SRC, CARD_W_SRC = 500, 300
+  local CARD_H      = 160
+  local SCALE       = CARD_H / CARD_H_SRC
+  local CARD_W      = CARD_W_SRC * SCALE
+  local PADDING     = 15
+  local cardSpace   = CARD_W + PADDING
+
+  -- wiel omlaag = naar rechts; omdraaien? wissel '-' naar '+'
+  p.scrollOffset = math.max(0, (p.scrollOffset or 0) - y * cardSpace)
 end
 
 function game.keypressed(key)
-    if key == "space" and scene == "playing" and game.currentPlayer == net.localId then
-        local b = buttons and buttons.play
-        if b then
-            local cx, cy = b.x + b.w/2, b.y + b.h/2
-            game.mousepressed(cx, cy, 1)
-        end
-    end
+  -- Eindscherm → terug naar menu
+  if scene == "gameover" and (key == "return" or key == "kpenter" or key == "escape") then
+    local state = require("state")
+    local menu  = require("menu")
+    state.enter(menu)
+    return
+  end
+  
+  if key ~= "space" then return end
+
+  -- niet reageren op het eindscherm
+  if scene == "gameover" then return end
+
+  local myId    = net.localId or 1
+  local myPhase = require("utils").phase_of(game, myId)
+  local isMyTurn = (game.currentPlayer == myId)
+
+  -- Alleen in hand-fase en als jij aan de beurt bent
+  if not (isMyTurn) then return end
+
+  -- Pak de play-knop uit de laatst getekende UI-knoppen
+  local btns = game._uiButtons
+  local b = btns and btns.play
+  if not b then return end
+
+  -- Simuleer een muisklik op de 'Speel' knop
+  local cx, cy = b.x + b.w * 0.5, b.y + b.h * 0.5
+  game.mousepressed(cx, cy, 1)
 end
 
 --------------------------------------------------------------------
@@ -595,8 +641,7 @@ function game.start(mode, aiCount)
     -- Trekstapel maken en schudden  ➜  **alleen de host doet dit**
     --------------------------------------------------------------
     if mode ~= "multiplayer-client" then
-        drawPile.init(game.deckCount)        -- host: deck & shuffle
-
+    
                 -- Host bepaalt aantal seats op basis van aantal TCP-clients
         local seats = 1 + (net.client_count and net.client_count() or 0)
         local MAX = (config.MAX_SEATS or 4)
@@ -611,8 +656,8 @@ function game.start(mode, aiCount)
         local profile = require("profile")
         player.players[1].name = profile.get_name()
         for i = 2, seats do
-        local nm = (net.clients[i] and net.clients[i].name) or ("Speler " .. i)
-        player.players[i].name = nm
+            local nm = (net.clients[i] and net.clients[i].name) or ("Speler " .. i)
+            player.players[i].name = nm
         end
 
         game.maxPlayers = seats
@@ -735,7 +780,7 @@ end
 -- ====== VERVANG je huidige finalize_setup door deze ======
 function game.finalize_setup()
     -- 1) Wacht tot iedereen z'n faceUp gekozen heeft
-    local needed = (config.faceUpCount or 3)
+    local needed = config.SETUP_OPEN or config.OPEN_SIZE or config.OPEN_COUNT or config.faceUpCount or 3
     for pid = 1, game.maxPlayers do
         if #player.players[pid].faceUp < needed then
             return -- nog niet klaar met setup
@@ -808,43 +853,38 @@ end
 -- game.next_turn()  – speler-wissel + AI-timer + fase-update
 --------------------------------------------------------------------
 function game.next_turn()
-    -- Iemand net uit? Check eerst of we al mogen eindigen
+  -- 1) Klaar? Dan eindigen.
+  -- (Gebruik game:check_winner() als jouw functie met dubbelepunt is gedefinieerd.)
   if game.check_winner() then
-    if net.isHost() then net.send_state() end
+    if net.isHost and net.isHost() then net.send_state() end
     return
   end
 
--- roteer naar volgende NIET-finished speler
-  local spins = 0
+  -- 2) Zoek volgende NIET-finished seat
+  local tries = 0
   repeat
     game.currentPlayer = (game.currentPlayer % game.maxPlayers) + 1
-    spins = spins + 1
-    if spins > game.maxPlayers then break end
-  until not is_finished(player.players[game.currentPlayer])
+    tries = tries + 1
+  until tries > game.maxPlayers or not is_finished_seat(game.currentPlayer)
 
+  -- 3) Fase sync
   utils.update_phase_for_player(game, game.currentPlayer)
-  utils.sort_hand(hand)
 
-
-
-  ------------------------------------------------------------------
-  -- 4) AI-wachttijd (optioneel)
-  ------------------------------------------------------------------
+  -- 4) AI-delay (alleen als AI aan zet)
   local curP = player.players[game.currentPlayer]
   if game.mode == "ai" and curP and curP.isAI then
     local minDelay, maxDelay = 0.5, 2.3
-    local r = love.math.random() -- 0..1 float
-    game.aiTimer      = minDelay + (maxDelay - minDelay) * r
+    game.aiTimer      = minDelay + (maxDelay - minDelay) * love.math.random()
     game.waitingForAI = true
-    print(("[AI] wacht %.2fs (seat %d)"):format(game.aiTimer, game.currentPlayer))
   else
     game.waitingForAI = false
     game.aiTimer      = 0
   end
-  ------------------------------------------------------------------
-  -- 5) Host broadcast (MP)
-  ------------------------------------------------------------------
-  if net.isMultiplayer() and net.isHost() then net.send_state() end
+
+  -- 5) Host broadcast
+  if net.isMultiplayer and net.isMultiplayer() and net.isHost and net.isHost() then
+    net.send_state()
+  end
 end
 
 
@@ -852,24 +892,7 @@ end
 -- game.check_winner()  – einde-spel controle
 --------------------------------------------------------------------
 function game.check_winner()
-  local survivors = {}
-  for i = 1, game.maxPlayers do
-    local p = require("player").players[i]
-    if p and not (#p.hand==0 and #p.faceUp==0 and #p.faceDown==0) then
-      table.insert(survivors, i)
-    end
-  end
-
-  if #survivors <= 1 then
-    -- ⬇️ NIEUW: winnaar = eerste die klaar was (fallback: last survivor / current)
-    if game.finishedOrder and #game.finishedOrder > 0 then
-      game.winner = game.finishedOrder[1]
-    else
-      game.winner = survivors[1] or game.currentPlayer
-    end
-    return true
-  end
-  return false
+  return game._update_finished_and_maybe_end()
 end
 
 return game

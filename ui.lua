@@ -28,6 +28,13 @@ local function draw_turn_glow(x, y, w, h, radius)
     love.graphics.setColor(1,1,1)
 end
 
+
+--helper voor name  displayen
+local function disp_name(id)
+  local p = require("player").players[id]
+  return (p and p.name and p.name ~= "") and p.name or ("Speler " .. tostring(id or "?"))
+end
+
 --------------------------------------------------------------------
 -- Hulpfuncties om de Y-posities van de rijen terug te geven
 --------------------------------------------------------------------
@@ -54,8 +61,6 @@ end
 -- helpers voor de Y‑positie van de face‑down / face‑up rijen
 -- TARGET_H staat al elders op 140 px
 local EXTRA_GAP  = 70
-local net        = require("net")
-
 local function row_faceDown_Y(boxY, index)
     -- host‑only (ai) → localId is nil, dus fallback naar speler 1
     local isMe = (index == (net.localId or 1))
@@ -167,7 +172,7 @@ function ui.draw_deck(deck)
     for i = 0, zichtbaar - 1 do
         love.graphics.draw(cardBack, x + i * 2, y - i * 2, math.rad(-i * 2), schaal, schaal)
     end
-    love.graphics.setColor(0, 0, 0)
+    love.graphics.setColor(1,1,1,1)
     love.graphics.printf("Deck: " .. count, x - 30, y + kaart_hoogte + 10, 120, "center")
 end
 
@@ -308,14 +313,21 @@ function ui.draw_player_area(playerData, index, totalPlayers)
         end
     end
 
-    local function draw_name(labelX, labelY, alignRight)
-        local p = player.players[index]
-        local base = (p and p.name and p.name ~= "") and p.name or ("Speler " .. index)
-        local txt  = isMe and (base .. " (YOU)") or base
-        love.graphics.setColor(1,1,1)
-        love.graphics.print(txt, alignRight and (labelX - 160) or labelX, labelY)
-        love.graphics.setColor(1,1,1)
-    end
+-- draw_name(x, y, alignRight, id, isMe, p)
+local function draw_name(labelX, labelY, alignRight, id, isMe, p)
+  local base = (p and type(p.name) == "string" and p.name ~= "")
+      and p.name
+      or ("Speler " .. tostring(id or "?"))
+
+  local txt = isMe and (base .. " (YOU)") or base
+
+  love.graphics.setColor(1, 1, 1, 1)
+  local x = alignRight and (labelX - 160) or labelX
+  love.graphics.print(tostring(txt), x, labelY)
+end
+
+
+
 
     ------------------------------------------------------------------
     -- SEAT: BOTTOM (local) – scrollbare hand + rijen erboven
@@ -627,7 +639,7 @@ function ui.draw_action_buttons()
     local spacing   = 20
 
     -- Pas-knop alleen tijdens extra beurt van speler 1
-    local allowPass = (game.extraTurn and game.currentPlayer == net.localId)
+    local allowPass = (game.extraTurn == true) and (game.currentPlayer == (net.localId or 1))
 
     local order = { "pickup", "play" }
     if allowPass then table.insert(order, "pass") end
@@ -710,30 +722,26 @@ function ui.get_card_positions(hand)
 end
 
 function ui.draw_all_players(players)
-  local w,h = love.graphics.getWidth(), love.graphics.getHeight()
-
-  local seatForIndex = { [1]="bottom", [2]="top", [3]="left", [4]="right" }
   local count = #players
+  local me = (require("net").localId or 1)
 
-  -- eerst anderen, dan jij (zodat jouw hand bovenop ligt)
-  for i=2, math.min(count,4) do
-    ui.draw_player_area(players[i], i, count, seatForIndex[i])
+  local order = {}
+  for i = 1, count do if i ~= me then table.insert(order, i) end end
+  table.insert(order, me) -- jij als laatste → bovenop
+
+  for _, i in ipairs(order) do
+    ui.draw_player_area(players[i], i, count)
   end
-  ui.draw_player_area(players[1], 1, count, "bottom")
 end
 
 
--- Toon een correct eindscherm voor 2–4 spelers (met namen)
-function ui.draw_end_screen(winnerId, players)
+function ui.draw_end_screen(winnerId, players, finishedOrder)
   local w, h = love.graphics.getWidth(), love.graphics.getHeight()
-  local function total_cards(p) return #(p.hand or {}) + #(p.faceUp or {}) + #(p.faceDown or {}) end
 
-  -- achtergrond
-  love.graphics.setColor(0, 0, 0, 0.65)
-  love.graphics.rectangle("fill", w*0.15, h*0.2, w*0.70, h*0.60, 20, 20)
-  love.graphics.setColor(1, 1, 1, 1)
+  local function total_cards(p)
+    return #(p.hand or {}) + #(p.faceUp or {}) + #(p.faceDown or {})
+  end
 
-  -- winnaar-naam bepalen
   local function disp_name(id)
     local p = players and players[id]
     local n = p and p.name
@@ -741,42 +749,67 @@ function ui.draw_end_screen(winnerId, players)
     return "Speler " .. tostring(id or "?")
   end
 
+  -- ✅ Vertrouw finishedOrder boven winnerId
+  if type(finishedOrder) == "table" and finishedOrder[1] and players[finishedOrder[1]] then
+    winnerId = finishedOrder[1]
+  end
+
+  -- posities 1..N uit finishedOrder
+  local pos = nil
+  if type(finishedOrder) == "table" and #finishedOrder > 0 then
+    pos = {}
+    for i, pid in ipairs(finishedOrder) do pos[pid] = i end
+  end
+
+  -- achtergrond
+  love.graphics.setColor(0, 0, 0, 0.65)
+  love.graphics.rectangle("fill", w*0.15, h*0.2, w*0.70, h*0.60, 20, 20)
+  love.graphics.setColor(1, 1, 1, 1)
+
   -- titel
-  local you = (net and net.localId) and (winnerId == net.localId) and " (YOU)" or ""
+  local you   = (net and net.localId == winnerId) and " (YOU)" or ""
   local title = ("Winnaar: %s%s"):format(disp_name(winnerId), you)
   love.graphics.printf(title, w*0.15, h*0.23, w*0.70, "center")
 
-  -- ranglijst / resterende kaarten
+  -- rows
   local rows = {}
-  for i, p in ipairs(players or {}) do
-    table.insert(rows, { id = i, left = total_cards(p) })
+  for id, p in pairs(players or {}) do
+    if type(id) == "number" and p then
+      rows[#rows+1] = { id = id, left = total_cards(p) }
+    end
   end
 
   table.sort(rows, function(a, b)
-    -- winnaar eerst, daarna meeste kaarten eerst; bij gelijk: lagere id eerst
-    if a.id == winnerId and b.id ~= winnerId then return true end
-    if b.id == winnerId and a.id ~= winnerId then return false end
-    if a.left == b.left then return a.id < b.id end
-    return a.left > b.left
+    if pos then
+      local pa = pos[a.id] or 1e9
+      local pb = pos[b.id] or 1e9
+      if pa ~= pb then return pa < pb end
+    else
+      if a.id == winnerId and b.id ~= winnerId then return true end
+      if b.id == winnerId and a.id ~= winnerId then return false end
+    end
+    if a.left ~= b.left then return a.left > b.left end
+    return a.id < b.id
   end)
 
   local y = h*0.30
   local lineH = 32
   for _, r in ipairs(rows) do
-    local isWin = (r.id == winnerId)
-    local tag = isWin and "🏆 " or "• "
+    local isWin  = (r.id == winnerId)
+    local tag    = isWin and "🏆 " or "• "           -- ✅ string i.p.v. boolean
     local youTag = (net and net.localId == r.id) and " (YOU)" or ""
-    local txt = ("%s%s%s — %d kaarten over"):format(tag, disp_name(r.id), youTag, r.left)
+    local line   = string.format("%s%s%s — %d kaarten over", tag, disp_name(r.id), youTag, r.left)
 
-    if isWin then love.graphics.setColor(1,1,1,1) else love.graphics.setColor(1,1,1,0.90) end
-    love.graphics.printf(txt, w*0.20, y, w*0.60, "left")
+    love.graphics.setColor(1,1,1, isWin and 1 or 0.90)
+    love.graphics.printf(line, w*0.20, y, w*0.60, "left")
     y = y + lineH
   end
 
-  -- hint
   love.graphics.setColor(1,1,1,0.85)
   love.graphics.printf("Druk op Enter om terug te gaan naar het menu", w*0.15, h*0.72, w*0.70, "center")
 end
+
+
 
 
 function ui.draw_banners(effects)

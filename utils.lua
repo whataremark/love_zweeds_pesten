@@ -134,25 +134,42 @@ end
 
 -- ⚠️ schrijf de fase op de speler zelf; alleen currentPlayer spiegelt naar game.state
 function utils.update_phase_for_player(game, id)
-    local playerMod = require("player")
-    local p = playerMod.players[id]
-    if not p then return "unknown" end
+  local playerMod = require("player")
+  local p = playerMod.players[id]
+  if not p then return "unknown" end
 
-    local prev = p.phase
-    p.phase = phase_for_player_obj(p)
+  -- fase bepalen
+  local phase
+  if #p.hand > 0 then
+    phase = "playingHand"
+  elseif #p.faceUp > 0 then
+    phase = "playingOpen"
+  elseif #p.faceDown > 0 then
+    phase = "playingBlind"
+  else
+    phase = "finished"
+  end
+  p.phase = phase
 
-    -- Nieuw: als deze speler nu voor het eerst 'finished' is, log in volgorde
-    if p.phase == "finished" and not p.finished then
-        p.finished = true
-        game.finishedOrder = game.finishedOrder or {}
-        table.insert(game.finishedOrder, id)
+  -- bij "finished": eenmalig in finishedOrder
+  if phase == "finished" and not p.finished then
+    p.finished = true
+    local already = false
+    for _, pid in ipairs(game.finishedOrder or {}) do
+      if pid == id then already = true; break end
     end
-
-    if id == game.currentPlayer then
-        game.state = p.phase
+    if not already then
+      game.finishedOrder = game.finishedOrder or {}
+      table.insert(game.finishedOrder, id)
     end
-    return p.phase
+  end
+
+  if id == game.currentPlayer then
+    game.state = p.phase
+  end
+  return p.phase
 end
+
 
 -- handig: cached phase ophalen; zo nodig eerst berekenen
 function utils.phase_of(game, id)

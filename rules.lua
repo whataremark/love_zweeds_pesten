@@ -47,6 +47,7 @@ function rules.handle_card_effects(game, playerIndex, kaart, advanceTurn)
         game.extraTurn = true
         game.nextMustBeUnder7 = false
         require("utils").trigger_fx(game, "TEN")
+        utils.update_phase_for_player(game, playerIndex)
             -- ←-- Zet AI-timer alléén als de AI nu echt weer aan zet is
         if game.mode == "ai" and game.currentPlayer == 2 then
             game.waitingForAI = true
@@ -61,6 +62,7 @@ end
     -- 8 gives the player an extra turn
     if kaart.waarde == "8" then
         game.extraTurn = true
+        utils.update_phase_for_player(game, playerIndex)
     -- ←-- Zet AI-timer alléén als de AI nu echt weer aan zet is
         if game.mode == "ai" and game.currentPlayer == 2 then
             game.waitingForAI = true
