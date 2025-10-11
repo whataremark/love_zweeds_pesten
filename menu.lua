@@ -303,42 +303,59 @@ function menu.draw()
     -- hitbox opslaan
     menu._rulesRect = { x = rulesX, y = rulesY, w = rulesW, h = rulesH }
 
+    -- ==== Instellingen-knop ====
+    local setGap = 10
+    local setW   = buttonW
+    local setH   = 48
+    local setX   = listLeft
+    local setY   = rulesY + rulesH + setGap
+
+    love.graphics.setColor(1,1,1,0.10)
+    love.graphics.rectangle("fill", setX, setY, setW, setH, 10, 10)
+    love.graphics.setColor(1,1,1,0.9)
+    love.graphics.rectangle("line", setX, setY, setW, setH, 10, 10)
+    love.graphics.printf("Instellingen", setX, setY + 14, setW, "center")
+    -- hit box opslaan
+    menu._settingsRect = { x = setX, y = setY, w = setW, h = setH }
+
   -- Checkbox “Speel met 2 decks”
-  local checkY    = menu._rulesRect.y + menu._rulesRect.h + 20
-  local checkX    = panelX + padX
-  local checkSize = 26
+local baseY     = (menu._settingsRect and (menu._settingsRect.y + menu._settingsRect.h)) 
+               or (menu._rulesRect and (menu._rulesRect.y + menu._rulesRect.h)) 
+               or (listY + (#options * rowH))
+local checkY    = baseY + 20
+local checkX    = panelX + padX
+local checkSize = 26
 
-  -- box rand
-  love.graphics.setColor(1, 1, 1, 0.9)
-  love.graphics.rectangle("line", checkX, checkY, checkSize, checkSize, 6, 6)
+-- box rand
+love.graphics.setColor(1, 1, 1, 0.9)
+love.graphics.rectangle("line", checkX, checkY, checkSize, checkSize, 6, 6)
 
-  -- indien aan: groen vlak + vinkje
-  if menu.useTwoDecks then
-    love.graphics.setColor(0.2, 0.7, 0.3, 0.9)
-    love.graphics.rectangle("fill", checkX + 2, checkY + 2, checkSize - 4, checkSize - 4, 5, 5)
-    love.graphics.setColor(1, 1, 1, 1)
-    -- simpel vinkje
-    love.graphics.setLineWidth(3)
-    love.graphics.line(checkX + 4, checkY + checkSize * 0.55,
-                       checkX + checkSize * 0.35, checkY + checkSize - 4,
-                       checkX + checkSize - 4, checkY + 4)
-    love.graphics.setLineWidth(1)
-  end
+-- indien aan: groen vlak + vinkje
+if menu.useTwoDecks then
+  love.graphics.setColor(0.2, 0.7, 0.3, 0.9)
+  love.graphics.rectangle("fill", checkX + 2, checkY + 2, checkSize - 4, checkSize - 4, 5, 5)
+  love.graphics.setColor(1, 1, 1, 1)
+  love.graphics.setLineWidth(3)
+  love.graphics.line(checkX + 4, checkY + checkSize * 0.55,
+                     checkX + checkSize * 0.35, checkY + checkSize - 4,
+                     checkX + checkSize - 4, checkY + 4)
+  love.graphics.setLineWidth(1)
+end
 
-  love.graphics.setColor(1, 1, 1, 0.9)
-  love.graphics.setFont(optionFont)
-  love.graphics.print("Speel met 2 decks", checkX + checkSize + 12, checkY + 2)
+love.graphics.setColor(1, 1, 1, 0.9)
+love.graphics.setFont(optionFont)
+love.graphics.print("Speel met 2 decks", checkX + checkSize + 12, checkY + 2)
 
+-- Hints ONDER de checkbox (Enter / D)
+local hintsY = checkY + checkSize + 20
+love.graphics.setFont(hintFont)
+love.graphics.setColor(1, 1, 1, 0.6)
+love.graphics.printf("• Gebruik Enter om te starten •  D om decks te toggelen.",
+  panelX + padX, hintsY, panelW - 2 * padX, "left")
 
-  -- Hints onderaan het paneel
-  love.graphics.setFont(hintFont)
-  love.graphics.setColor(1, 1, 1, 0.6)
-  love.graphics.printf("• Gebruik Enter om te starten •  D om decks te toggelen.",
-    panelX + padX, checkY + checkSize + 20, panelW - 2 * padX, "left")
-
-  -- klikgebieden bewaren (voor mousepressed)
-  menu._checkRect = { x = checkX, y = checkY, w = checkSize, h = checkSize }
-  menu._panelRect = { x = panelX, y = panelY, w = panelW, h = panelH }
+-- klikgebieden bewaren (voor mousepressed)
+menu._checkRect = { x = checkX, y = checkY, w = checkSize, h = checkSize }
+menu._panelRect = { x = panelX, y = panelY, w = panelW, h = panelH }
 end
 
 local function hit(x, y, r) return x>=r.x and x<=r.x+r.w and y>=r.y and y<=r.y+r.h end
@@ -385,6 +402,14 @@ end
     state.enter(require("manual"))
     return
   end
+  
+  -- Instellingen
+local sr = menu._settingsRect
+if sr and hit(x, y, sr) then
+  local settings = require("settings")
+  state.enter(settings)
+  return
+end
 
 end
 
