@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>Zweeds Pesten Web</title>
+<style>
+body,html{margin:0;padding:0;height:100%;overflow:hidden;font-family:sans-serif;}
+#overlay{position:absolute;top:0;left:0;z-index:10;background:rgba(0,0,0,0.6);color:#fff;padding:10px;}
+#log{margin-top:8px;max-height:200px;overflow:auto;font-size:12px;white-space:pre-line;}
+#game-container,iframe{width:100%;height:100%;border:0;}
+</style>
+</head>
+<body>
+<div id="overlay">
+  <input id="roomCode" placeholder="room" maxlength="6">
+  <button id="createRoom">Create Room</button>
+  <button id="joinRoom">Join Room</button>
+  <button id="leaveRoom">Leave</button>
+  <div id="log"></div>
+</div>
+<div id="game-container"></div>
+
+<script>
+window.log = function(msg){const logEl=document.getElementById('log');logEl.textContent += msg + '\n';console.log(msg);};
+</script>
+
+<script>
+async function loadLove(){
+  try{
+    const res = await fetch('love/index.html');
+    if(res.ok){
+      const frame=document.createElement('iframe');
+      frame.src='love/index.html';
+      frame.id='gameFrame';
+      document.getElementById('game-container').appendChild(frame);
+      window.gameFrame = frame.contentWindow;
+    } else {
+      log('Drop your love.js build into /public/love/');
+    }
+  }catch(e){
+    log('Drop your love.js build into /public/love/');
+  }
+}
+loadLove();
+</script>
+
+<script src="app.config.js"></script>
+<script>
+if(!window.FIREBASE_CONFIG){
+  log('Missing app.config.js. Copy app.config.sample.js and fill credentials.');
+}
+</script>
+
+<script type="module" src="js/firebase-init.js"></script>
+<script type="module" src="js/realtime.js"></script>
+<script src="js/love-bridge.js"></script>
+
+<script>
+const roomInput=document.getElementById('roomCode');
+document.getElementById('createRoom').onclick=async()=>{
+  const id=await window.NET.createRoom();
+  roomInput.value=id;
+  log('Created room '+id);
+  attachListeners(id);
+};
+document.getElementById('joinRoom').onclick=async()=>{
+  const id=roomInput.value.trim();
+  if(id){
+    await window.NET.joinRoom(id);
+    log('Joined room '+id);
+    attachListeners(id);
+  }
+};
+document.getElementById('leaveRoom').onclick=async()=>{
+  await window.NET.leaveRoom();
+  log('Left room');
+};
+function attachListeners(id){
+  window.NET.onPlayers(id, players=>log('Players: '+Object.keys(players).join(',')));
+  window.NET.onMoves(id, move=>log('Move: '+JSON.stringify(move)));
+}
+</script>
+</body>
+</html>
